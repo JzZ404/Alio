@@ -1,0 +1,6 @@
+﻿.env
+__pycache__/
+*.pyc
+.pytest_cache/
+feat2/next-app/node_modules/
+feat2/next-app/.next/
