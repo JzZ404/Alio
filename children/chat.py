@@ -16,7 +16,7 @@ def load_chat_history() -> list[dict]:
     try:
         with open(_HISTORY_FILE) as f:
             return json.load(f)
-    except (json.JSONDecodeError, ValueError):
+    except (json.JSONDecodeError, ValueError, OSError):
         return []
 
 
