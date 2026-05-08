@@ -6,6 +6,8 @@ import pytest
 @pytest.fixture(autouse=True)
 def tmp_working_dir(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
+    import children.chat
+    monkeypatch.setattr(children.chat, "_session", None)
 
 
 def test_load_chat_history_returns_empty_when_missing():

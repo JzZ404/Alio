@@ -8,6 +8,7 @@ _HISTORY_FILE = "chat_history.json"
 _INFO_FILE = "my_info.json"
 _REPORT_PREFIX = "report_"
 _LOG_PREFIX = "med_log_"
+_session = None
 
 
 def load_chat_history() -> list[dict]:
@@ -114,12 +115,20 @@ def create_chat_session(system_prompt: str, history: list[dict]):
     )
 
 
+def _get_session():
+    global _session
+    if _session is None:
+        info, reports, med_logs = _load_all_context()
+        system_prompt = build_system_prompt(info, reports, med_logs)
+        history = load_chat_history()
+        _session = create_chat_session(system_prompt, history)
+    return _session
+
+
 def send_message(user_input: str) -> str:
-    info, reports, med_logs = _load_all_context()
-    system_prompt = build_system_prompt(info, reports, med_logs)
-    history = load_chat_history()
-    chat = create_chat_session(system_prompt, history)
+    chat = _get_session()
     response = chat.send_message(user_input)
+    history = load_chat_history()
     history.append({"role": "user", "content": user_input})
     history.append({"role": "model", "content": response.text})
     save_chat_history(history)
