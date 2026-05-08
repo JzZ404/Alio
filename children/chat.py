@@ -40,7 +40,7 @@ def build_system_prompt(info: dict, reports: list[dict], med_logs: list[tuple[st
 
     if reports:
         report_lines = []
-        for r in reports:
+        for r in sorted(reports, key=lambda r: r["date"], reverse=True):
             meds_noted = ", ".join(r.get("medications_noted", [])) or "none"
             urgent = "YES" if r.get("urgent") else "no"
             report_lines.append(

@@ -97,3 +97,14 @@ def test_build_system_prompt_omits_log_section_when_empty():
     info = {"name": "Aaron", "medications": [], "appointments": []}
     result = build_system_prompt(info, reports=[], med_logs=[])
     assert "Medication Logs" not in result
+
+
+def test_build_system_prompt_sorts_reports_newest_first():
+    from children.chat import build_system_prompt
+    info = {"name": "Aaron", "medications": [], "appointments": []}
+    reports = [
+        {"date": "2026-05-01", "mood": "tired", "medications_noted": [], "urgent": False, "summary": "Older day."},
+        {"date": "2026-05-07", "mood": "calm", "medications_noted": [], "urgent": False, "summary": "Recent day."},
+    ]
+    result = build_system_prompt(info, reports=reports, med_logs=[])
+    assert result.index("2026-05-07") < result.index("2026-05-01")
