@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Pytest
+.pytest_cache/
+
+# macOS
+.DS_Store
+
+# Runtime-generated data files
+report_*.json
+med_log_*.txt
+chat_history.json
+
+# Environment
+.env
+*.env
+
+# Claude Code local settings
+.claude/settings.local.json
