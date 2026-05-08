@@ -68,3 +68,59 @@ Upcoming appointments:
 
 [Daily Report History]
 {reports_section}{log_section}"""
+
+
+def _load_all_context() -> tuple[dict, list[dict], list[tuple[str, str]]]:
+    with open(_INFO_FILE) as f:
+        info = json.load(f)
+
+    report_files = sorted(
+        [fn for fn in os.listdir(".") if fn.startswith(_REPORT_PREFIX) and fn.endswith(".json")],
+        reverse=True,
+    )
+    reports = []
+    for fn in report_files:
+        date_str = fn[len(_REPORT_PREFIX):-5]
+        with open(fn) as f:
+            data = json.load(f)
+        data["date"] = date_str
+        reports.append(data)
+
+    log_files = sorted(
+        [fn for fn in os.listdir(".") if fn.startswith(_LOG_PREFIX) and fn.endswith(".txt")],
+        reverse=True,
+    )
+    med_logs = []
+    for fn in log_files:
+        date_str = fn[len(_LOG_PREFIX):-4]
+        with open(fn) as f:
+            content = f.read().strip()
+        if content:
+            med_logs.append((date_str, content))
+
+    return info, reports, med_logs
+
+
+def create_chat_session(system_prompt: str, history: list[dict]):
+    client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
+    content_history = [
+        types.Content(role=entry["role"], parts=[types.Part(text=entry["content"])])
+        for entry in history
+    ]
+    return client.chats.create(
+        model="gemma-4-31b-it",
+        config=types.GenerateContentConfig(system_instruction=system_prompt),
+        history=content_history,
+    )
+
+
+def send_message(user_input: str) -> str:
+    info, reports, med_logs = _load_all_context()
+    system_prompt = build_system_prompt(info, reports, med_logs)
+    history = load_chat_history()
+    chat = create_chat_session(system_prompt, history)
+    response = chat.send_message(user_input)
+    history.append({"role": "user", "content": user_input})
+    history.append({"role": "model", "content": response.text})
+    save_chat_history(history)
+    return response.text

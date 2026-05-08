@@ -108,3 +108,92 @@ def test_build_system_prompt_sorts_reports_newest_first():
     ]
     result = build_system_prompt(info, reports=reports, med_logs=[])
     assert result.index("2026-05-07") < result.index("2026-05-01")
+
+
+def test_send_message_returns_model_response():
+    from children.chat import send_message
+    from unittest.mock import patch, MagicMock
+
+    fake_response = MagicMock()
+    fake_response.text = "Aaron has been calm and stable."
+
+    mock_chat = MagicMock()
+    mock_chat.send_message.return_value = fake_response
+
+    mock_client = MagicMock()
+    mock_client.chats.create.return_value = mock_chat
+
+    info = {
+        "name": "Aaron",
+        "medications": [],
+        "appointments": [],
+    }
+    with open("my_info.json", "w") as f:
+        json.dump(info, f)
+
+    with patch("children.chat.genai.Client", return_value=mock_client), \
+         patch.dict("os.environ", {"GOOGLE_API_KEY": "fake-key"}):
+        result = send_message("How is Aaron doing?")
+
+    assert result == "Aaron has been calm and stable."
+
+
+def test_send_message_saves_history():
+    from children.chat import send_message
+    from unittest.mock import patch, MagicMock
+
+    fake_response = MagicMock()
+    fake_response.text = "He's doing well."
+
+    mock_chat = MagicMock()
+    mock_chat.send_message.return_value = fake_response
+
+    mock_client = MagicMock()
+    mock_client.chats.create.return_value = mock_chat
+
+    info = {"name": "Aaron", "medications": [], "appointments": []}
+    with open("my_info.json", "w") as f:
+        json.dump(info, f)
+
+    with patch("children.chat.genai.Client", return_value=mock_client), \
+         patch.dict("os.environ", {"GOOGLE_API_KEY": "fake-key"}):
+        send_message("How is he?")
+
+    with open("chat_history.json") as f:
+        history = json.load(f)
+
+    assert history[-2] == {"role": "user", "content": "How is he?"}
+    assert history[-1] == {"role": "model", "content": "He's doing well."}
+
+
+def test_send_message_loads_existing_history():
+    from children.chat import send_message
+    from unittest.mock import patch, MagicMock
+
+    fake_response = MagicMock()
+    fake_response.text = "Still doing well."
+
+    mock_chat = MagicMock()
+    mock_chat.send_message.return_value = fake_response
+
+    mock_client = MagicMock()
+    mock_client.chats.create.return_value = mock_chat
+
+    existing = [
+        {"role": "user", "content": "previous question"},
+        {"role": "model", "content": "previous answer"},
+    ]
+    with open("chat_history.json", "w") as f:
+        json.dump(existing, f)
+
+    info = {"name": "Aaron", "medications": [], "appointments": []}
+    with open("my_info.json", "w") as f:
+        json.dump(info, f)
+
+    with patch("children.chat.genai.Client", return_value=mock_client), \
+         patch.dict("os.environ", {"GOOGLE_API_KEY": "fake-key"}):
+        send_message("Follow-up question")
+
+    # Verify history was passed to create()
+    passed_history = mock_client.chats.create.call_args.kwargs["history"]
+    assert len(passed_history) == 2
