@@ -1,26 +1,49 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: #EEEEF5;
+  color: #1a1a2e;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
+
+/* Hide scrollbar */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Voice blob animations */
+@keyframes blob-breathe {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  33% { transform: scale(1.08) rotate(6deg); }
+  66% { transform: scale(0.94) rotate(-4deg); }
+}
+
+@keyframes blob-slow {
+  0%, 100% { transform: scale(1.06) rotate(0deg); opacity: 0.62; }
+  50% { transform: scale(0.91) rotate(-9deg); opacity: 0.45; }
+}
+
+@keyframes blob-float {
+  0%, 100% { transform: translateY(0px) scale(0.88); opacity: 0.42; }
+  50% { transform: translateY(-14px) scale(1.12); opacity: 0.65; }
+}
+
+.blob-1 { animation: blob-breathe 4s ease-in-out infinite; }
+.blob-2 { animation: blob-slow 5.5s ease-in-out infinite; }
+.blob-3 { animation: blob-float 7s ease-in-out infinite; }
+
+/* Waveform animation */
+@keyframes wave-bar {
+  0%, 100% { height: 4px; }
+  50% { height: 16px; }
+}
+
+.wave-bar { animation: wave-bar 0.8s ease-in-out infinite; }
+.wave-bar:nth-child(2) { animation-delay: 0.1s; }
+.wave-bar:nth-child(3) { animation-delay: 0.2s; }
+.wave-bar:nth-child(4) { animation-delay: 0.3s; }
+.wave-bar:nth-child(5) { animation-delay: 0.4s; }

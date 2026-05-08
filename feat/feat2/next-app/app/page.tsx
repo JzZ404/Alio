@@ -1,29 +1,66 @@
 import Link from "next/link";
 
-export default function Home() {
+export default function Landing() {
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen gap-6 p-8 bg-gray-50">
-      <h1 className="text-3xl font-bold text-gray-800">Health Assistant</h1>
-      <div className="flex flex-col gap-4 w-full max-w-sm">
-        <Link
-          href="/caregiver"
-          className="block text-center bg-blue-600 text-white text-xl font-semibold py-6 rounded-2xl shadow active:bg-blue-700"
+    <div className="max-w-[390px] mx-auto min-h-screen flex flex-col">
+      {/* Hero */}
+      <div className="bg-[#5654FF] px-7 pt-20 pb-16">
+        <div
+          className="text-[11px] font-bold tracking-[0.2em] mb-5"
+          style={{ color: "#D5FF2C" }}
         >
-          Caregiver
-        </Link>
+          ALIO
+        </div>
+        <h1 className="text-white text-[36px] font-bold leading-tight mb-3">
+          When you can&#39;t<br />be there,<br />Alio is.
+        </h1>
+        <p className="text-white/60 text-sm leading-relaxed">
+          AI-powered elder care for the<br />whole care circle.
+        </p>
+      </div>
+
+      {/* Role selector */}
+      <div className="flex-1 bg-[#EEEEF5] px-5 pt-8 pb-10 flex flex-col gap-3">
+        <p className="text-[11px] font-semibold text-[#9898B4] uppercase tracking-widest mb-2">
+          Continue as
+        </p>
+
         <Link
           href="/family"
-          className="block text-center bg-green-600 text-white text-xl font-semibold py-6 rounded-2xl shadow active:bg-green-700"
+          className="bg-white rounded-2xl px-5 py-5 flex items-center gap-4 shadow-sm active:scale-[0.98] transition-transform"
         >
-          Family
+          <div className="w-12 h-12 rounded-2xl bg-[#F0F0FA] flex items-center justify-center text-2xl flex-shrink-0">
+            👩
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-[#1A1A2E] text-[15px]">
+              Family Member
+            </div>
+            <div className="text-[13px] text-[#9898B4] mt-0.5">
+              Track your parent&#39;s daily care
+            </div>
+          </div>
+          <span className="text-[#C4C4D4] text-xl font-light">›</span>
         </Link>
+
         <Link
-          href="/medications"
-          className="block text-center bg-purple-600 text-white text-xl font-semibold py-6 rounded-2xl shadow active:bg-purple-700"
+          href="/caregiver"
+          className="bg-white rounded-2xl px-5 py-5 flex items-center gap-4 shadow-sm active:scale-[0.98] transition-transform"
         >
-          Medications
+          <div className="w-12 h-12 rounded-2xl bg-[#F0F0FA] flex items-center justify-center text-2xl flex-shrink-0">
+            🩺
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-[#1A1A2E] text-[15px]">
+              Caregiver
+            </div>
+            <div className="text-[13px] text-[#9898B4] mt-0.5">
+              Log visits and voice notes
+            </div>
+          </div>
+          <span className="text-[#C4C4D4] text-xl font-light">›</span>
         </Link>
       </div>
-    </main>
+    </div>
   );
 }
