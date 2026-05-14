@@ -15,7 +15,7 @@ import {
 } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 
-const CAREGIVER_NAME = 'Sarah Mitchell';
+const CAREGIVER_NAME = 'Sarah Lee';
 const threadIdFor = (caregiverId: string, patientId: string) =>
   `${caregiverId}__${patientId}`;
 

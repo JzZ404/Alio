@@ -6,7 +6,7 @@ PATIENT_ID = "dorothy-chen"
 
 SAMPLE_INFO = {
     "id": PATIENT_ID,
-    "name": "Dorothy Chen",
+    "name": "Erin Yeung",
     "medications": [{"name": "Lisinopril", "time": "8:00 AM", "with_food": True}],
     "appointments": [{"doctor": "Dr. Smith", "type": "Cardiology", "date": "2026-05-20", "time": "10:00 AM", "location": "UW Medical"}],
 }
@@ -113,7 +113,7 @@ def test_save_chat_history_inserts_turns():
 def test_build_system_prompt_includes_patient_name():
     from children.chat import build_system_prompt
     result = build_system_prompt(SAMPLE_INFO, [], [])
-    assert "Dorothy Chen" in result
+    assert "Erin Yeung" in result
 
 
 def test_build_system_prompt_includes_medication():

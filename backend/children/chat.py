@@ -6,6 +6,14 @@ from supabase import create_client
 
 _session = None
 _supabase_client = None
+_genai_client = None
+
+
+def _get_genai_client():
+    global _genai_client
+    if _genai_client is None:
+        _genai_client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
+    return _genai_client
 
 
 def _get_supabase():
@@ -127,7 +135,7 @@ Upcoming appointments:
 
 
 def create_chat_session(system_prompt: str, history: list[dict]):
-    client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
+    client = _get_genai_client()
     content_history = [
         types.Content(role=entry["role"], parts=[types.Part(text=entry["content"])])
         for entry in history

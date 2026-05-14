@@ -164,7 +164,7 @@ export default function LogsPage() {
         activePatientId,
         activePatient?.name ?? 'Patient',
       );
-      // Append a tappable "Dorothy's Report" card to the chat and jump to it.
+      // Append a tappable "Erin's Report" card to the chat and jump to it.
       const turn: ConversationTurn = {
         kind: 'report',
         id: `report-turn-${result.id}`,

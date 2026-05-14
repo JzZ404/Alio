@@ -90,7 +90,7 @@ export default function FamilyRecordsPage() {
     >
       {/* Top header — "Records" pill + Search + Plus (positioned at top-60 for consistency) */}
       <header className="absolute left-[25px] right-[25px] top-[60px] z-10 flex items-center justify-between gap-[12px]">
-        <span className="flex h-[42px] items-center rounded-[10px] bg-brand-tint-1 px-[12px] text-[20px] font-bold text-black">
+        <span className="flex h-[42px] items-center text-[20px] font-bold text-black">
           Records
         </span>
         <div className="flex items-center gap-[12px]">
