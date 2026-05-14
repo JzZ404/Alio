@@ -51,3 +51,14 @@ backend/*.pyc
 backend/report_*.json
 backend/symptom_check_*.json
 backend/med_log_*.txt
+
+# Python (children/ module)
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Runtime-generated data files (children chatbot)
+report_*.json
+med_log_*.txt
+chat_history.json
