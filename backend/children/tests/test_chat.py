@@ -37,6 +37,7 @@ def reset_session(monkeypatch):
     import children.chat
     monkeypatch.setattr(children.chat, "_session", None)
     monkeypatch.setattr(children.chat, "_supabase_client", None)
+    monkeypatch.setattr(children.chat, "_genai_client", None)
 
 
 def _mock_supabase(info=SAMPLE_INFO, reports=None, med_logs=None, history=None):
