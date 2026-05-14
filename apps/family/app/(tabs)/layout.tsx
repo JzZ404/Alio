@@ -4,7 +4,7 @@ import { MobileFrame, TabBar } from '@alio/ui';
 export default function TabsLayout({ children }: { children: ReactNode }) {
   return (
     <MobileFrame>
-      <div className="relative h-dvh overflow-hidden sm:h-full sm:min-h-0">
+      <div className="relative overflow-hidden" style={{ height: '100svh' }}>
         {children}
         <TabBar
           variant="family"
