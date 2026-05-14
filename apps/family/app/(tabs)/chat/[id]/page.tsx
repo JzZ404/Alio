@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   ChatBubble,
@@ -18,6 +18,14 @@ import {
   SAMPLE_FM_CONVERSATIONS,
   type ChatMessage,
 } from '@alio/mock-data';
+import { supabase, type FamilyMessageRow } from '@/lib/supabase';
+import { ReportCard } from '@/components/ReportCard';
+
+// Map a family-side chat thread ID to the Supabase thread_id that the
+// caregiver app writes to. Add entries as more caregivers/patients come online.
+const SUPABASE_THREAD_FOR: Record<string, string | undefined> = {
+  'sarah-caregiver': 'caregiver-001__dorothy-chen',
+};
 
 /**
  * Family Chat conversation — same layout as Caregiver Chat conversation,
@@ -30,9 +38,72 @@ export default function FamilyChatConversationPage() {
 
   const thread = SAMPLE_FM_CHAT_THREADS.find((t) => t.id === id);
   const initial = SAMPLE_FM_CONVERSATIONS[id] ?? [];
+  const supabaseThreadId = SUPABASE_THREAD_FOR[id];
 
   const [messages, setMessages] = useState<ChatMessage[]>(initial);
+  // messageId -> compiled_reports.id, for messages that should render as a
+  // structured ReportCard instead of a plain chat bubble.
+  const [reportIdByMessage, setReportIdByMessage] = useState<Record<string, string>>({});
   const [draft, setDraft] = useState('');
+
+  // Subscribe to live messages from the caregiver app via Supabase realtime.
+  // Initial fetch loads any messages we missed before the subscription opened.
+  useEffect(() => {
+    if (!supabaseThreadId) return;
+
+    let cancelled = false;
+    const seen = new Set<string>();
+
+    const toChatMessage = (row: FamilyMessageRow): ChatMessage => ({
+      id: row.id,
+      sender: 'them',
+      text: row.text,
+    });
+
+    (async () => {
+      const { data } = await supabase
+        .from('family_messages')
+        .select('*')
+        .eq('thread_id', supabaseThreadId)
+        .order('created_at');
+      if (cancelled || !data) return;
+      const fresh = (data as FamilyMessageRow[]).filter((r) => !seen.has(r.id));
+      fresh.forEach((r) => seen.add(r.id));
+      setMessages((prev) => [...prev, ...fresh.map(toChatMessage)]);
+      setReportIdByMessage((prev) => {
+        const next = { ...prev };
+        for (const r of fresh) if (r.report_id) next[r.id] = r.report_id;
+        return next;
+      });
+    })();
+
+    const channel = supabase
+      .channel(`family_messages:${supabaseThreadId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'family_messages',
+          filter: `thread_id=eq.${supabaseThreadId}`,
+        },
+        (payload) => {
+          const row = payload.new as FamilyMessageRow;
+          if (seen.has(row.id)) return;
+          seen.add(row.id);
+          setMessages((prev) => [...prev, toChatMessage(row)]);
+          if (row.report_id) {
+            setReportIdByMessage((prev) => ({ ...prev, [row.id]: row.report_id! }));
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [supabaseThreadId]);
 
   const handleSend = () => {
     const text = draft.trim();
@@ -103,9 +174,17 @@ export default function FamilyChatConversationPage() {
           </p>
         ) : (
           <div className="flex flex-col gap-[12px]">
-            {messages.map((m) => (
-              <ChatBubble key={m.id} message={m} />
-            ))}
+            {messages.map((m) => {
+              const reportId = reportIdByMessage[m.id];
+              if (reportId) {
+                return (
+                  <div key={m.id} className="flex">
+                    <ReportCard reportId={reportId} />
+                  </div>
+                );
+              }
+              return <ChatBubble key={m.id} message={m} />;
+            })}
           </div>
         )}
       </div>

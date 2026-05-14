@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
 import {
   IconBox,
@@ -17,11 +18,18 @@ import {
   type MedicalRecord,
   type RecordType,
 } from '@alio/mock-data';
+import { supabase, type CompiledReportRow } from '@/lib/supabase';
+import { VisitRecordItem } from '@/components/VisitRecordItem';
 
-type FilterTab = 'All' | RecordType;
-const FILTERS: FilterTab[] = ['All', 'Lab report', 'Prescription', 'Other'];
+// Hardcoded for the prototype (single patient). Replace with real identity
+// when auth lands.
+const PATIENT_ID = 'dorothy-chen';
+
+type FilterTab = 'All' | RecordType | 'Visit';
+const FILTERS: FilterTab[] = ['All', 'Visit', 'Lab report', 'Prescription', 'Other'];
 const FILTER_LABELS: Record<FilterTab, string> = {
   'All':          'All',
+  'Visit':        'Visit',
   'Lab report':   'Lab Report',
   'Prescription': 'Prescription',
   'Other':        'Other',
@@ -33,12 +41,37 @@ const FILTER_LABELS: Record<FilterTab, string> = {
  * AddRecordModal. Header positioned at top-60 to match Logs/AI/Chat screens.
  */
 export default function FamilyRecordsPage() {
+  const router = useRouter();
   const [records, setRecords] = useState<MedicalRecord[]>(SAMPLE_RECORDS);
+  const [visits, setVisits] = useState<CompiledReportRow[]>([]);
   const [activeFilter, setActiveFilter] = useState<FilterTab>('All');
   const [modalOpen, setModalOpen] = useState(false);
 
-  const filtered =
-    activeFilter === 'All' ? records : records.filter((r) => r.type === activeFilter);
+  // Fetch compiled visit reports for this patient on mount. Newest first.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('compiled_reports')
+        .select('*')
+        .eq('patient_id', PATIENT_ID)
+        .order('created_at', { ascending: false });
+      if (!cancelled && data) setVisits(data as CompiledReportRow[]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const showVisits = activeFilter === 'All' || activeFilter === 'Visit';
+  const filteredRecords =
+    activeFilter === 'All'
+      ? records
+      : activeFilter === 'Visit'
+        ? []
+        : records.filter((r) => r.type === activeFilter);
+
+  const totalCount = filteredRecords.length + (showVisits ? visits.length : 0);
 
   const handleSave = (rec: Omit<MedicalRecord, 'id'>) => {
     setRecords((prev) => [
@@ -130,18 +163,29 @@ export default function FamilyRecordsPage() {
           </span>
         </div>
 
-        {/* Records list */}
+        {/* Records list — visits first (newest), then static medical records */}
         <ul className="mt-[14px] flex flex-col gap-[8px]">
-          {filtered.length === 0 ? (
+          {totalCount === 0 ? (
             <li className="py-12 text-center text-[14px] text-gray-60">
               No {activeFilter === 'All' ? 'records' : activeFilter.toLowerCase()} yet.
             </li>
           ) : (
-            filtered.map((r) => (
-              <li key={r.id}>
-                <RecordItem record={r} />
-              </li>
-            ))
+            <>
+              {showVisits &&
+                visits.map((v) => (
+                  <li key={v.id}>
+                    <VisitRecordItem
+                      row={v}
+                      onClick={() => router.push(`/records/visit/${v.id}`)}
+                    />
+                  </li>
+                ))}
+              {filteredRecords.map((r) => (
+                <li key={r.id}>
+                  <RecordItem record={r} />
+                </li>
+              ))}
+            </>
           )}
         </ul>
       </div>

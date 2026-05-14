@@ -10,9 +10,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@alio/mock-data": "workspace:*",
     "@alio/theme": "workspace:*",
     "@alio/ui": "workspace:*",
-    "@alio/mock-data": "workspace:*",
+    "@supabase/supabase-js": "^2.105.4",
     "clsx": "^2.1.1",
     "lucide-react": "^0.460.0",
     "next": "^14.2.18",

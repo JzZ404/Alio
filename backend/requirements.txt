@@ -1,0 +1,23 @@
+# Python ≥ 3.11
+
+# Web server
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic
+
+# AI — Google Gemma via the Gen AI SDK
+google-genai
+
+# Audio: transcription fallback path used when the browser's Web Speech API fails
+pydub
+SpeechRecognition
+
+# Database
+supabase
+
+# Prescription PDF parsing (legacy /prescriptions endpoints)
+pdfplumber
+
+# Dev convenience — load .env in ad-hoc Python scripts
+python-dotenv

@@ -3,30 +3,35 @@
 > AI copilot for elder care connecting seniors, caregivers, and adult children.
 > *"When you can't be there, Alio is."*
 
-This repo holds the **UI prototype** for Alio. Backend (FastAPI + Gemma LLM + auth + persistence) is the next phase — most "live" features are mocked at the UI layer with typed fixtures that act as the data contract.
+This repo holds the full Alio stack: two Next.js apps (caregiver + family), a
+FastAPI backend that talks to Google Gemma, and a Supabase Postgres database
+with realtime subscriptions. A caregiver speaks visit notes; the family sees a
+structured report the moment the caregiver sends it.
 
 ## Quick start
 
-```bash
-# 1. Install pnpm if you don't have it
-npm install -g pnpm   # or: corepack enable && corepack prepare pnpm@latest --activate
+Three processes, run in three terminals (or background them).
 
-# 2. Install dependencies
+```bash
+# 1. Backend  (Python, port 8000)
+cd backend
+python -m venv .venv && source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env                                # fill in GOOGLE_API_KEY + SUPABASE_*
+uvicorn api:app --port 8000 --env-file .env --reload
+
+# 2. Frontend  (Node, ports 3001 + 3002)
 pnpm install
+pnpm dev                       # both apps in parallel
+# or: pnpm dev:caregiver       # localhost:3001
+# or: pnpm dev:family          # localhost:3002
 
-# 3. Run both apps in parallel
-pnpm dev
-
-# Caregiver portal → http://localhost:3001
-# Family portal    → http://localhost:3002
+# 3. Database  (one-time, in Supabase web SQL editor)
+# Paste supabase/schema.sql → Run
 ```
 
-Run one app at a time:
-
-```bash
-pnpm dev:caregiver    # localhost:3001
-pnpm dev:family       # localhost:3002
-```
+Full walkthrough: see [SETUP.md](SETUP.md).
+Architecture / data flow / table reference: see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## What's in the box
 
@@ -36,12 +41,22 @@ pnpm dev:family       # localhost:3002
 │   ├── caregiver/         Next.js 14 App Router app (port 3001)
 │   └── family/            Next.js 14 App Router app (port 3002)
 ├── packages/
-│   ├── theme/             Design tokens + Tailwind preset + Century Gothic fonts + globals.css
+│   ├── theme/             Design tokens + Tailwind preset + Century Gothic + globals.css
 │   ├── ui/                Shared components + 288 generated Caesarzkn icons
 │   └── mock-data/         Typed fixtures — implicit data contract for the engineer
+├── backend/               FastAPI + Google Gemma — see backend/README.md
+│   ├── api.py
+│   ├── medical_ai.py
+│   ├── report.py
+│   └── requirements.txt
+├── supabase/
+│   └── schema.sql         Three tables (caregiver_logs, compiled_reports,
+│                          family_messages) + RLS policies + realtime
 ├── icons/                 SVG source files for the icon generator (one-time use)
 ├── scripts/
 │   └── generate-icons.mjs Regenerates packages/ui/src/icons/*.gen.tsx from icons/
+├── ARCHITECTURE.md        Data flow, table reference, where each feature lives
+├── SETUP.md               Step-by-step new-engineer onboarding
 └── .figma-refs/           Reference screenshots from Figma (visual diff baseline)
 ```
 
@@ -49,62 +64,87 @@ pnpm dev:family       # localhost:3002
 
 | File | What |
 |---|---|
-| [CLAUDE.md](CLAUDE.md) | House rules — read first if you're picking this up |
-| [PLAN.md](PLAN.md) | Original build plan + scope |
+| [SETUP.md](SETUP.md) | Step-by-step setup for a fresh clone |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Stack diagram, data flow, table & endpoint reference |
+| [backend/README.md](backend/README.md) | Backend-specific (every endpoint, every prompt) |
+| [CLAUDE.md](CLAUDE.md) | House rules for AI agents picking this up |
 | [DESIGN.md](DESIGN.md) | Design system (colors, type, radii, spacing, text styles, animations) |
 | [INVENTORY.md](INVENTORY.md) | Screen inventory from initial Figma extraction |
+| [PLAN.md](PLAN.md) | Original UI build plan + scope |
 
 ## Tech stack
 
-- **Next.js 14** App Router + React 18 + TypeScript
-- **Tailwind CSS** with a shared preset from `@alio/theme`
-- **pnpm workspaces** monorepo
-- **Century Gothic** webfont, loaded via `next/font/local` from `packages/theme/fonts/`
-- **No backend yet** — every API-like surface is a mock in `@alio/mock-data`
+- **Frontend:** Next.js 14 App Router + React 18 + TypeScript + Tailwind CSS;
+  pnpm workspaces monorepo
+- **Backend:** FastAPI + uvicorn (Python ≥ 3.11)
+- **AI:** Google Gemma (`models/gemma-4-31b-it`) via the `google-genai` SDK,
+  with retry + exponential backoff on transient errors
+- **Database:** Supabase (Postgres + realtime + RLS) — three tables, no auth
+  yet (anon key only; tighten policies before production)
+- **Browser STT:** Web Speech API (Chrome/Edge) with fallback to backend
+  `/transcribe` chunk-polling every 3s for Opera/Firefox/Brave/Safari
+- **Fonts:** Century Gothic, loaded via `next/font/local` from
+  `packages/theme/fonts/`
 
 ## App structure
 
-Each app has its own tab bar (different sets of tabs per portal):
+Each app has its own tab bar. Different sets per portal.
 
-**Caregiver portal** (port 3001)
-- `/home` — patient schedule with expandable patient cards (avatar, map, emergency contacts)
-- `/logs` — voice-first AI logging (idle/recording/conversation) + `/logs/history` past visits
-- `/chat` — care circle threads + `/chat/[id]` 1:1 conversations
+**Caregiver portal** (port 3001) — Sarah Mitchell's view
+- `/home` — patient schedule with expandable patient cards
+- `/logs` — voice-first visit log → live captions → review → Save → structured
+  report via the **+** button → tappable card in chat → opens
+  `/logs/report/[id]` for the template view → **Send to family**
+- `/chat` — care circle threads + `/chat/[id]` 1:1
 - `/profiles` — placeholder
 
-**Family portal** (port 3002)
-- `/home` — caregiver status card (folded/expanded states) + Today's Status vitals + calendar + upcoming appointments
-- `/ai-check` — full AI flow: voice (Alio voice ▾) → recording → message conversation (Patient ▾) with image recognition + text input
-- `/chat` — placeholder
-- `/records` — placeholder
+**Family portal** (port 3002) — Janet's view of Mom (Dorothy Chen)
+- `/home` — caregiver status card + Today's Status vitals + calendar +
+  upcoming appointments
+- `/ai-check` — voice / message conversation with the AI assistant
+- `/chat` + `/chat/[id]` — care thread; Sarah's compiled reports stream in
+  via Supabase realtime and render as structured `ReportCard` inline
+- `/records` — medical record list (lab reports, prescriptions); the **Visit**
+  filter shows compiled caregiver reports; tap → `/records/visit/[id]`
 
-## For the engineer
+## For the engineer picking this up
 
-The frontend is structured so the data layer is the only thing that needs to change when real backends come online:
+The data contract lives in two places that you'll touch when wiring real
+data:
 
-- All mock data lives in `packages/mock-data/src/index.ts` — typed `Patient`, `Caregiver`, `ChatThread`, `ChatMessage`, `ConversationTurn`, `Vital`, `Appointment`, etc.
-- Replace those exports with real queries against your Supabase / Gemma / FastAPI services
-- Screens import named fixtures (e.g. `SAMPLE_PATIENTS`) — swap each for a hook (`usePatients()`) returning the same shape and screens will continue rendering
+1. `packages/mock-data/src/index.ts` — typed fixtures (`Patient`, `Caregiver`,
+   `ChatMessage`, `ConversationTurn`, etc.). Screens import named exports;
+   swap with hooks (`usePatients()`, `useThreadMessages(id)`) returning the
+   same shape and screens keep rendering.
+2. `apps/{caregiver,family}/lib/supabase.ts` — the Supabase client +
+   table-row types (`FamilyMessageRow`, `CompiledReportRow`, `VisitReport`).
+   These already drive the caregiver Log rehydration, family chat realtime,
+   and Records visit list.
 
-The simulated transcript stream in `/ai-check` and `/logs` is wall-clock-based — wire it to real STT events when the AI service lands.
+The simulated transcript stream in `/ai-check` is still wall-clock-based —
+wire it to real STT events when the AI service lands.
 
 ## Icons
 
-288 Caesarzkn icons + a handful of custom ones live in `packages/ui/src/icons/`. To regenerate from SVGs in `/icons/`:
+288 Caesarzkn icons + a handful of custom ones live in `packages/ui/src/icons/`.
+To regenerate from SVGs in `/icons/`:
 
 ```bash
 pnpm icons:generate
 ```
 
-The generator (`scripts/generate-icons.mjs`) normalizes hardcoded colors to `currentColor` so icons can be themed via CSS.
+The generator (`scripts/generate-icons.mjs`) normalizes hardcoded colors to
+`currentColor` so icons can be themed via CSS.
 
 ## Design assets
 
-- Figma file (reference): `9oY1M8Eqn6c8KTJA0limuE` — ask in the team for access.
+- Figma file (reference): `9oY1M8Eqn6c8KTJA0limuE` — ask the team for access
 - Local screenshots from Figma (visual diff baseline): `.figma-refs/`
 
 ## Status
 
 - ✅ Phase 1 UI prototype: caregiver Home + Logs + Chat, family Home + AI Check
-- ⏳ Phase 2: backend wiring (you're here)
-- ⏳ Phase 3: Elder portal
+- ✅ Phase 2 backend wiring: FastAPI + Gemma + Supabase, structured visit
+  reports end-to-end, realtime family chat
+- ⏳ Phase 3: real auth (replace hardcoded `caregiver-001` / `dorothy-chen`),
+  multi-patient, elder portal, edit-section affordances on the report template

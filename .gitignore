@@ -14,6 +14,7 @@ out/
 .env
 .env.local
 .env.*.local
+backend/.env
 
 # Logs
 npm-debug.log*
@@ -40,3 +41,13 @@ next-env.d.ts
 
 # Local server logs
 /tmp/*-dev.log
+
+# Python (backend/)
+backend/__pycache__/
+backend/.venv/
+backend/.pytest_cache/
+backend/*.pyc
+# Patient-data scratch produced by FastAPI when running locally
+backend/report_*.json
+backend/symptom_check_*.json
+backend/med_log_*.txt

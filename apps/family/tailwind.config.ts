@@ -4,6 +4,7 @@ import { tailwindPreset } from '@alio/theme/tailwind-preset';
 const config: Config = {
   content: [
     './app/**/*.{ts,tsx}',
+    './components/**/*.{ts,tsx}',
     '../../packages/ui/src/**/*.{ts,tsx}',
   ],
   presets: [tailwindPreset as Config],
