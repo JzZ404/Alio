@@ -65,6 +65,42 @@ create index if not exists compiled_reports_lookup_idx
   on compiled_reports (caregiver_id, patient_id, visit_date desc);
 
 -- =============================================================
+-- patients — patient profile: name, medications, appointments
+-- =============================================================
+create table if not exists patients (
+  id text primary key,               -- e.g. 'dorothy-chen'
+  name text not null,
+  medications jsonb not null default '[]',
+  appointments jsonb not null default '[]',
+  created_at timestamptz not null default now()
+);
+
+create policy "patients anon read" on patients for select using (true);
+create policy "patients anon insert" on patients for insert with check (true);
+create policy "patients anon update" on patients for update using (true);
+
+alter table patients enable row level security;
+
+-- =============================================================
+-- ai_chat_history — family AI chatbot conversation turns
+-- =============================================================
+create table if not exists ai_chat_history (
+  id uuid primary key default gen_random_uuid(),
+  patient_id text not null,
+  role text not null check (role in ('user', 'model')),
+  content text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists ai_chat_history_lookup_idx
+  on ai_chat_history (patient_id, created_at);
+
+alter table ai_chat_history enable row level security;
+
+create policy "ai_chat_history anon read"   on ai_chat_history for select using (true);
+create policy "ai_chat_history anon insert" on ai_chat_history for insert with check (true);
+
+-- =============================================================
 -- Row-level security — anon key can read/insert from the browser
 -- (Prototype policy. Tighten once real auth lands.)
 -- =============================================================

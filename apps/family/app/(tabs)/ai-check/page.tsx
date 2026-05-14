@@ -20,10 +20,23 @@ import {
   type UploadKind,
 } from '@alio/ui';
 import {
-  SAMPLE_AI_CONVERSATION,
   SIMULATED_TRANSCRIPT,
   type ChatMessage,
 } from '@alio/mock-data';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
+const PATIENT_ID = 'dorothy-chen';
+
+async function askAI(message: string): Promise<string> {
+  const res = await fetch(`${API_URL}/children/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ patient_id: PATIENT_ID, message }),
+  });
+  if (!res.ok) throw new Error(`AI error ${res.status}`);
+  const data = await res.json();
+  return data.reply as string;
+}
 
 type View = 'voice-idle' | 'voice-recording' | 'message';
 
@@ -36,7 +49,8 @@ export default function FamilyAICheckPage() {
   const router = useRouter();
   const [view, setView] = useState<View>('voice-idle');
   const [transcript, setTranscript] = useState('');
-  const [conversation, setConversation] = useState<ChatMessage[]>(SAMPLE_AI_CONVERSATION);
+  const [conversation, setConversation] = useState<ChatMessage[]>([]);
+  const [loading, setLoading] = useState(false);
   const [draft, setDraft] = useState('');
   const [uploadOpen, setUploadOpen] = useState(false);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
@@ -70,33 +84,36 @@ export default function FamilyAICheckPage() {
     setView('voice-recording');
   };
 
-  const handleDone = () => {
-    const newMessage: ChatMessage = {
-      id: `m-${Date.now()}`,
-      sender: 'me',
-      text: transcript || SIMULATED_TRANSCRIPT,
-    };
-    const aiReply: ChatMessage = {
-      id: `m-${Date.now()}-ai`,
-      sender: 'them',
-      text: "Got it. Logged and analyzed against Dorothy's recent vitals.",
-    };
-    setConversation((prev) => [...prev, newMessage, aiReply]);
+  const handleDone = async () => {
+    const text = transcript || SIMULATED_TRANSCRIPT;
+    const userMsg: ChatMessage = { id: `m-${Date.now()}`, sender: 'me', text };
+    setConversation((prev) => [...prev, userMsg]);
     setView('message');
+    setLoading(true);
+    try {
+      const reply = await askAI(text);
+      setConversation((prev) => [...prev, { id: `m-${Date.now()}-ai`, sender: 'them', text: reply }]);
+    } catch {
+      setConversation((prev) => [...prev, { id: `m-${Date.now()}-err`, sender: 'them', text: 'Sorry, something went wrong. Please try again.' }]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSendText = () => {
+  const handleSendText = async () => {
     const text = draft.trim();
-    if (!text) return;
-    setConversation((prev) => [
-      ...prev,
-      { id: `m-${Date.now()}`, sender: 'me', text },
-    ]);
+    if (!text || loading) return;
+    setConversation((prev) => [...prev, { id: `m-${Date.now()}`, sender: 'me', text }]);
     setDraft('');
-    // After sending from voice mode's keyboard input, drop into message view
-    if (view !== 'message') {
-      setKeyboardOpen(false);
-      setView('message');
+    if (view !== 'message') { setKeyboardOpen(false); setView('message'); }
+    setLoading(true);
+    try {
+      const reply = await askAI(text);
+      setConversation((prev) => [...prev, { id: `m-${Date.now()}-ai`, sender: 'them', text: reply }]);
+    } catch {
+      setConversation((prev) => [...prev, { id: `m-${Date.now()}-err`, sender: 'them', text: 'Sorry, something went wrong. Please try again.' }]);
+    } finally {
+      setLoading(false);
     }
   };
 

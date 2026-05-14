@@ -300,3 +300,22 @@ class FormatReportRequest(BaseModel):
 @app.post("/caregiver-logs/report/format-for-family")
 def format_for_family(req: FormatReportRequest):
     return {"text": format_report_for_family(req.patient_name, req.visit_date, req.report)}
+
+
+# =============================================================
+# Family AI chatbot — children/chat.py powered by Gemma + Supabase
+# =============================================================
+
+class ChildrenChatRequest(BaseModel):
+    patient_id: str
+    message: str
+
+
+@app.post("/children/chat")
+def children_chat(req: ChildrenChatRequest):
+    from children.chat import send_message
+    try:
+        reply = send_message(req.patient_id, req.message)
+        return {"reply": reply}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
