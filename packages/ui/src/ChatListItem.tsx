@@ -18,13 +18,10 @@ const SUBTITLE_GRAY = '#A8A8A8';
  *   - 1:1 thread → single round image at 50px
  *   - Group thread → 3 overlapping faces (~28px each) clustered
  */
-export function ChatListItem({ thread }: { thread: ChatThread }) {
+export function ChatListItem({ thread, onOpen }: { thread: ChatThread; onOpen?: (id: string) => void }) {
   const subtitleColor = thread.isTyping ? '#5E69F6' : SUBTITLE_GRAY;
-  return (
-    <Link
-      href={`/chat/${thread.id}`}
-      className="relative flex h-[72px] items-center gap-[16px] overflow-hidden rounded-[12px] bg-brand-tint-1 pb-[8px] pl-[12px] pr-[16px] pt-[8px] transition-colors active:bg-brand-border/50"
-    >
+  const className = "w-full relative flex h-[72px] items-center gap-[16px] overflow-hidden rounded-[12px] bg-brand-tint-1 pb-[8px] pl-[12px] pr-[16px] pt-[8px] transition-colors active:bg-brand-border/50";
+  const inner = (<>
       <Avatar
         isGroup={thread.isGroup}
         hasStatus={thread.status === 'online'}
@@ -32,7 +29,6 @@ export function ChatListItem({ thread }: { thread: ChatThread }) {
         groupSrcs={thread.groupAvatars}
         name={thread.name}
       />
-
       <div className="flex min-w-0 flex-1 flex-col gap-[8px]">
         <div className="flex items-center gap-[4px]">
           <span className="truncate text-[14px] text-black">{thread.name}</span>
@@ -40,19 +36,12 @@ export function ChatListItem({ thread }: { thread: ChatThread }) {
             <IconPinFilled className="size-[12px] shrink-0 text-brand-primary" />
           )}
         </div>
-        <span
-          className="truncate text-[12px] leading-none"
-          style={{ color: subtitleColor }}
-        >
+        <span className="truncate text-[12px] leading-none" style={{ color: subtitleColor }}>
           {thread.lastMessage}
         </span>
       </div>
-
       <div className="flex h-[43px] w-[50px] shrink-0 flex-col items-end justify-between">
-        <span
-          className="text-[12px] leading-none tabular-nums"
-          style={{ color: SUBTITLE_GRAY }}
-        >
+        <span className="text-[12px] leading-none tabular-nums" style={{ color: SUBTITLE_GRAY }}>
           {thread.timestamp}
         </span>
         {thread.unreadCount > 0 && (
@@ -61,8 +50,12 @@ export function ChatListItem({ thread }: { thread: ChatThread }) {
           </span>
         )}
       </div>
-    </Link>
-  );
+  </>);
+
+  if (onOpen) {
+    return <button type="button" onClick={() => onOpen(thread.id)} className={className}>{inner}</button>;
+  }
+  return <Link href={`/chat/${thread.id}`} className={className}>{inner}</Link>;
 }
 
 /**
