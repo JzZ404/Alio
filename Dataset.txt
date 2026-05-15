@@ -1,0 +1,2 @@
+https://www.kaggle.com/datasets/tboyle10/medicaltranscriptions
+https://www.kaggle.com/datasets/pinuto/laboratory-test-results-anonymized-dataset

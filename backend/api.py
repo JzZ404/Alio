@@ -25,6 +25,8 @@ from medical_ai import (
     compile_caregiver_logs,
     compile_structured_report,
     format_report_for_family,
+    interpret_lab_text,
+    extract_lab_text_from_image,
 )
 import os
 from supabase import create_client
@@ -129,6 +131,89 @@ def sync_prescription():
         return save_prescription(SIMULATED_EPIC_MEDS, "simulated_epic")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/lab-report/upload")
+async def upload_lab_report(request: Request):
+    """Accept a PDF lab report OR a photo of one. Content-Type drives routing:
+      application/pdf  → pdfplumber text extraction
+      image/*          → Gemini vision OCR
+    Then routes the extracted text through the fine-tuned medical model
+    (local Ollama when USE_LOCAL_OLLAMA=1) for plain-language interpretation.
+
+    Returns: { "summary": str, "flags": [str], "follow_up": "routine"|"soon"|"urgent" }
+    """
+    import io
+    import pdfplumber
+
+    body = await request.body()
+    if not body:
+        raise HTTPException(status_code=422, detail="No file data received")
+
+    content_type = (request.headers.get("content-type") or "").lower().split(";")[0].strip()
+
+    # ── Extract raw text from PDF or image ─────────────────────────────────
+    try:
+        if content_type == "application/pdf":
+            with pdfplumber.open(io.BytesIO(body)) as pdf:
+                extracted = "\n".join(p.extract_text() or "" for p in pdf.pages)
+        elif content_type.startswith("image/"):
+            extracted = extract_lab_text_from_image(body, mime_type=content_type)
+        else:
+            # Fallback: sniff bytes — PDFs start with %PDF
+            if body[:4] == b"%PDF":
+                with pdfplumber.open(io.BytesIO(body)) as pdf:
+                    extracted = "\n".join(p.extract_text() or "" for p in pdf.pages)
+            else:
+                raise HTTPException(
+                    status_code=415,
+                    detail=f"Unsupported content type: {content_type or 'unknown'} — send a PDF or an image."
+                )
+    except HTTPException:
+        raise
+    except ValueError as e:
+        # extract_lab_text_from_image raises this for non-lab images
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Could not extract text: {e}")
+
+    if not extracted.strip():
+        raise HTTPException(status_code=422, detail="No text extracted from the file")
+
+    # ── Interpret via the fine-tuned model ────────────────────────────────
+    try:
+        result = interpret_lab_text(extracted)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    # ── Notify family chat (best-effort; doesn't break the response) ──────
+    try:
+        sb = _get_supabase()
+        flags_text = "; ".join(result.get("flags", [])) or "All results normal"
+        follow_up = result.get("follow_up", "routine")
+        followup_label = {
+            "routine": "Routine — nothing urgent",
+            "soon":    "Soon — mention at next appointment",
+            "urgent":  "Urgent — contact doctor today",
+        }.get(follow_up, follow_up)
+        body_text = (
+            f"📋 Lab report uploaded\n\n"
+            f"{result.get('summary', '')}\n\n"
+            f"Flags: {flags_text}\n"
+            f"Follow-up: {followup_label}"
+        )
+        sb.table("family_messages").insert({
+            "thread_id": "default",
+            "sender": "caregiver",
+            "text": body_text,
+        }).execute()
+    except Exception as e:
+        # Family notification is non-critical — log and move on
+        print(f"[lab-report/upload] family notification failed: {e}")
+
+    return result
 
 
 @app.get("/prescriptions")

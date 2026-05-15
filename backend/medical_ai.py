@@ -3,10 +3,147 @@ import os
 import re
 from datetime import datetime
 
+import requests
 from google import genai
 from google.genai import types
 
 _MODEL_NAME = "models/gemma-4-31b-it"
+
+# ── Local Ollama dispatch (fine-tuned Gemma 4 E2B) ──
+# When USE_LOCAL_OLLAMA=1, all AI calls route through Ollama's /api/generate
+# with raw=true and an explicit Gemma 4 chat template. Ollama's own chat
+# template handling is broken for Gemma 4's special tokens (May 2026), so we
+# build the prompt ourselves.
+_USE_LOCAL_OLLAMA = os.environ.get("USE_LOCAL_OLLAMA", "").lower() in ("1", "true", "yes")
+_OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
+_OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "alio-medical")
+
+
+def _format_gemma4_prompt(system: str, user: str) -> str:
+    """Build the Gemma 4 chat template prompt manually (matches the tokens
+    the fine-tuned model was trained on)."""
+    return (
+        f"<|turn>system\n{system}<turn|>\n"
+        f"<|turn>user\n{user}<turn|>\n"
+        f"<|turn>model\n"
+    )
+
+
+def _call_ollama(system: str, user: str, json_mode: bool = False) -> str:
+    """Call the local Ollama server using raw mode + explicit chat template."""
+    payload = {
+        "model": _OLLAMA_MODEL,
+        "prompt": _format_gemma4_prompt(system, user),
+        "raw": True,
+        "stream": False,
+        "options": {
+            "temperature": 0.4,
+            "num_predict": 512,
+            "stop": ["<turn|>"],
+        },
+    }
+    if json_mode:
+        payload["format"] = "json"
+    r = requests.post(f"{_OLLAMA_URL}/api/generate", json=payload, timeout=180)
+    r.raise_for_status()
+    return r.json().get("response", "").strip()
+
+
+def _call_gemma(system: str, user: str, json_mode: bool = False) -> str:
+    """Single dispatch point — routes to local Ollama or hosted Google API."""
+    if _USE_LOCAL_OLLAMA:
+        return _call_ollama(system, user, json_mode=json_mode)
+    client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
+    config_kwargs = {"system_instruction": system}
+    if json_mode:
+        config_kwargs["response_mime_type"] = "application/json"
+    response = retry_transient(lambda: client.models.generate_content(
+        model=_MODEL_NAME,
+        config=types.GenerateContentConfig(**config_kwargs),
+        contents=user,
+    ))
+    return (response.text or "").strip()
+
+
+def active_model_name() -> str:
+    return f"ollama:{_OLLAMA_MODEL}" if _USE_LOCAL_OLLAMA else _MODEL_NAME
+
+
+# ── Lab report interpretation (same system prompt the model was trained on) ──
+
+_LAB_SYSTEM = """\
+You are a medical assistant helping a patient or family member understand lab
+results. You will receive a list of lab test names, their values, and reference
+ranges. Some may be flagged as High or Low.
+
+Your job: write a plain-language explanation (3-5 sentences) of what the
+results mean overall. Focus on: what is normal, what is flagged and why it
+matters, and whether the family should follow up with a doctor soon.
+
+Do NOT diagnose. Do NOT use jargon. If everything is normal, say so clearly.
+
+Reply in EXACTLY this JSON format with no extra text:
+{
+  "summary": "...",
+  "flags": ["..."],
+  "follow_up": "routine" | "soon" | "urgent"
+}
+flags is a list of the abnormal results in plain language (empty list if none).
+follow_up: "routine" = nothing urgent, "soon" = mention at next appointment,
+"urgent" = contact doctor today."""
+
+
+def interpret_lab_text(extracted_text: str) -> dict:
+    """Take raw text extracted from a lab report (e.g., pdfplumber output) and
+    return a structured JSON interpretation. Routes through _call_gemma so it
+    respects USE_LOCAL_OLLAMA."""
+    if not extracted_text.strip():
+        raise ValueError("Lab report text is empty")
+    user_message = f"Lab Results:\n\n{extracted_text.strip()}"
+    raw = _call_gemma(system=_LAB_SYSTEM, user=user_message, json_mode=True)
+    return _parse_json_response(raw)
+
+
+# ── Image OCR for lab report photos (snapped on a phone, scanned, etc.) ──
+# Uses the hosted Gemma 4 31B for the *vision* step; the medical interpretation
+# still runs locally via _call_gemma → Ollama. So PHI for the image OCR DOES go
+# to Google's API briefly, but the reasoning stays on-device. For fully offline
+# image input, swap this for Tesseract or the local Gemma 4 multimodal projector
+# via llama-mtmd-cli.
+
+_VISION_MODEL = os.environ.get("VISION_MODEL", "models/gemma-4-31b-it")
+
+_VISION_EXTRACT_PROMPT = """\
+This is a photo or scan of a medical lab report. Extract ALL test results in
+a clean plain-text format, one per line, preserving:
+  - Test name
+  - Value with units
+  - Normal/reference range
+  - Status flag (High / Low / Normal) if shown
+
+Example output line:
+  Sodium: 138 mmol/L  (Normal range: 135-145)  Normal
+
+Output ONLY the extracted results, no commentary, no headers other than the
+panel name if visible (e.g. "Comprehensive Metabolic Panel"). If the image
+isn't a lab report, output exactly: "NOT_A_LAB_REPORT"."""
+
+
+def extract_lab_text_from_image(image_bytes: bytes, mime_type: str = "image/png") -> str:
+    """OCR a lab-report image using Gemini/Gemma vision. Returns the extracted
+    structured text, ready to feed into interpret_lab_text()."""
+    client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
+    response = retry_transient(lambda: client.models.generate_content(
+        model=_VISION_MODEL,
+        contents=[
+            _VISION_EXTRACT_PROMPT,
+            types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
+        ],
+    ))
+    text = (response.text or "").strip()
+    if text == "NOT_A_LAB_REPORT" or not text:
+        raise ValueError("This image doesn't look like a lab report")
+    return text
 
 _HARD_ESCALATION_KEYWORDS = [
     "chest pain",
@@ -172,13 +309,12 @@ def triage_conversation(
     if not conversation:
         raise ValueError("conversation must contain at least one message")
     system_prompt = _build_system_prompt(patient_profile, recent_reports, mode="triage")
-    client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
-    response = retry_transient(lambda: client.models.generate_content(
-        model=_MODEL_NAME,
-        config=types.GenerateContentConfig(system_instruction=system_prompt),
-        contents=_format_conversation_as_text(conversation),
-    ))
-    parsed = _parse_json_response(response.text)
+    raw = _call_gemma(
+        system=system_prompt,
+        user=_format_conversation_as_text(conversation),
+        json_mode=True,
+    )
+    parsed = _parse_json_response(raw)
     return _apply_escalation_override(parsed, conversation)
 
 
@@ -194,13 +330,8 @@ def explain_report_question(
         f"Family member's question about today's report:\n{question.strip()}"
     )
     conversation = [{"role": "user", "content": user_message}]
-    client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
-    response = retry_transient(lambda: client.models.generate_content(
-        model=_MODEL_NAME,
-        config=types.GenerateContentConfig(system_instruction=system_prompt),
-        contents=user_message,
-    ))
-    parsed = _parse_json_response(response.text)
+    raw = _call_gemma(system=system_prompt, user=user_message, json_mode=True)
+    parsed = _parse_json_response(raw)
     return _apply_escalation_override(parsed, conversation)
 
 
@@ -260,13 +391,7 @@ def compile_caregiver_logs(patient_name: str, logs: list[dict]) -> str:
         "\n\nWrite the compiled shift report."
     )
 
-    client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
-    response = retry_transient(lambda: client.models.generate_content(
-        model=_MODEL_NAME,
-        config=types.GenerateContentConfig(system_instruction=_COMPILE_LOGS_SYSTEM),
-        contents=user_message,
-    ))
-    return (response.text or "").strip()
+    return _call_gemma(system=_COMPILE_LOGS_SYSTEM, user=user_message).strip()
 
 
 _STRUCTURED_REPORT_SYSTEM = """\
@@ -373,16 +498,8 @@ def compile_structured_report(patient_name: str, logs: list[dict]) -> dict:
         "\n\nReturn the JSON visit report."
     )
 
-    client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
-    response = retry_transient(lambda: client.models.generate_content(
-        model=_MODEL_NAME,
-        config=types.GenerateContentConfig(
-            system_instruction=_STRUCTURED_REPORT_SYSTEM,
-            response_mime_type="application/json",
-        ),
-        contents=user_message,
-    ))
-    return _parse_json_response(response.text or "")
+    raw = _call_gemma(system=_STRUCTURED_REPORT_SYSTEM, user=user_message, json_mode=True)
+    return _parse_json_response(raw)
 
 
 def format_report_for_family(patient_name: str, visit_date: str, report: dict) -> str:

@@ -52,6 +52,33 @@ backend/report_*.json
 backend/symptom_check_*.json
 backend/med_log_*.txt
 
+# Python (root + nested)
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Fine-tune artifacts (too big for git; see METHODS.md to regenerate)
+# Downloaded GGUF files (~4GB total)
+Unsloth/
+# Build logs + resumable scratch
+data/build.log
+data/build.err
+data/build_checkpoint.jsonl
+# Kaggle datasets (fetched at build time, not committed)
+data/mtsamples.csv
+data/lab_test_results_public.csv
+data/metadata.json
+# HuggingFace / training output
+outputs/
+# Local server stdout/stderr (backend + Next.js dev)
+.logs/
+
+# Claude Code / agent internal workspace
+.agents/
+.scratch/
+.superpowers/
+.mcp.json
+skills-lock.json
 # Python (children/ module)
 __pycache__/
 *.pyc
