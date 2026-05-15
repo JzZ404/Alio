@@ -114,7 +114,7 @@ export type PatientContact = {
 export const SAMPLE_PATIENTS: Patient[] = [
   {
     id: 'dorothy-chen',
-    name: 'Dorothy Chen',
+    name: 'Erin Yeung',
     time: '10:00 AM',
     address: '1234 Maple St',
     fullAddress: '1234 Maple St, Portland, OR',
@@ -151,7 +151,7 @@ export const SAMPLE_PATIENTS: Patient[] = [
 // The caregiver themselves (for CG Home header)
 export const SAMPLE_CG_USER = {
   id: 'caregiver-001',
-  name: 'Sarah Mitchell',
+  name: 'Sarah Lee',
   role: 'Caregiver' as const,
   avatarUrl: '/avatars/nurse.png',
   notifications: 2,
@@ -200,7 +200,7 @@ export type Caregiver = {
 
 export const SAMPLE_CAREGIVER: Caregiver = {
   id: 'caregiver-001',
-  name: 'Sarah Mitchell',
+  name: 'Sarah Lee',
   visits: 87,
 };
 
@@ -311,7 +311,7 @@ export type ChatThread = {
 export const SAMPLE_CHAT_THREADS: ChatThread[] = [
   {
     id: 'sarah-circle',
-    name: "Sarah Mitchell's care circle",
+    name: "Sarah Lee's care circle",
     lastMessage: 'Thank you very much!',
     timestamp: '11:38AM',
     unreadCount: 2,
@@ -375,7 +375,7 @@ export const SAMPLE_AI_CONVERSATION: ChatMessage[] = [
   {
     id: 'a1',
     sender: 'me',
-    text: 'Dorothy seems to have some side effect on the drugs',
+    text: 'Erin seems to have some side effect on the drugs',
     imageUrl: '/chat/hand-closeup.jpg',
   },
   {
@@ -394,7 +394,7 @@ export const SAMPLE_AI_CONVERSATION: ChatMessage[] = [
 export const SAMPLE_FM_CHAT_THREADS: ChatThread[] = [
   {
     id: 'sarah-caregiver',
-    name: 'Sarah Mitchell',
+    name: 'Sarah Lee',
     lastMessage: 'Just finished morning meds, all good!',
     timestamp: '11:24AM',
     unreadCount: 1,
@@ -404,7 +404,7 @@ export const SAMPLE_FM_CHAT_THREADS: ChatThread[] = [
   },
   {
     id: 'dorothy-circle',
-    name: "Dorothy's Care Circle",
+    name: "Erin's Care Circle",
     lastMessage: "Janet: Will visit Sunday",
     timestamp: '10:42AM',
     unreadCount: 3,

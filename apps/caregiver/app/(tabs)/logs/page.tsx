@@ -33,7 +33,7 @@ type View = 'voice-idle' | 'voice-recording' | 'voice-review' | 'message';
 type RecordState = 'idle' | 'recording' | 'saving';
 type CompileState = 'idle' | 'compiling';
 
-export default function LogsPage() {
+export default function LogsPage({ onOpenReport }: { onOpenReport?: (id: string) => void } = {}) {
   const router = useRouter();
   const [view, setView] = useState<View>('voice-idle');
   const [recordState, setRecordState] = useState<RecordState>('idle');
@@ -164,7 +164,7 @@ export default function LogsPage() {
         activePatientId,
         activePatient?.name ?? 'Patient',
       );
-      // Append a tappable "Dorothy's Report" card to the chat and jump to it.
+      // Append a tappable "Erin's Report" card to the chat and jump to it.
       const turn: ConversationTurn = {
         kind: 'report',
         id: `report-turn-${result.id}`,
@@ -734,7 +734,7 @@ function MessageView({ turns }: { turns: ConversationTurn[] }) {
               <ReportBubble
                 key={turn.id}
                 patientName={turn.patientName}
-                onClick={() => router.push(`/logs/report/${turn.reportId}`)}
+                onClick={() => onOpenReport ? onOpenReport(turn.reportId) : undefined}
               />
             );
           }

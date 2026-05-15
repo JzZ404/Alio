@@ -4,9 +4,11 @@ import { useParams, useRouter } from 'next/navigation';
 import { IconBox, IconChevronLeft } from '@alio/ui';
 import { ReportCard } from '@/components/ReportCard';
 
-export default function FamilyVisitDetailPage() {
+export default function FamilyVisitDetailPage({ id: propId, onBack }: { id?: string; onBack?: () => void } = {}) {
   const router = useRouter();
-  const { id } = useParams<{ id: string }>();
+  const params = useParams<{ id: string }>();
+  const id = propId ?? params?.id ?? '';
+  const handleBack = onBack ?? (() => router.back());
 
   return (
     <div
@@ -16,7 +18,7 @@ export default function FamilyVisitDetailPage() {
       }}
     >
       <header className="absolute left-[25px] right-[25px] top-[60px] z-10 flex items-center gap-[16px]">
-        <IconBox size={42} aria-label="Back" onClick={() => router.back()}>
+        <IconBox size={42} aria-label="Back" onClick={handleBack}>
           <IconChevronLeft className="size-6 text-gray-100" />
         </IconBox>
         <span className="flex h-[42px] items-center rounded-[10px] bg-brand-tint-1 px-[12px] text-[16px] font-bold text-black">

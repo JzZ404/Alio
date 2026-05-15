@@ -47,8 +47,8 @@ export default function FamilyHomePage() {
         />
 
         <TodayStatusCard
-          elderName="Harold"
-          statusLine="Harold is stable today."
+          elderName="Erin"
+          statusLine="Erin is stable today."
           medications={SAMPLE_MEDICATIONS}
           vitals={SAMPLE_VITALS}
           lastVisitBy={SAMPLE_CAREGIVER.name}
