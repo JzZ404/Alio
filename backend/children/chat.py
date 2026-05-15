@@ -1,5 +1,6 @@
 import os
 
+import requests
 from google import genai
 from google.genai import types
 from supabase import create_client
@@ -8,12 +9,39 @@ _session = None
 _supabase_client = None
 _genai_client = None
 
+_USE_LOCAL_OLLAMA = os.environ.get("USE_LOCAL_OLLAMA", "").lower() in ("1", "true", "yes")
+_OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
+_OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "hf.co/aarony630/alio-medical")
+
 
 def _get_genai_client():
     global _genai_client
     if _genai_client is None:
         _genai_client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
     return _genai_client
+
+
+def _build_ollama_prompt(system: str, history: list[dict], user_input: str) -> str:
+    """Build full multi-turn Gemma 4 chat prompt for Ollama raw mode."""
+    parts = [f"<|turn>system\n{system}<turn|>\n"]
+    for entry in history:
+        role = "model" if entry["role"] == "model" else "user"
+        parts.append(f"<|turn>{role}\n{entry['content']}<turn|>\n")
+    parts.append(f"<|turn>user\n{user_input}<turn|>\n<|turn>model\n")
+    return "".join(parts)
+
+
+def _call_ollama_chat(system: str, history: list[dict], user_input: str) -> str:
+    payload = {
+        "model": _OLLAMA_MODEL,
+        "prompt": _build_ollama_prompt(system, history, user_input),
+        "raw": True,
+        "stream": False,
+        "options": {"temperature": 0.4, "num_predict": 512, "stop": ["<turn|>"]},
+    }
+    r = requests.post(f"{_OLLAMA_URL}/api/generate", json=payload, timeout=180)
+    r.raise_for_status()
+    return r.json().get("response", "").strip()
 
 
 def _get_supabase():
@@ -158,10 +186,19 @@ def _get_session(patient_id: str):
 
 
 def send_message(patient_id: str, user_input: str) -> str:
-    chat = _get_session(patient_id)
-    response = chat.send_message(user_input)
+    if _USE_LOCAL_OLLAMA:
+        # Stateless path — rebuild full prompt each call with history
+        info, reports, med_logs = _load_all_context(patient_id)
+        system_prompt = build_system_prompt(info, reports, med_logs)
+        history = load_chat_history(patient_id)
+        reply = _call_ollama_chat(system_prompt, history, user_input)
+    else:
+        chat = _get_session(patient_id)
+        response = chat.send_message(user_input)
+        reply = response.text
+
     save_chat_history(patient_id, [
         {"role": "user", "content": user_input},
-        {"role": "model", "content": response.text},
+        {"role": "model", "content": reply},
     ])
-    return response.text
+    return reply
