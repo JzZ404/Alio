@@ -20,7 +20,7 @@ const SUBTITLE_GRAY = '#A8A8A8';
  */
 export function ChatListItem({ thread, onOpen }: { thread: ChatThread; onOpen?: (id: string) => void }) {
   const subtitleColor = thread.isTyping ? '#5E69F6' : SUBTITLE_GRAY;
-  const className = "relative flex h-[72px] items-center gap-[16px] overflow-hidden rounded-[12px] bg-brand-tint-1 pb-[8px] pl-[12px] pr-[16px] pt-[8px] transition-colors active:bg-brand-border/50";
+  const className = "w-full relative flex h-[72px] items-center gap-[16px] overflow-hidden rounded-[12px] bg-brand-tint-1 pb-[8px] pl-[12px] pr-[16px] pt-[8px] transition-colors active:bg-brand-border/50";
   const inner = (<>
       <Avatar
         isGroup={thread.isGroup}
