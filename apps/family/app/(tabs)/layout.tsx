@@ -6,13 +6,16 @@ import { usePathname } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { IconHome, IconMicrophone, IconChat, IconMedicalRecord } from '@alio/ui';
 
-const HomeTab     = dynamic(() => import('./home/page'),     { ssr: false });
-const AICheckTab  = dynamic(() => import('./ai-check/page'), { ssr: false });
-const ChatTab     = dynamic(() => import('./chat/page'),     { ssr: false });
-const RecordsTab  = dynamic(() => import('./records/page'),  { ssr: false });
+const HomeTab        = dynamic(() => import('./home/page'),              { ssr: false });
+const AICheckTab     = dynamic(() => import('./ai-check/page'),          { ssr: false });
+const ChatTab        = dynamic(() => import('./chat/page'),              { ssr: false });
+const RecordsTab     = dynamic(() => import('./records/page'),           { ssr: false });
+const ChatDetail     = dynamic(() => import('./chat/[id]/page'),         { ssr: false });
+const RecordDetail   = dynamic(() => import('./records/visit/[id]/page'),{ ssr: false });
 
 const TABS = ['home', 'ai-check', 'chat', 'records'] as const;
 type Tab = typeof TABS[number];
+type SubPage = { type: 'chat'; id: string } | { type: 'record'; id: string } | null;
 
 const NAV_W = 365;
 const NAV_H = 69;
@@ -29,18 +32,13 @@ const tabs = [
 export default function TabsLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const segments = pathname.split('/').filter(Boolean);
-  const isSubPage = segments.length > 1;
-
   const pathTab = segments[0] as Tab;
-  const [active, setActive] = useState<Tab>(
-    TABS.includes(pathTab) ? pathTab : 'home'
-  );
+  const [active, setActive] = useState<Tab>(TABS.includes(pathTab) ? pathTab : 'home');
+  const [subPage, setSubPage] = useState<SubPage>(null);
 
-  // Sync active tab when returning from a sub-page via back button
   useEffect(() => {
-    if (!isSubPage && TABS.includes(pathTab)) {
-      setActive(pathTab);
-    }
+    if (TABS.includes(pathTab)) setActive(pathTab);
+    setSubPage(null);
   }, [pathname]);
 
   const activeIdx = tabs.findIndex(t => t.id === active);
@@ -52,22 +50,16 @@ export default function TabsLayout({ children }: { children: ReactNode }) {
   return (
     <MobileFrame>
       <div className="relative overflow-hidden" style={{ height: '100svh' }}>
-        {isSubPage ? (
-          // Detail pages render normally via Next.js routing
-          <div className="absolute inset-0 overflow-y-auto">
-            {children}
-          </div>
-        ) : (
-          // Top-level tabs switch via state — no URL change
-          <div className="absolute inset-0 bottom-[85px] overflow-y-auto">
-            {active === 'home'     && <HomeTab />}
-            {active === 'ai-check' && <AICheckTab />}
-            {active === 'chat'     && <ChatTab />}
-            {active === 'records'  && <RecordsTab />}
-          </div>
-        )}
+        <div className="absolute inset-0 bottom-[85px] overflow-y-auto">
+          {subPage?.type === 'chat'   && <ChatDetail   id={subPage.id} onBack={() => setSubPage(null)} />}
+          {subPage?.type === 'record' && <RecordDetail id={subPage.id} onBack={() => setSubPage(null)} />}
+          {!subPage && active === 'home'     && <HomeTab />}
+          {!subPage && active === 'ai-check' && <AICheckTab />}
+          {!subPage && active === 'chat'     && <ChatTab    onOpenThread={(id) => setSubPage({ type: 'chat',   id })} />}
+          {!subPage && active === 'records'  && <RecordsTab onOpenVisit ={(id) => setSubPage({ type: 'record', id })} />}
+        </div>
 
-        {!isSubPage && (
+        {!subPage && (
           <nav
             className="absolute flex items-stretch rounded-full border border-white/80 bg-white/40 shadow-[0_2px_22px_rgba(0,0,0,0.15)] backdrop-blur-2xl bottom-4 left-1/2 -translate-x-1/2"
             style={{ width: NAV_W, height: NAV_H, padding: PAD, position: 'absolute' }}
@@ -81,11 +73,8 @@ export default function TabsLayout({ children }: { children: ReactNode }) {
             {tabs.map((tab, idx) => {
               const isActive = idx === activeIdx;
               return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActive(tab.id)}
-                  className="relative z-10 flex flex-1 flex-col items-center justify-center gap-1"
-                >
+                <button key={tab.id} onClick={() => setActive(tab.id)}
+                  className="relative z-10 flex flex-1 flex-col items-center justify-center gap-1">
                   <tab.Icon className={`size-6 ${isActive ? 'text-brand-active' : 'text-gray-100'}`} />
                   <span className={`text-[11.5px] font-bold leading-none ${isActive ? 'text-brand-active' : 'text-gray-100'}`}>
                     {tab.label}

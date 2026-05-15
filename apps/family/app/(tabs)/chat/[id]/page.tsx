@@ -31,10 +31,11 @@ const SUPABASE_THREAD_FOR: Record<string, string | undefined> = {
  * Family Chat conversation — same layout as Caregiver Chat conversation,
  * just sourcing from the family fixture (`SAMPLE_FM_*`).
  */
-export default function FamilyChatConversationPage() {
+export default function FamilyChatConversationPage({ id: propId, onBack }: { id?: string; onBack?: () => void } = {}) {
   const router = useRouter();
   const params = useParams<{ id: string }>();
-  const id = params?.id ?? '';
+  const id = propId ?? params?.id ?? '';
+  const handleBack = onBack ?? (() => router.back());
 
   const thread = SAMPLE_FM_CHAT_THREADS.find((t) => t.id === id);
   const initial = SAMPLE_FM_CONVERSATIONS[id] ?? [];
@@ -129,7 +130,7 @@ export default function FamilyChatConversationPage() {
           size={42}
           shape="pill"
           aria-label="Back"
-          onClick={() => router.back()}
+          onClick={handleBack}
         >
           <IconChevronLeft className="size-[20px] text-gray-100" />
         </IconBox>

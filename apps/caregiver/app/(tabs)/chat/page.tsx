@@ -9,7 +9,7 @@ import { SAMPLE_CHAT_THREADS } from '@alio/mock-data';
  * "Alio voice" pill position on the Logs screen — keeps the top toolbar
  * height consistent across the app.
  */
-export default function CaregiverChatPage() {
+export default function CaregiverChatPage({ onOpenThread }: { onOpenThread?: (id: string) => void } = {}) {
   return (
     <div
       className="relative h-full min-h-screen overflow-hidden sm:h-[852px] sm:min-h-0"
@@ -37,7 +37,7 @@ export default function CaregiverChatPage() {
       <ul className="absolute bottom-[110px] left-[22px] right-[22px] top-[129px] flex flex-col gap-[12px] overflow-y-auto">
         {SAMPLE_CHAT_THREADS.map((thread) => (
           <li key={thread.id}>
-            <ChatListItem thread={thread} />
+            <ChatListItem thread={thread} onOpen={onOpenThread} />
           </li>
         ))}
       </ul>

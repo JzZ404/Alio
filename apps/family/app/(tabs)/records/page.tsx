@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
 import {
   IconBox,
@@ -40,8 +39,7 @@ const FILTER_LABELS: Record<FilterTab, string> = {
  * List of patient medical records with filter pills and a + FAB that opens
  * AddRecordModal. Header positioned at top-60 to match Logs/AI/Chat screens.
  */
-export default function FamilyRecordsPage() {
-  const router = useRouter();
+export default function FamilyRecordsPage({ onOpenVisit }: { onOpenVisit?: (id: string) => void } = {}) {
   const [records, setRecords] = useState<MedicalRecord[]>(SAMPLE_RECORDS);
   const [visits, setVisits] = useState<CompiledReportRow[]>([]);
   const [activeFilter, setActiveFilter] = useState<FilterTab>('All');
@@ -176,7 +174,7 @@ export default function FamilyRecordsPage() {
                   <li key={v.id}>
                     <VisitRecordItem
                       row={v}
-                      onClick={() => router.push(`/records/visit/${v.id}`)}
+                      onClick={() => onOpenVisit ? onOpenVisit(v.id) : undefined}
                     />
                   </li>
                 ))}

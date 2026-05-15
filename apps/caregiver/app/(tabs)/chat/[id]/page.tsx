@@ -24,10 +24,11 @@ import {
  * Header with back + avatar + name + online + search, message bubbles
  * (right=me, left=them), quick actions row, input bar.
  */
-export default function ChatConversationPage() {
+export default function ChatConversationPage({ id: propId, onBack }: { id?: string; onBack?: () => void } = {}) {
   const router = useRouter();
   const params = useParams<{ id: string }>();
-  const id = params?.id ?? '';
+  const id = propId ?? params?.id ?? '';
+  const handleBack = onBack ?? (() => router.back());
 
   const thread = SAMPLE_CHAT_THREADS.find((t) => t.id === id);
   const initial = SAMPLE_CONVERSATIONS[id] ?? [];
@@ -59,7 +60,7 @@ export default function ChatConversationPage() {
           size={42}
           shape="pill"
           aria-label="Back"
-          onClick={() => router.back()}
+          onClick={handleBack}
         >
           <IconChevronLeft className="size-[20px] text-gray-100" />
         </IconBox>
