@@ -7,7 +7,7 @@ House rules for this folder. Read at session start, every session.
 ## Product
 
 **Alio** — AI copilot for elder care connecting seniors, caregivers, and adult children.
-Tagline: *"So no one cares alone."*
+Tagline: *"When you can't be there, Alio is."*
 
 Three portals:
 - **Caregiver** — voice-first visit notes, mobile-optimized (in scope)

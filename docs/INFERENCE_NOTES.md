@@ -61,8 +61,10 @@ Migration steps:
 brew install --cask ollama
 
 # 2. Pull / create the fine-tuned model
+#    Canonical release: https://www.kaggle.com/models/matong666/alio-medical
+#    HuggingFace mirror is what `ollama pull` actually consumes:
 ollama pull hf.co/aarony630/alio-medical:Q4_K_M
-# If that errors on import (Modelfile uses a relative FROM path), do:
+# If that errors on import (HF's Modelfile uses a relative FROM path), do:
 #   ollama create alio-medical -f backend/Modelfile.alio-medical
 # but first edit Modelfile.alio-medical to point FROM at the absolute blob
 # path on macOS:  ~/.ollama/models/blobs/sha256-<hash>

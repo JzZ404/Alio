@@ -1,7 +1,7 @@
 # Alio
 
 > AI copilot for elder care connecting seniors, caregivers, and adult children.
-> *"So no one cares alone."*
+> *"When you can't be there, Alio is."*
 
 This repo holds the full Alio stack: two Next.js apps (caregiver + family), a
 FastAPI backend that talks to Google Gemma, and a Supabase Postgres database
