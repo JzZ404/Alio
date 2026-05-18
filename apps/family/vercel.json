@@ -1,0 +1,5 @@
+{
+  "installCommand": "npm install -g pnpm@11 && cd ../.. && pnpm install --no-frozen-lockfile --config.ignore-scripts=true",
+  "buildCommand": "cd ../.. && pnpm --filter @alio/family build",
+  "outputDirectory": ".next"
+}
