@@ -33,8 +33,9 @@ type View = 'voice-idle' | 'voice-recording' | 'voice-review' | 'message';
 type RecordState = 'idle' | 'recording' | 'saving';
 type CompileState = 'idle' | 'compiling';
 
-export default function LogsPage() {
+export default function LogsPage({ onOpenReport }: { onOpenReport?: (id: string) => void } = {}) {
   const router = useRouter();
+  const openReport = onOpenReport ?? ((id: string) => router.push(`/logs/report/${id}`));
   const [view, setView] = useState<View>('voice-idle');
   const [recordState, setRecordState] = useState<RecordState>('idle');
   const [liveTranscript, setLiveTranscript] = useState('');
@@ -164,7 +165,7 @@ export default function LogsPage() {
         activePatientId,
         activePatient?.name ?? 'Patient',
       );
-      // Append a tappable "Dorothy's Report" card to the chat and jump to it.
+      // Append a tappable "Erin's Report" card to the chat and jump to it.
       const turn: ConversationTurn = {
         kind: 'report',
         id: `report-turn-${result.id}`,
@@ -389,10 +390,10 @@ export default function LogsPage() {
       const aiTurn: ConversationTurn = {
         kind: 'ai-summary',
         id: `turn-${ts}-ai`,
-        summary: summary.summary,
-        mood: summary.mood,
-        medicationsNoted: summary.medications_noted,
-        urgent: summary.urgent,
+        summary: summary.summary || '(Note saved — summary not generated.)',
+        mood: summary.mood || '',
+        medicationsNoted: summary.medications_noted ?? [],
+        urgent: !!summary.urgent,
       };
       setConversation((prev) => [...prev, aiTurn]);
       await persistLog(text, summary);
@@ -430,10 +431,10 @@ export default function LogsPage() {
       const aiTurn: ConversationTurn = {
         kind: 'ai-summary',
         id: `turn-${ts}-ai`,
-        summary: summary.summary,
-        mood: summary.mood,
-        medicationsNoted: summary.medications_noted,
-        urgent: summary.urgent,
+        summary: summary.summary || '(Note saved — summary not generated.)',
+        mood: summary.mood || '',
+        medicationsNoted: summary.medications_noted ?? [],
+        urgent: !!summary.urgent,
       };
       setConversation((prev) => [...prev, aiTurn]);
       await persistLog(transcript, summary);
@@ -450,7 +451,7 @@ export default function LogsPage() {
 
   return (
     <div
-      className="relative h-full min-h-screen overflow-hidden sm:h-[852px] sm:min-h-0"
+      className="relative h-full overflow-hidden"
       style={{
         background:
           'linear-gradient(135deg, #E3E5F1 0%, #EAEAF2 50%, #D3D5EC 100%)',
@@ -487,7 +488,7 @@ export default function LogsPage() {
       </header>
 
       {view === 'message' ? (
-        <MessageView turns={conversation} />
+        <MessageView turns={conversation} onOpenReport={openReport} />
       ) : view === 'voice-review' ? (
         <VoiceReviewView
           value={editingTranscript}
@@ -505,7 +506,7 @@ export default function LogsPage() {
       )}
 
       {view === 'voice-review' ? (
-        <div className="absolute bottom-[95px] left-[25px] right-[25px] z-10 flex items-center justify-between gap-3">
+        <div className="absolute bottom-[20px] left-[25px] right-[25px] z-10 flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={handleDiscardReview}
@@ -524,7 +525,7 @@ export default function LogsPage() {
           </button>
         </div>
       ) : view === 'message' || keyboardOpen ? (
-        <div className="absolute bottom-[95px] left-[16px] right-[16px] z-10 flex items-center gap-[10px]">
+        <div className="absolute bottom-[20px] left-[16px] right-[16px] z-10 flex items-center gap-[10px]">
           <div className="flex h-[44px] flex-1 items-center gap-[8px] rounded-full bg-white px-[14px] shadow-sm">
             <input
               type="text"
@@ -566,7 +567,7 @@ export default function LogsPage() {
           </button>
         </div>
       ) : (
-        <div className="absolute bottom-[95px] left-[25px] right-[25px] z-10 flex items-center justify-between">
+        <div className="absolute bottom-[20px] left-[25px] right-[25px] z-10 flex items-center justify-between">
           <IconBox
             size={48}
             aria-label="Open keyboard"
@@ -629,24 +630,33 @@ function VoiceView({
       </div>
 
       {liveTranscript && (
-        <p className="absolute left-[24px] right-[24px] bottom-[180px] text-center text-[18px] leading-[26px] font-medium">
+        <div className="absolute left-1/2 bottom-[120px] w-[311px] -translate-x-1/2 text-center text-[18px] leading-[26px] font-medium">
           {(() => {
-            // Show only the last ~30 words so long transcripts never overflow;
-            // fade older words to gray-60 and keep the most recent 4 in black,
-            // matching the "karaoke" treatment in the Figma recording state.
+            // Chunk the transcript into ~5-word lines so each line fits the
+            // 311px blob width, then show only the last 4 lines. Fade older
+            // lines whole — line-by-line, not word-by-word.
             const words = liveTranscript.trim().split(/\s+/);
-            const tail = words.slice(-30);
-            const splitAt = Math.max(0, tail.length - 4);
-            return tail.map((w, i) => (
-              <span
-                key={`${i}-${w}`}
-                className={i < splitAt ? 'text-gray-60' : 'text-gray-100'}
-              >
-                {w}{i < tail.length - 1 ? ' ' : ''}
-              </span>
-            ));
+            const wordsPerLine = 5;
+            const lines: string[] = [];
+            for (let i = 0; i < words.length; i += wordsPerLine) {
+              lines.push(words.slice(i, i + wordsPerLine).join(' '));
+            }
+            const tail = lines.slice(-4);
+            return tail.map((line, i) => {
+              const distFromEnd = tail.length - 1 - i;
+              const color =
+                distFromEnd === 0 ? 'text-gray-100'
+                : distFromEnd === 1 ? 'text-gray-100 opacity-70'
+                : distFromEnd === 2 ? 'text-gray-100 opacity-45'
+                                    : 'text-gray-100 opacity-25';
+              return (
+                <div key={i} className={color}>
+                  {line}
+                </div>
+              );
+            });
           })()}
-        </p>
+        </div>
       )}
 
       {error && (
@@ -695,8 +705,13 @@ function VoiceReviewView({
   );
 }
 
-function MessageView({ turns }: { turns: ConversationTurn[] }) {
-  const router = useRouter();
+function MessageView({
+  turns,
+  onOpenReport,
+}: {
+  turns: ConversationTurn[];
+  onOpenReport: (id: string) => void;
+}) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -715,6 +730,7 @@ function MessageView({ turns }: { turns: ConversationTurn[] }) {
                 key={turn.id}
                 time={turn.time}
                 transcript={turn.transcript}
+                defaultExpanded
               />
             );
           }
@@ -734,7 +750,7 @@ function MessageView({ turns }: { turns: ConversationTurn[] }) {
               <ReportBubble
                 key={turn.id}
                 patientName={turn.patientName}
-                onClick={() => router.push(`/logs/report/${turn.reportId}`)}
+                onClick={() => onOpenReport(turn.reportId)}
               />
             );
           }
@@ -796,7 +812,7 @@ function SummaryBubble({
         <div>
           <p className="text-xs uppercase text-gray-60">Medications</p>
           <p className="text-gray-100">
-            {turn.medicationsNoted.length ? turn.medicationsNoted.join(', ') : 'None'}
+            {(turn.medicationsNoted ?? []).length ? (turn.medicationsNoted ?? []).join(', ') : 'None'}
           </p>
         </div>
       </div>

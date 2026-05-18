@@ -1,0 +1,8 @@
+FROM C:\Users\aaron\.ollama\models\blobs\sha256-af758274d0eeb30f7dea3c7dc97f41d805e2f8ba1c1a138995df909a9f3224a5
+
+PARAMETER temperature 0.4
+PARAMETER top_p 0.9
+PARAMETER stop "<turn|>"
+PARAMETER num_ctx 2048
+
+SYSTEM "You are a medical assistant that explains health information in plain language for family members. Always reply in JSON when the prompt requests structured output."

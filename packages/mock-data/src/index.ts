@@ -10,8 +10,9 @@ export type Person = {
 };
 
 export const SAMPLE_ELDER: Person = {
-  id: 'elder-001',
-  name: 'Harold Mitchell',
+  id: 'erin-yeung',
+  name: 'Erin Yeung',
+  avatarUrl: '/avatars/elder1.png',
 };
 
 // =============================================================
@@ -75,12 +76,12 @@ export type LogHistoryItem = {
 };
 
 export const LOGS_HISTORY: LogHistoryItem[] = [
-  { id: 'log-1', patientName: "Sarah's Log", date: '2026/4/5 13:03' },
-  { id: 'log-2', patientName: "Jassie's Log", date: '2026/2/9 13:03' },
-  { id: 'log-3', patientName: "Aaron's Log", date: '2026/9/9 13:43' },
-  { id: 'log-4', patientName: "Feis's Log", date: '2026/9/9 13:43' },
-  { id: 'log-5', patientName: "Naomi's Log", date: '2026/9/9 13:43' },
-  { id: 'log-6', patientName: "Jack's Log", date: '2026/9/9 13:43' },
+  { id: 'log-1', patientName: "Erin's Log", date: '2026/5/16 10:42' },
+  { id: 'log-2', patientName: "Erin's Log", date: '2026/5/15 10:38' },
+  { id: 'log-3', patientName: "Erin's Log", date: '2026/5/14 10:51' },
+  { id: 'log-4', patientName: "Erin's Log", date: '2026/5/13 10:30' },
+  { id: 'log-5', patientName: "Erin's Log", date: '2026/5/12 10:45' },
+  { id: 'log-6', patientName: "Erin's Log", date: '2026/5/11 10:33' },
 ];
 
 // =============================================================
@@ -113,23 +114,23 @@ export type PatientContact = {
 
 export const SAMPLE_PATIENTS: Patient[] = [
   {
-    id: 'dorothy-chen',
-    name: 'Dorothy Chen',
+    id: 'erin-yeung',
+    name: 'Erin Yeung',
     time: '10:00 AM',
     address: '1234 Maple St',
     fullAddress: '1234 Maple St, Portland, OR',
     avatarUrl: '/avatars/elder1.png',
     emergencyContacts: [
       { id: 'c1', name: 'Janet Chen', relation: 'Daughter', phone: '(503) 555-0192' },
-      { id: 'c2', name: 'Robert Chen', relation: 'Son', phone: '(503) 555-0192' },
+      { id: 'c2', name: 'Robert Chen', relation: 'Son', phone: '(503) 555-0145' },
     ],
   },
   {
     id: 'margaret-williams',
     name: 'Margaret Williams',
-    time: '10:00 AM',
-    address: '1234 Maple St',
-    fullAddress: '1234 Maple St, Portland, OR',
+    time: '1:00 PM',
+    address: '500 Oak Ave',
+    fullAddress: '500 Oak Ave, Portland, OR',
     avatarUrl: '/avatars/elder2.avif',
     emergencyContacts: [
       { id: 'c1', name: 'Patricia Williams', relation: 'Daughter', phone: '(503) 555-0123' },
@@ -143,7 +144,7 @@ export const SAMPLE_PATIENTS: Patient[] = [
     fullAddress: '890 Pine Blvd, Portland, OR',
     avatarUrl: '/avatars/elder3.webp',
     emergencyContacts: [
-      { id: 'c1', name: 'Mary Foster', relation: 'Wife', phone: '(503) 555-0145' },
+      { id: 'c1', name: 'Mary Foster', relation: 'Wife', phone: '(503) 555-0177' },
     ],
   },
 ];
@@ -151,7 +152,7 @@ export const SAMPLE_PATIENTS: Patient[] = [
 // The caregiver themselves (for CG Home header)
 export const SAMPLE_CG_USER = {
   id: 'caregiver-001',
-  name: 'Sarah Mitchell',
+  name: 'Sarah Lee',
   role: 'Caregiver' as const,
   avatarUrl: '/avatars/nurse.png',
   notifications: 2,
@@ -180,7 +181,7 @@ export const SAMPLE_RECORDS: MedicalRecord[] = [
 ];
 
 export const RECORDS_OWNER = {
-  label: "Dr. Harold's Records",
+  label: "Erin's Records",
   countLabel: '6 records on file',
   syncStatus: 'Synced' as const,
 };
@@ -200,7 +201,7 @@ export type Caregiver = {
 
 export const SAMPLE_CAREGIVER: Caregiver = {
   id: 'caregiver-001',
-  name: 'Sarah Mitchell',
+  name: 'Sarah Lee',
   visits: 87,
 };
 
@@ -310,51 +311,59 @@ export type ChatThread = {
 
 export const SAMPLE_CHAT_THREADS: ChatThread[] = [
   {
-    id: 'sarah-circle',
-    name: "Sarah Mitchell's care circle",
-    lastMessage: 'Thank you very much!',
-    timestamp: '11:38AM',
-    unreadCount: 2,
+    id: 'janet-chen',
+    name: 'Janet Chen',
+    lastMessage: "Please pay more attention to my mom's knee today",
+    timestamp: '11:24AM',
+    unreadCount: 1,
     pinned: true,
-    isGroup: true,
     status: 'online',
-    avatarUrl: '/avatars/nurse.png',
-    groupAvatars: ['/avatars/nurse.png', '/avatars/person1.avif', '/avatars/person2.webp'],
+    avatarUrl: '/avatars/janet.jpg',
   },
   {
-    id: 'mitchells-family',
-    name: 'Mitchells Family',
-    lastMessage: 'Danna is typing...',
+    id: 'erin-circle',
+    name: "Erin's Care Circle",
+    lastMessage: 'Janet: Will visit Sunday',
+    timestamp: '10:42AM',
+    unreadCount: 2,
+    isGroup: true,
+    avatarUrl: '/avatars/elder1.png',
+    groupAvatars: ['/avatars/elder1.png', '/avatars/nurse.png', '/avatars/janet.jpg'],
+  },
+  {
+    id: 'patricia-williams',
+    name: 'Patricia Williams',
+    lastMessage: 'Patricia is typing...',
     timestamp: '10:18AM',
     unreadCount: 1,
-    isGroup: true,
     isTyping: true,
     avatarUrl: '/avatars/person2.webp',
-    groupAvatars: ['/avatars/person2.webp', '/avatars/person3.avif', '/avatars/person4.avif'],
   },
   {
-    id: 'miranda',
-    name: 'Miranda',
-    lastMessage: 'I will let her know.',
+    id: 'robert-chen',
+    name: 'Robert Chen',
+    lastMessage: 'Thanks for the update on mom.',
     timestamp: '10:10AM',
-    unreadCount: 1,
-    avatarUrl: '/avatars/person1.avif',
-  },
-  {
-    id: 'charles',
-    name: 'Charles',
-    lastMessage: "When's the next appointment...",
-    timestamp: '10:10AM',
-    unreadCount: 1,
+    unreadCount: 0,
     avatarUrl: '/avatars/person3.avif',
   },
   {
-    id: 'emily',
-    name: 'Emily',
-    lastMessage: "When's the next appointment...",
-    timestamp: '10:08AM',
-    unreadCount: 1,
+    id: 'mary-foster',
+    name: 'Mary Foster',
+    lastMessage: 'See you this afternoon.',
+    timestamp: '9:52AM',
+    unreadCount: 0,
     avatarUrl: '/avatars/person4.avif',
+  },
+  {
+    id: 'williams-circle',
+    name: "Margaret's Care Circle",
+    lastMessage: 'Patricia: Thanks Sarah!',
+    timestamp: 'Yesterday',
+    unreadCount: 0,
+    isGroup: true,
+    avatarUrl: '/avatars/elder2.avif',
+    groupAvatars: ['/avatars/elder2.avif', '/avatars/nurse.png', '/avatars/person2.webp'],
   },
 ];
 
@@ -375,7 +384,7 @@ export const SAMPLE_AI_CONVERSATION: ChatMessage[] = [
   {
     id: 'a1',
     sender: 'me',
-    text: 'Dorothy seems to have some side effect on the drugs',
+    text: 'Erin seems to have some side effect on the drugs',
     imageUrl: '/chat/hand-closeup.jpg',
   },
   {
@@ -394,23 +403,23 @@ export const SAMPLE_AI_CONVERSATION: ChatMessage[] = [
 export const SAMPLE_FM_CHAT_THREADS: ChatThread[] = [
   {
     id: 'sarah-caregiver',
-    name: 'Sarah Mitchell',
-    lastMessage: 'Just finished morning meds, all good!',
+    name: 'Sarah Lee',
+    lastMessage: "Please pay more attention to my mom's knee today",
     timestamp: '11:24AM',
-    unreadCount: 1,
+    unreadCount: 0,
     pinned: true,
     status: 'online',
     avatarUrl: '/avatars/nurse.png',
   },
   {
-    id: 'dorothy-circle',
-    name: "Dorothy's Care Circle",
-    lastMessage: "Janet: Will visit Sunday",
+    id: 'erin-circle',
+    name: "Erin's Care Circle",
+    lastMessage: 'Sarah: Erin had a great morning today',
     timestamp: '10:42AM',
     unreadCount: 3,
     isGroup: true,
     avatarUrl: '/avatars/elder1.png',
-    groupAvatars: ['/avatars/elder1.png', '/avatars/nurse.png', '/avatars/person1.avif'],
+    groupAvatars: ['/avatars/elder1.png', '/avatars/nurse.png', '/avatars/janet.jpg'],
   },
   {
     id: 'dr-rowan',
@@ -421,21 +430,13 @@ export const SAMPLE_FM_CHAT_THREADS: ChatThread[] = [
     avatarUrl: '/avatars/person4.avif',
   },
   {
-    id: 'patricia',
-    name: 'Patricia Williams',
-    lastMessage: 'Patricia is typing...',
+    id: 'robert-chen',
+    name: 'Robert Chen',
+    lastMessage: 'Robert is typing...',
     timestamp: '8:55AM',
     unreadCount: 0,
     isTyping: true,
-    avatarUrl: '/avatars/person2.webp',
-  },
-  {
-    id: 'janet',
-    name: 'Janet Chen',
-    lastMessage: 'Mom seems happier today',
-    timestamp: 'Yesterday',
-    unreadCount: 0,
-    avatarUrl: '/avatars/person1.avif',
+    avatarUrl: '/avatars/person3.avif',
   },
 ];
 
@@ -446,34 +447,50 @@ export const SAMPLE_FM_CONVERSATIONS: Record<string, ChatMessage[]> = {
     { id: 'fm-m3', sender: 'them', text: 'She is in good spirits. BP looks normal — 120/80.' },
     { id: 'fm-m4', sender: 'me',   text: 'Wonderful. Could you make sure she takes her morning meds?' },
     { id: 'fm-m5', sender: 'them', text: 'Just finished morning meds, all good!' },
+    { id: 'fm-m6', sender: 'me',   text: "Please pay more attention to my mom's knee today" },
   ],
-  'dorothy-circle': [
-    { id: 'fm-d1', sender: 'them', text: 'Sarah: Dorothy had a great morning today 🌞' },
-    { id: 'fm-d2', sender: 'me',   text: "That's wonderful to hear!" },
-    { id: 'fm-d3', sender: 'them', text: 'Janet: Will visit Sunday' },
+  'erin-circle': [
+    { id: 'fm-e1', sender: 'them', text: 'Sarah: Erin had a great morning today 🌞' },
+    { id: 'fm-e2', sender: 'me',   text: "That's wonderful to hear!" },
+    { id: 'fm-e3', sender: 'them', text: 'Robert: Will visit Sunday' },
   ],
   'dr-rowan': [
     { id: 'fm-r1', sender: 'them', text: 'Following up on the test results from last week.' },
     { id: 'fm-r2', sender: 'them', text: 'Everything looks within normal range — I want to schedule a follow-up in 4 weeks.' },
   ],
-  janet: [
-    { id: 'fm-j1', sender: 'them', text: 'Mom seems happier today' },
-    { id: 'fm-j2', sender: 'me',   text: 'I noticed too — the new physical therapy plan might be helping.' },
+  'robert-chen': [
+    { id: 'fm-rc1', sender: 'them', text: 'Hey sis, how is mom doing this week?' },
+    { id: 'fm-rc2', sender: 'me',   text: 'Sarah says her BP is normal. Knee still bothering her though.' },
   ],
 };
 
 /** Sample conversation per thread. Defaults to a "no messages yet" empty state. */
 export const SAMPLE_CONVERSATIONS: Record<string, ChatMessage[]> = {
-  'sarah-circle': [
-    { id: 'm1', sender: 'me', text: 'Hi Sarah, how is Harold doing today?' },
-    { id: 'm2', sender: 'them', text: "He's stable. Blood pressure looks good — 116/70." },
-    { id: 'm3', sender: 'me', text: 'Did he take the morning meds?' },
-    { id: 'm4', sender: 'them', text: 'Yes, all of them. He had toast and tea for breakfast.' },
-    { id: 'm5', sender: 'me', text: 'Thank you very much!' },
+  'janet-chen': [
+    { id: 'jc1', sender: 'them', text: 'Good morning Sarah!' },
+    { id: 'jc2', sender: 'them', text: "Please pay more attention to my mom's knee today" },
   ],
-  miranda: [
-    { id: 'm1', sender: 'them', text: 'Hey, has Mom been eating well this week?' },
-    { id: 'm2', sender: 'me', text: 'Sarah reports she had toast + tea this morning and finished her dinner yesterday.' },
-    { id: 'm3', sender: 'them', text: 'I will let her know.' },
+  'erin-circle': [
+    { id: 'ec1', sender: 'me',   text: 'Erin had a great morning today 🌞' },
+    { id: 'ec2', sender: 'them', text: "Janet: That's wonderful to hear!" },
+    { id: 'ec3', sender: 'them', text: 'Robert: Will visit Sunday' },
+  ],
+  'robert-chen': [
+    { id: 'rc1', sender: 'them', text: "When's mom's next appointment?" },
+    { id: 'rc2', sender: 'me',   text: 'Cardiology follow-up is May 30 at 10AM with Dr. Rowan.' },
+    { id: 'rc3', sender: 'them', text: 'Thanks for the update on mom.' },
+  ],
+  'patricia-williams': [
+    { id: 'pw1', sender: 'them', text: 'Hi Sarah, has mom taken her afternoon meds?' },
+    { id: 'pw2', sender: 'me',   text: 'Heading there at 1PM — will confirm once she has.' },
+  ],
+  'mary-foster': [
+    { id: 'mf1', sender: 'them', text: 'Harold seemed tired this morning.' },
+    { id: 'mf2', sender: 'me',   text: "I'll keep an eye on him today. See you this afternoon." },
+    { id: 'mf3', sender: 'them', text: 'See you this afternoon.' },
+  ],
+  'williams-circle': [
+    { id: 'wc1', sender: 'me',   text: 'Margaret finished her PT exercises today 💪' },
+    { id: 'wc2', sender: 'them', text: 'Patricia: Thanks Sarah!' },
   ],
 };

@@ -10,20 +10,24 @@ import {
   api,
   ApiError,
   type CompiledReportRow,
+  type MedsFlag,
+  type ReportFlag,
   type Severity,
   type VisitReport,
 } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 
-const CAREGIVER_NAME = 'Sarah Mitchell';
+const CAREGIVER_NAME = 'Sarah Lee';
 const threadIdFor = (caregiverId: string, patientId: string) =>
   `${caregiverId}__${patientId}`;
 
 type SendState = 'idle' | 'sending' | 'sent';
 
-export default function LogReportPage() {
+export default function LogReportPage({ id: propId, onBack }: { id?: string; onBack?: () => void } = {}) {
   const router = useRouter();
-  const { id } = useParams<{ id: string }>();
+  const params = useParams<{ id: string }>();
+  const id = propId ?? params?.id ?? '';
+  const handleBack = onBack ?? (() => router.back());
 
   const [row, setRow] = useState<CompiledReportRow | null>(null);
   const [loading, setLoading] = useState(true);
@@ -81,14 +85,14 @@ export default function LogReportPage() {
 
   return (
     <div
-      className="relative h-full min-h-screen overflow-hidden sm:h-[852px] sm:min-h-0"
+      className="relative h-full overflow-hidden"
       style={{
         background: 'linear-gradient(135deg, #E3E5F1 0%, #EAEAF2 50%, #D3D5EC 100%)',
       }}
     >
       {/* Back + title */}
       <header className="absolute left-[25px] right-[25px] top-[60px] z-10 flex items-center gap-[16px]">
-        <IconBox size={42} aria-label="Back" onClick={() => router.back()}>
+        <IconBox size={42} aria-label="Back" onClick={handleBack}>
           <IconChevronLeft className="size-6 text-gray-100" />
         </IconBox>
         <span className="flex h-[42px] items-center rounded-[10px] bg-brand-tint-1 px-[12px] text-[16px] font-bold text-black">
@@ -110,7 +114,7 @@ export default function LogReportPage() {
 
       {/* Send to family button */}
       {row && (
-        <div className="absolute bottom-[170px] left-1/2 -translate-x-1/2 z-10 w-[349px]">
+        <div className="absolute bottom-[20px] left-1/2 -translate-x-1/2 z-10 w-[349px]">
           <button
             type="button"
             onClick={handleSendToFamily}
@@ -132,20 +136,28 @@ export default function LogReportPage() {
   );
 }
 
+// Local Gemma occasionally omits sections from the compile JSON. Fill in
+// "No data" defaults so the page renders something instead of crashing.
+const NO_DATA_FLAG: ReportFlag = { severity: 'none', label: 'No data', note: null };
+const NO_DATA_MEDS_FLAG: MedsFlag = { ...NO_DATA_FLAG, meds: [] };
+
 function ReportBody({ row }: { row: CompiledReportRow }) {
-  const r = row.report;
-  const vitalsValue = [r.vitals.bp, r.vitals.pulse, r.vitals.temp]
+  const r = row.report ?? ({} as VisitReport);
+  const vitals = r.vitals ?? { bp: null, pulse: null, temp: null, flag: NO_DATA_FLAG };
+  const mood = r.mood ?? { value: '', flag: NO_DATA_FLAG };
+  const meds = r.meds ?? { status: '', flag: NO_DATA_MEDS_FLAG };
+
+  const vitalsValue = [vitals.bp, vitals.pulse, vitals.temp]
     .filter(Boolean)
     .join('   ') || '—';
 
   return (
-    <div className="absolute left-0 right-0 top-[122px] bottom-[240px] overflow-y-auto px-[22px] py-[12px]">
+    <div className="absolute left-0 right-0 top-[122px] bottom-0 overflow-y-auto px-[22px] pt-[12px] pb-[100px]">
       <p className="font-bold text-[20px] text-black">
         Visit・{row.patient_name}
       </p>
       <p className="mt-1 text-[14px] text-black">
-        {formatVisitDate(row.visit_date)}
-        {row.visit_time ? `・${row.visit_time}` : ''}
+        {formatLocalDate(row.created_at)}・{formatLocalTime(row.created_at)}
       </p>
 
       <div className="mt-[20px] flex flex-col gap-[12px]">
@@ -153,23 +165,23 @@ function ReportBody({ row }: { row: CompiledReportRow }) {
           title="Vitals"
           icon={<VitalsIcon />}
           primaryValue={vitalsValue}
-          flag={r.vitals.flag}
+          flag={vitals.flag ?? NO_DATA_FLAG}
         />
         <ReportCard
           title="Mood & Energy"
           icon={<MoodIcon />}
-          primaryValue={r.mood.value || '—'}
-          flag={r.mood.flag}
+          primaryValue={mood.value || '—'}
+          flag={mood.flag ?? NO_DATA_FLAG}
         />
         <ReportCard
           title="Meds"
           icon={<MedsIcon />}
-          primaryValue={r.meds.status || '—'}
-          flag={r.meds.flag}
+          primaryValue={meds.status || '—'}
+          flag={meds.flag ?? NO_DATA_MEDS_FLAG}
           extra={
-            r.meds.flag?.meds && r.meds.flag.meds.length > 0 ? (
+            meds.flag?.meds && meds.flag.meds.length > 0 ? (
               <div className="flex flex-wrap gap-x-3 gap-y-1 text-[14px] text-black">
-                {r.meds.flag.meds.map((m) => (
+                {meds.flag.meds.map((m) => (
                   <span key={m.name} className="inline-flex items-center gap-1">
                     {m.name}
                     {m.taken ? (
@@ -310,9 +322,14 @@ function CrossIcon({ className }: { className?: string }) {
   );
 }
 
-function formatVisitDate(iso: string): string {
-  // iso = "YYYY-MM-DD" → "Mon DD" (Apr 27)
-  const d = new Date(iso + 'T00:00:00');
+function formatLocalDate(iso: string): string {
+  const d = new Date(iso);
   if (isNaN(d.getTime())) return iso;
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function formatLocalTime(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
 }

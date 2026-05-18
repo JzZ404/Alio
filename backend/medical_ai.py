@@ -29,8 +29,13 @@ def _format_gemma4_prompt(system: str, user: str) -> str:
     )
 
 
-def _call_ollama(system: str, user: str, json_mode: bool = False) -> str:
-    """Call the local Ollama server using raw mode + explicit chat template."""
+def _call_ollama(system: str, user: str, json_mode: bool | dict = False) -> str:
+    """Call the local Ollama server using raw mode + explicit chat template.
+
+    json_mode: False = freeform text, True = "any valid JSON", dict = strict
+    JSON schema (required field shapes). The fine-tuned E2B is small enough that
+    it needs an explicit schema to reliably hit the summarize/compile shapes.
+    """
     payload = {
         "model": _OLLAMA_MODEL,
         "prompt": _format_gemma4_prompt(system, user),
@@ -42,20 +47,23 @@ def _call_ollama(system: str, user: str, json_mode: bool = False) -> str:
             "stop": ["<turn|>"],
         },
     }
-    if json_mode:
+    if isinstance(json_mode, dict):
+        payload["format"] = json_mode
+    elif json_mode:
         payload["format"] = "json"
     r = requests.post(f"{_OLLAMA_URL}/api/generate", json=payload, timeout=180)
     r.raise_for_status()
     return r.json().get("response", "").strip()
 
 
-def _call_gemma(system: str, user: str, json_mode: bool = False) -> str:
+def _call_gemma(system: str, user: str, json_mode: bool | dict = False) -> str:
     """Single dispatch point — routes to local Ollama or hosted Google API."""
     if _USE_LOCAL_OLLAMA:
         return _call_ollama(system, user, json_mode=json_mode)
     client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
     config_kwargs = {"system_instruction": system}
     if json_mode:
+        # Hosted API only uses the mime-type hint; schema is ignored here.
         config_kwargs["response_mime_type"] = "application/json"
     response = retry_transient(lambda: client.models.generate_content(
         model=_MODEL_NAME,

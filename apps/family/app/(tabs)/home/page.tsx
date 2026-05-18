@@ -29,7 +29,7 @@ export default function FamilyHomePage() {
 
   return (
     <div
-      className="h-full min-h-screen overflow-y-auto pb-32 sm:h-[852px] sm:min-h-0"
+      className="h-full overflow-y-auto pb-32"
       style={{
         background:
           'linear-gradient(135deg, #E3E5F1 0%, #EAEAF2 50%, #D3D5EC 100%)',
@@ -47,8 +47,8 @@ export default function FamilyHomePage() {
         />
 
         <TodayStatusCard
-          elderName="Harold"
-          statusLine="Harold is stable today."
+          elderName="Erin"
+          statusLine="Erin is stable today."
           medications={SAMPLE_MEDICATIONS}
           vitals={SAMPLE_VITALS}
           lastVisitBy={SAMPLE_CAREGIVER.name}

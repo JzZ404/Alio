@@ -1,6 +1,9 @@
 import io
 import json
-from datetime import date, datetime
+from datetime import date, datetime, timezone
+
+from dotenv import load_dotenv
+load_dotenv()
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -305,27 +308,30 @@ class CompileLogsRequest(BaseModel):
 @app.post("/caregiver-logs/compile")
 def compile_logs(req: CompileLogsRequest):
     """
-    Compile today's caregiver_logs for {caregiver_id, patient_id} into a
-    STRUCTURED VisitReport, persist it as a row in compiled_reports, and
-    return the report id + structured fields. The frontend renders this as
-    a tappable card in the chat that opens the full report template.
+    Compile the MOST RECENT caregiver_log for {caregiver_id, patient_id} into
+    a STRUCTURED VisitReport, persist it as a row in compiled_reports, and
+    return the report id + structured fields. Real-time per-note flow — every
+    Compile tap rolls up only the latest note (keeps the prompt short enough
+    for the fine-tuned E2B model).
     """
     try:
         sb = _get_supabase()
-        today = date.today().isoformat()
+        now_utc = datetime.now(timezone.utc)
+        today = now_utc.date().isoformat()
         result = (
             sb.table("caregiver_logs")
             .select("*")
             .eq("caregiver_id", req.caregiver_id)
             .eq("patient_id", req.patient_id)
             .eq("visit_date", today)
-            .order("created_at")
+            .order("created_at", desc=True)
+            .limit(1)
             .execute()
         )
         logs = result.data or []
         structured = compile_structured_report(req.patient_name, logs)
 
-        visit_time = datetime.now().strftime("%H:%M")
+        visit_time = now_utc.strftime("%H:%M")
         insert_res = (
             sb.table("compiled_reports")
             .insert({
@@ -385,3 +391,22 @@ class FormatReportRequest(BaseModel):
 @app.post("/caregiver-logs/report/format-for-family")
 def format_for_family(req: FormatReportRequest):
     return {"text": format_report_for_family(req.patient_name, req.visit_date, req.report)}
+
+
+# =============================================================
+# Family AI chatbot — children/chat.py powered by Gemma + Supabase
+# =============================================================
+
+class ChildrenChatRequest(BaseModel):
+    patient_id: str
+    message: str
+
+
+@app.post("/children/chat")
+def children_chat(req: ChildrenChatRequest):
+    from children.chat import send_message
+    try:
+        reply = send_message(req.patient_id, req.message)
+        return {"reply": reply}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

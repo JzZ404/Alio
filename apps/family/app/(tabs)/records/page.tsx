@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
 import {
   IconBox,
@@ -23,7 +22,7 @@ import { VisitRecordItem } from '@/components/VisitRecordItem';
 
 // Hardcoded for the prototype (single patient). Replace with real identity
 // when auth lands.
-const PATIENT_ID = 'dorothy-chen';
+const PATIENT_ID = 'erin-yeung';
 
 type FilterTab = 'All' | RecordType | 'Visit';
 const FILTERS: FilterTab[] = ['All', 'Visit', 'Lab report', 'Prescription', 'Other'];
@@ -40,8 +39,7 @@ const FILTER_LABELS: Record<FilterTab, string> = {
  * List of patient medical records with filter pills and a + FAB that opens
  * AddRecordModal. Header positioned at top-60 to match Logs/AI/Chat screens.
  */
-export default function FamilyRecordsPage() {
-  const router = useRouter();
+export default function FamilyRecordsPage({ onOpenVisit }: { onOpenVisit?: (id: string) => void } = {}) {
   const [records, setRecords] = useState<MedicalRecord[]>(SAMPLE_RECORDS);
   const [visits, setVisits] = useState<CompiledReportRow[]>([]);
   const [activeFilter, setActiveFilter] = useState<FilterTab>('All');
@@ -82,7 +80,7 @@ export default function FamilyRecordsPage() {
 
   return (
     <div
-      className="relative h-full min-h-screen overflow-hidden sm:h-[852px] sm:min-h-0"
+      className="relative h-full overflow-hidden"
       style={{
         background:
           'linear-gradient(135deg, #E3E5F1 0%, #EAEAF2 50%, #D3D5EC 100%)',
@@ -90,7 +88,7 @@ export default function FamilyRecordsPage() {
     >
       {/* Top header — "Records" pill + Search + Plus (positioned at top-60 for consistency) */}
       <header className="absolute left-[25px] right-[25px] top-[60px] z-10 flex items-center justify-between gap-[12px]">
-        <span className="flex h-[42px] items-center rounded-[10px] bg-brand-tint-1 px-[12px] text-[20px] font-bold text-black">
+        <span className="flex h-[42px] items-center text-[20px] font-bold text-black">
           Records
         </span>
         <div className="flex items-center gap-[12px]">
@@ -176,7 +174,7 @@ export default function FamilyRecordsPage() {
                   <li key={v.id}>
                     <VisitRecordItem
                       row={v}
-                      onClick={() => router.push(`/records/visit/${v.id}`)}
+                      onClick={() => onOpenVisit ? onOpenVisit(v.id) : undefined}
                     />
                   </li>
                 ))}

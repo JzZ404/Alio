@@ -12,19 +12,38 @@ from medical_ai import retry_transient
 
 _REPORT_PREFIX = "report_"
 _SYSTEM_PROMPT = """\
-You are a medical report summarizer for a family member with no medical background.
+You are a clinical-reasoning assistant turning ONE caregiver voice note for
+{patient_name} into a short structured summary the family can read at a glance.
+You MUST return JSON that matches the schema exactly. Do not include prose
+outside the JSON object.
 
-You will receive a caregiver's daily health report for {patient_name}. It may include \
-a voice transcript, typed notes, or both. The notes may contain medical terminology.
+Rules:
+- "summary": 2-3 plain-language sentences. No medical jargon. Only what the
+  caregiver actually said.
+- "mood": one short phrase (e.g. "In pain", "Cheerful", "Tired"). Empty string
+  if not mentioned.
+- "medications_noted": list of medication names the caregiver mentioned (taken
+  OR missed). Empty list if none mentioned.
+- "urgent": true ONLY if there's a critical concern (BP > 160/100, severe pain,
+  missed critical med, fall, chest pain, stroke signs).
 
-Your job:
-Combine all input into a plain-language summary (3-5 sentences) — no jargon.
-
-Reply in this exact JSON format with no extra text:
+SCHEMA (return EXACTLY this shape):
 {{
-  "summary": "...",
-  "mood": "...",
-  "medications_noted": ["..."],
+  "summary": string,
+  "mood": string,
+  "medications_noted": [string],
+  "urgent": boolean
+}}
+
+EXAMPLE input:
+Voice transcript: Morning check at 9:15. BP 142 over 88, pulse 76. She slept
+poorly but mood is fine. Took Lisinopril and Metformin. Out of Vitamin D.
+
+EXAMPLE output:
+{{
+  "summary": "Morning check at 9:15. Blood pressure 142/88, pulse 76. Slept poorly but mood is fine. Took her morning Lisinopril and Metformin. Out of Vitamin D.",
+  "mood": "Fine",
+  "medications_noted": ["Lisinopril", "Metformin", "Vitamin D"],
   "urgent": false
 }}"""
 
@@ -62,6 +81,18 @@ def transcribe_audio(wav_bytes: bytes) -> str:
     return recognizer.recognize_google(audio)
 
 
+_SUMMARY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "summary": {"type": "string"},
+        "mood": {"type": "string"},
+        "medications_noted": {"type": "array", "items": {"type": "string"}},
+        "urgent": {"type": "boolean"},
+    },
+    "required": ["summary", "mood", "medications_noted", "urgent"],
+}
+
+
 def summarize_report(patient_name: str, transcript: str, notes: str) -> dict:
     if not transcript and not notes:
         raise ValueError("At least one of transcript or notes must be provided.")
@@ -72,17 +103,26 @@ def summarize_report(patient_name: str, transcript: str, notes: str) -> dict:
         parts.append(f"Written notes: {notes}")
     combined = "\n\n".join(parts)
 
+    # Always hit hosted Gemma 31B for summarize regardless of USE_LOCAL_OLLAMA.
+    # The fine-tuned E2B is reliable for the structured /compile shape but
+    # hallucinates badly on freeform single-note summaries — see WRITEUP §3.2
+    # for the tradeoff. /compile (the headline demo) still uses local Ollama.
     client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
     response = retry_transient(lambda: client.models.generate_content(
         model="models/gemma-4-31b-it",
         config=types.GenerateContentConfig(
-            system_instruction=_SYSTEM_PROMPT.format(patient_name=patient_name)
+            system_instruction=_SYSTEM_PROMPT.format(patient_name=patient_name),
+            response_mime_type="application/json",
         ),
         contents=combined,
     ))
-
-    raw = response.text.strip()
+    raw = (response.text or "").strip()
     match = re.search(r"\{.*\}", raw, re.DOTALL)
     if not match:
         raise ValueError(f"Could not parse JSON from model response: {raw}")
-    return json.loads(match.group())
+    parsed = json.loads(match.group())
+    parsed.setdefault("summary", "")
+    parsed.setdefault("mood", "")
+    parsed.setdefault("medications_noted", [])
+    parsed.setdefault("urgent", False)
+    return parsed
