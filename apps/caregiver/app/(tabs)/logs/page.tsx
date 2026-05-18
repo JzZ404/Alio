@@ -487,7 +487,7 @@ export default function LogsPage({ onOpenReport }: { onOpenReport?: (id: string)
       </header>
 
       {view === 'message' ? (
-        <MessageView turns={conversation} />
+        <MessageView turns={conversation} onOpenReport={onOpenReport} />
       ) : view === 'voice-review' ? (
         <VoiceReviewView
           value={editingTranscript}
@@ -695,7 +695,13 @@ function VoiceReviewView({
   );
 }
 
-function MessageView({ turns }: { turns: ConversationTurn[] }) {
+function MessageView({
+  turns,
+  onOpenReport,
+}: {
+  turns: ConversationTurn[];
+  onOpenReport?: (id: string) => void;
+}) {
   const router = useRouter();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
