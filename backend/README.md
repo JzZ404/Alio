@@ -1,7 +1,10 @@
 # Alio — Backend
 
 FastAPI service that turns the caregiver's voice notes into structured visit
-reports for the family, using Google's Gemma model and Supabase for storage.
+reports for the family, using Google's Gemma 4 model and Supabase for storage.
+
+> *Gemma is a trademark of Google LLC. Alio is not endorsed by or affiliated
+> with Google.*
 
 The frontend lives in `../apps/{caregiver,family}` and talks to this server at
 `http://localhost:8000` (configurable via `NEXT_PUBLIC_API_URL` in each app's

@@ -111,3 +111,11 @@ Three things distinguish Alio from "talk to a model about elder care":
 - **Backend API reference:** [`backend/README.md`](https://github.com/JzZ404/Alio/blob/feat/caregiver/backend/README.md)
 
 > *"When you can't be there, Alio is."*
+
+---
+
+*Gemma is a trademark of Google LLC. Alio uses Google's Gemma 4 models
+(`gemma-4-31b-it` via the Gen AI SDK, and a fine-tuned `gemma-4-e2b-it`
+variant published at [huggingface.co/aarony630/alio-medical](https://huggingface.co/aarony630/alio-medical))
+to power its visit summarization and structured report generation. We are
+not endorsed by or affiliated with Google.*

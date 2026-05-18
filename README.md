@@ -148,3 +148,15 @@ The generator (`scripts/generate-icons.mjs`) normalizes hardcoded colors to
   reports end-to-end, realtime family chat
 - ⏳ Phase 3: real auth (replace hardcoded `caregiver-001` / `erin-chen`),
   multi-patient, elder portal, edit-section affordances on the report template
+
+## Attribution
+
+Alio uses Google's **Gemma 4** models for AI-powered summarization and
+structured report generation:
+- `gemma-4-31b-it` via the Gen AI SDK as the primary inference model
+- A fine-tuned `gemma-4-e2b-it` variant published at
+  [huggingface.co/aarony630/alio-medical](https://huggingface.co/aarony630/alio-medical)
+  for local / offline use
+
+**Gemma is a trademark of Google LLC.** Alio is not endorsed by or
+affiliated with Google.
