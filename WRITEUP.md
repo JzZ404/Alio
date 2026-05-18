@@ -7,7 +7,7 @@
 
 ## The 2 AM phone call
 
-Dorothy Chen is 78. She lives alone in Portland. Her daughter Janet lives in Seattle. Janet would visit every weekend if she could — but she can't, so Sarah Mitchell visits Dorothy three times a week as a professional caregiver, and Janet gets... whatever Sarah has time to text her.
+Erin Chen is 78. She lives alone in Portland. Her daughter Janet lives in Seattle. Janet would visit every weekend if she could — but she can't, so Sarah Mitchell visits Erin three times a week as a professional caregiver, and Janet gets... whatever Sarah has time to text her.
 
 Today, what she gets is: *"Mom did great today!"*
 
@@ -21,10 +21,10 @@ The "wow" moment isn't the AI itself. It's the **gap it closes**: voice notes �
 
 ## The end-to-end demo
 
-1. **Sarah opens the caregiver app** mid-shift, taps *Press to Speak*: *"I just measured Dorothy's blood pressure — 142 over 88. Pulse 76. She slept poorly, the neighbors were loud. I gave her the Metformin and the Lisinopril. She's out of Vitamin D, we'll need a refill."*
+1. **Sarah opens the caregiver app** mid-shift, taps *Press to Speak*: *"I just measured Erin's blood pressure — 142 over 88. Pulse 76. She slept poorly, the neighbors were loud. I gave her the Metformin and the Lisinopril. She's out of Vitamin D, we'll need a refill."*
 2. **Live captions appear as she talks** — Web Speech API in Chromium, a FastAPI streaming fallback in every other browser. She fixes one word and taps Save.
 3. After a couple more visits, she taps **+ Compile**. Gemma 4 reads every log of the day and returns a **structured JSON visit report** in <10s.
-4. The report appears as a tappable "Dorothy's Report" card in Sarah's chat. She opens it, sees *Vitals · BP 142/88 · pulse 76 · ⚠ Above usual range · Temp not taken* — and taps **Send to family**.
+4. The report appears as a tappable "Erin's Report" card in Sarah's chat. She opens it, sees *Vitals · BP 142/88 · pulse 76 · ⚠ Above usual range · Temp not taken* — and taps **Send to family**.
 5. **Cut to Janet's phone in Seattle.** Her Alio family app is open. A Supabase realtime subscription pushes the new row; the same structured card **materializes in her chat thread without a refresh**. She also sees the visit listed in the Records tab alongside lab reports and prescriptions.
 
 The whole flow takes less time than Sarah used to spend writing one text.
@@ -46,7 +46,7 @@ Gemma 4 isn't a chatbot here. It's a **structured-data engine.** Two distinct pr
 }
 ```
 
-We use Gemma 4 with `response_mime_type="application/json"` and a **worked example** baked into the system prompt — a fictitious Dorothy visit phrased exactly like the UI displays — to anchor the model's tone. Each `flag.severity` drives the red/amber/green color in the rendered report.
+We use Gemma 4 with `response_mime_type="application/json"` and a **worked example** baked into the system prompt — a fictitious Erin visit phrased exactly like the UI displays — to anchor the model's tone. Each `flag.severity` drives the red/amber/green color in the rendered report.
 
 Two design choices make this trustworthy:
 
@@ -99,7 +99,7 @@ Three things distinguish Alio from "talk to a model about elder care":
 
 ## What's next
 
-- **Auth + multi-patient.** Today everything is hardcoded to `caregiver-001 + dorothy-chen`. Supabase Auth + RLS by `auth.uid()` is one PR away.
+- **Auth + multi-patient.** Today everything is hardcoded to `caregiver-001 + erin-chen`. Supabase Auth + RLS by `auth.uid()` is one PR away.
 - **Inline editing on the report template.** The edit pencils are visible but inert; wiring them closes the loop.
 - **Streaming STT for long visits.** Chunk polling re-uploads the full accumulated audio each time. For 5-minute monologues we'd switch to a websocket against Google's streaming STT API.
 

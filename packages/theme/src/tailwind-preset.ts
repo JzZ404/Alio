@@ -26,7 +26,7 @@ export const tailwindPreset: Partial<Config> = {
         info: colors.info.blue,
       },
       fontFamily: {
-        sans: fontFamily.sans,
+        sans: [...fontFamily.sans],
       },
       fontSize: fontSize as never,
       borderRadius: borderRadius as never,

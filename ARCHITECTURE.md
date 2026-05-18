@@ -66,7 +66,7 @@ policies in `supabase/schema.sql` before any non-prototype use.
      Meds with severity flags)
    - inserts the row into `compiled_reports`
    - returns `{id, report, ...}`
-7. Caregiver chat appends a tappable **"Dorothy's Report"** card. Tap →
+7. Caregiver chat appends a tappable **"Erin's Report"** card. Tap →
    navigates to `/logs/report/[id]`, which fetches the row via
    `/caregiver-logs/report/{id}` and renders the structured cards.
 8. Sarah taps **Send to family**:
@@ -139,7 +139,7 @@ Raw transcript + per-log Gemma summary, one row per Save tap.
 |---|---|---|
 | `id` | uuid | pk |
 | `caregiver_id` | text | hardcoded `'caregiver-001'` for prototype |
-| `patient_id` | text | hardcoded `'dorothy-chen'` for prototype |
+| `patient_id` | text | hardcoded `'erin-chen'` for prototype |
 | `visit_date` | date | sent explicitly from the client (defaults are bypassed by supabase-js) |
 | `transcript` | text | what the caregiver said |
 | `summary` | text \| null | from `/summarize` |
@@ -182,9 +182,9 @@ production.
 
 There is no auth yet. The frontend hardcodes:
 - `caregiver_id = 'caregiver-001'` (matches `SAMPLE_CG_USER` in mock-data)
-- Active patient comes from `SAMPLE_PATIENTS[0]` (`'dorothy-chen'`)
+- Active patient comes from `SAMPLE_PATIENTS[0]` (`'erin-chen'`)
 - Family thread `sarah-caregiver` is mapped to Supabase thread_id
-  `caregiver-001__dorothy-chen` in `apps/family/.../chat/[id]/page.tsx`'s
+  `caregiver-001__erin-chen` in `apps/family/.../chat/[id]/page.tsx`'s
   `SUPABASE_THREAD_FOR` constant
 
 To add a second caregiver/patient pair: extend `SAMPLE_PATIENTS`, add an

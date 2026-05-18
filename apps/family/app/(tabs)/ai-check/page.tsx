@@ -22,7 +22,7 @@ import {
 import { type ChatMessage } from '@alio/mock-data';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
-const PATIENT_ID = 'dorothy-chen';
+const PATIENT_ID = 'erin-chen';
 
 async function askAI(message: string): Promise<string> {
   const res = await fetch(`${API_URL}/children/chat`, {

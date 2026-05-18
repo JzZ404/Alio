@@ -113,7 +113,7 @@ export type PatientContact = {
 
 export const SAMPLE_PATIENTS: Patient[] = [
   {
-    id: 'dorothy-chen',
+    id: 'erin-chen',
     name: 'Erin Yeung',
     time: '10:00 AM',
     address: '1234 Maple St',
@@ -403,7 +403,7 @@ export const SAMPLE_FM_CHAT_THREADS: ChatThread[] = [
     avatarUrl: '/avatars/nurse.png',
   },
   {
-    id: 'dorothy-circle',
+    id: 'erin-circle',
     name: "Erin's Care Circle",
     lastMessage: "Janet: Will visit Sunday",
     timestamp: '10:42AM',
@@ -447,8 +447,8 @@ export const SAMPLE_FM_CONVERSATIONS: Record<string, ChatMessage[]> = {
     { id: 'fm-m4', sender: 'me',   text: 'Wonderful. Could you make sure she takes her morning meds?' },
     { id: 'fm-m5', sender: 'them', text: 'Just finished morning meds, all good!' },
   ],
-  'dorothy-circle': [
-    { id: 'fm-d1', sender: 'them', text: 'Sarah: Dorothy had a great morning today 🌞' },
+  'erin-circle': [
+    { id: 'fm-d1', sender: 'them', text: 'Sarah: Erin had a great morning today 🌞' },
     { id: 'fm-d2', sender: 'me',   text: "That's wonderful to hear!" },
     { id: 'fm-d3', sender: 'them', text: 'Janet: Will visit Sunday' },
   ],

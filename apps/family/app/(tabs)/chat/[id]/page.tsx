@@ -24,7 +24,7 @@ import { ReportCard } from '@/components/ReportCard';
 // Map a family-side chat thread ID to the Supabase thread_id that the
 // caregiver app writes to. Add entries as more caregivers/patients come online.
 const SUPABASE_THREAD_FOR: Record<string, string | undefined> = {
-  'sarah-caregiver': 'caregiver-001__dorothy-chen',
+  'sarah-caregiver': 'caregiver-001__erin-chen',
 };
 
 /**

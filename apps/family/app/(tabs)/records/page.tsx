@@ -22,7 +22,7 @@ import { VisitRecordItem } from '@/components/VisitRecordItem';
 
 // Hardcoded for the prototype (single patient). Replace with real identity
 // when auth lands.
-const PATIENT_ID = 'dorothy-chen';
+const PATIENT_ID = 'erin-chen';
 
 type FilterTab = 'All' | RecordType | 'Visit';
 const FILTERS: FilterTab[] = ['All', 'Visit', 'Lab report', 'Prescription', 'Other'];

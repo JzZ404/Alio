@@ -95,7 +95,7 @@ Two prompt shapes:
   `explain_report_question`) — system prompt with explicit schema +
   `response_mime_type="application/json"` → parsed via `_parse_json_response`
 
-The structured-report prompt includes a worked example (a fictitious Dorothy
+The structured-report prompt includes a worked example (a fictitious Erin
 visit) to anchor Gemma's tone and label format. If you change the
 `VisitReport` shape on the frontend, update both the schema text AND the
 example in `_STRUCTURED_REPORT_SYSTEM`.

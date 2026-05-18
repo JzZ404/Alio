@@ -107,7 +107,7 @@ cd apps/family    && ./node_modules/.bin/next dev -p 3002
 ## 6. Smoke test
 
 Open http://localhost:3001/logs (caregiver). You should see:
-- Patient pill "Dorothy Chen" in the top-left
+- Patient pill "Erin Chen" in the top-left
 - "Hi, I am listening" + the gradient blob in the middle
 - Press to Speak button at the bottom
 
@@ -121,7 +121,7 @@ Test the full flow:
 1. Press to Speak → talk → Done → Save
 2. Repeat once more
 3. Tap **+** → "Compiling…" appears → switches to message view with a
-   tappable "Dorothy's Report" card
+   tappable "Erin's Report" card
 4. Tap the card → opens the structured report template
 5. Tap **Send to family**
 6. Open http://localhost:3002/chat/sarah-caregiver in another tab → the
@@ -146,7 +146,7 @@ Hardcoded identities to swap in `apps/caregiver/app/(tabs)/logs/page.tsx`:
 - `CAREGIVER_NAME = 'Sarah Mitchell'`
 
 And in `apps/family/app/(tabs)/chat/[id]/page.tsx`:
-- `SUPABASE_THREAD_FOR['sarah-caregiver'] = 'caregiver-001__dorothy-chen'`
+- `SUPABASE_THREAD_FOR['sarah-caregiver'] = 'caregiver-001__erin-chen'`
 
 When auth lands, replace all of these with values from `auth.uid()`.
 
