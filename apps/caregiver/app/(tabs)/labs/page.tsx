@@ -76,7 +76,7 @@ export default function LabReportUploadPage() {
 
   return (
     <div
-      className="relative min-h-screen overflow-y-auto pb-20"
+      className="relative overflow-y-auto pb-20"
       style={{
         background:
           'linear-gradient(135deg, #E3E5F1 0%, #EAEAF2 50%, #D3D5EC 100%)',

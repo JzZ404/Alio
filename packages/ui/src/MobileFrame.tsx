@@ -9,14 +9,13 @@ import { type ReactNode } from 'react';
  */
 export function MobileFrame({ children }: { children: ReactNode }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-30 sm:p-6">
+    <div className="flex h-screen items-center justify-center bg-gray-30 sm:p-6">
       <div
         className="
-          relative w-full
+          relative w-full h-full
           sm:w-[393px] sm:h-[852px]
-          sm:rounded-[40px] sm:overflow-hidden
+          overflow-hidden sm:rounded-[40px]
           sm:shadow-2xl sm:ring-1 sm:ring-black/10
-          min-h-screen sm:min-h-0
           bg-brand-tint-2
         "
       >

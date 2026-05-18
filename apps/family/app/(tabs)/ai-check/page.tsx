@@ -22,7 +22,7 @@ import {
 import { type ChatMessage } from '@alio/mock-data';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
-const PATIENT_ID = 'dorothy-chen';
+const PATIENT_ID = 'erin-yeung';
 
 async function askAI(message: string): Promise<string> {
   const res = await fetch(`${API_URL}/children/chat`, {
@@ -230,7 +230,7 @@ export default function FamilyAICheckPage() {
 
   return (
     <div
-      className="relative h-full min-h-screen overflow-hidden sm:h-[852px] sm:min-h-0"
+      className="relative h-full overflow-hidden"
       style={{ background: 'linear-gradient(135deg, #E3E5F1 0%, #EAEAF2 50%, #D3D5EC 100%)' }}
     >
       <header className="absolute left-[25px] right-[25px] top-[60px] z-10 flex items-center justify-between gap-3">

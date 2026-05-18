@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import clsx from 'clsx';
-import { IconChevronDown, IconMapsFilled, IconHandphone, IconChat } from './icons';
+import { IconChevronDown, IconMapsFilled, IconHandphone, IconChat, IconChecklistCircleFilled } from './icons';
 import type { Patient } from '@alio/mock-data';
 
 /**
@@ -22,6 +22,7 @@ export function PatientCard({
   mapImageUrl?: string;
 }) {
   const [expanded, setExpanded] = useState(!!defaultExpanded);
+  const [arrived, setArrived] = useState(false);
 
   return (
     <div className="flex flex-col gap-[12px] rounded-[16px] bg-brand-tint-1 p-[14px]">
@@ -121,6 +122,22 @@ export function PatientCard({
               </div>
             ))}
           </div>
+
+          {/* Arrival CTA */}
+          <button
+            type="button"
+            onClick={() => setArrived((a) => !a)}
+            aria-pressed={arrived}
+            className={clsx(
+              'mt-[4px] flex h-[44px] w-full items-center justify-center gap-[8px] rounded-full text-[14px] font-bold transition-colors',
+              arrived
+                ? 'bg-brand-accent/20 text-brand-accent'
+                : 'bg-brand-primary text-white active:bg-brand-primary/85',
+            )}
+          >
+            {arrived && <IconChecklistCircleFilled className="size-[18px]" />}
+            {arrived ? "Arrived" : "I'm Arrived"}
+          </button>
         </div>
       )}
     </div>

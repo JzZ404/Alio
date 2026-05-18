@@ -24,7 +24,7 @@ import { ReportCard } from '@/components/ReportCard';
 // Map a family-side chat thread ID to the Supabase thread_id that the
 // caregiver app writes to. Add entries as more caregivers/patients come online.
 const SUPABASE_THREAD_FOR: Record<string, string | undefined> = {
-  'sarah-caregiver': 'caregiver-001__dorothy-chen',
+  'sarah-caregiver': 'caregiver-001__erin-yeung',
 };
 
 /**
@@ -118,7 +118,7 @@ export default function FamilyChatConversationPage({ id: propId, onBack }: { id?
 
   return (
     <div
-      className="relative h-full min-h-screen overflow-hidden sm:h-[852px] sm:min-h-0"
+      className="relative h-full overflow-hidden"
       style={{
         background:
           'linear-gradient(135deg, #E3E5F1 0%, #EAEAF2 50%, #D3D5EC 100%)',
@@ -168,7 +168,7 @@ export default function FamilyChatConversationPage({ id: propId, onBack }: { id?
       </header>
 
       {/* Messages */}
-      <div className="absolute bottom-[200px] left-0 right-0 top-[129px] overflow-y-auto px-[16px] py-[12px]">
+      <div className="absolute bottom-[120px] left-0 right-0 top-[129px] overflow-y-auto px-[16px] py-[12px]">
         {messages.length === 0 ? (
           <p className="mt-12 text-center text-sm text-gray-60">
             No messages yet — say hi 👋
@@ -191,14 +191,14 @@ export default function FamilyChatConversationPage({ id: propId, onBack }: { id?
       </div>
 
       {/* Quick actions row */}
-      <div className="absolute bottom-[152px] left-0 right-0 flex items-center justify-center gap-[10px] px-[16px]">
+      <div className="absolute bottom-[72px] left-0 right-0 flex items-center justify-center gap-[10px] px-[16px]">
         <QuickAction icon={IconReminder} label="Send Notes" />
         <QuickAction icon={IconRefresh} label="Status Update" />
         <QuickAction icon={IconProfile} label="Contact" />
       </div>
 
       {/* Input row */}
-      <div className="absolute bottom-[100px] left-0 right-0 flex items-center gap-[10px] px-[16px]">
+      <div className="absolute bottom-[16px] left-0 right-0 flex items-center gap-[10px] px-[16px]">
         <button
           type="button"
           aria-label="Record voice message"
