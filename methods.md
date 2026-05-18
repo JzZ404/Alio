@@ -260,7 +260,7 @@ Voice      : speech_recognition (Google API today, faster-whisper for offline)
 
 ### Quick start — just pull the published model
 
-The trained model is published at **[huggingface.co/aarony630/alio-medical](https://huggingface.co/aarony630/alio-medical)**:
+The trained model is published on **Kaggle Models** ([matong666/alio-medical](https://www.kaggle.com/models/matong666/alio-medical)) as the canonical artifact, with a HuggingFace mirror at **[aarony630/alio-medical](https://huggingface.co/aarony630/alio-medical)** so Ollama can `pull` it in one command:
 
 ```bash
 # 1. Install Ollama (https://ollama.com/download)
