@@ -1,7 +1,7 @@
 # Alio — UI Prototype Plan
 
 > **Product:** Alio — AI copilot for elder care connecting seniors, caregivers, and adult children.
-> **Tagline:** "When you can't be there, Alio is."
+> **Tagline:** "So no one cares alone."
 
 ## Product
 

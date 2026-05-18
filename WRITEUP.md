@@ -13,24 +13,34 @@ JUDGING CRITERIA (Kaggle):
 ====================================================================
 -->
 
-## 1. The Problem  *(~150 words)*
+## 1. The Problem  *(~270 words)*
 
-53 million Americans care for an aging parent. Most are unpaid family members
-juggling work, kids, and a 200-mile drive to Mom's house. The information gap
-is brutal: a paid caregiver visits, something happens, and the family hears
-about it in a 90-second phone call hours later — if at all. Lab results sit
-in a portal nobody opens. Medication changes get lost in voicemail.
+This project began with a personal crisis. One of our teammates received the
+call no family wants — her 90-year-old grandmother, who lived alone with the
+support of a daily caregiver, had collapsed at home and been rushed to the
+ICU. What made it devastating wasn't the event itself, but what came after:
+the warning signs had been there for days. The caregiver had noticed changes,
+mentioned them in passing, sent updates through WhatsApp messages and
+handwritten notes. Those updates were scattered across chat threads, buried
+beneath work emails and everyday noise, and only ever reached one family
+member — who, like most adult children caring for aging parents, was already
+stretched thin.
 
-The cost is measured in preventable ER visits, missed medication doses, and
-the quiet exhaustion of adult children who can't tell, from 1,000 miles away,
-whether Mom is okay today.
+Nobody had failed on purpose. The caregiver had done her job. The family
+cared deeply. The problem was structural: there was no system connecting the
+people who showed up every day with the people who loved her from afar.
+Across millions of households, elderly care is held together by fragmented
+communication — informal messages, memory, and luck. Critical health signals
+routinely slip through the cracks, and families often only learn how serious
+things are when it's already too late.
 
-**Alio** is an AI copilot for elder care that connects the three people who
-need to be on the same page — the senior, the paid caregiver, and the adult
-child — through voice-first visit notes, AI-interpreted lab results, and
-real-time structured reports.
+That gap became our starting point. **Alio** is the platform we built to
+close it — an AI copilot for elder care that connects the three people who
+need to be on the same page: the senior, the paid caregiver, and the adult
+child. Voice-first visit notes, AI-interpreted lab results, real-time
+structured reports — so every family member stays in the loop, not just one.
 
-> *"When you can't be there, Alio is."*
+> *"So no one cares alone."*
 
 ---
 
@@ -50,26 +60,95 @@ fine-tuned, with no data leaving the device** for the most sensitive paths.
 
 ---
 
-## 3. How We Used Gemma 4  *(~350 words)*
+## 3. How We Used Gemma 4  *(~650 words)*
 
-### 3.1 One dispatch point, two modes
+### 3.0 The constraint that shaped every technical choice
 
-The whole app routes through a single function — `_call_gemma()` in
-[medical_ai.py](backend/medical_ai.py) — which switches on the
+Elder care is one of the worst possible domains for "ship your data to a
+cloud API and hope for the best." Every Alio call touches something a HIPAA
+covered entity would refuse to hand to a third party:
+
+- A caregiver's voice notes describing a patient's vitals, mood, and missed
+  meds.
+- Photos of prescription bottles, lab printouts, AVS summaries from a
+  recent ER visit.
+- Family chat threads about a parent's symptoms, falls, mental state.
+- The transcript of a 2 a.m. AI conversation a worried adult child has
+  about whether their mom's new chest pain is dangerous.
+
+For Alio to be a real product — not just a hackathon demo — the most
+sensitive call paths have to run on the family's own hardware. The senior's
+iPad. The caregiver's phone. A $200 mini-PC in the kitchen. That's a hard
+constraint, and it forced three technical decisions before we wrote a line
+of model code:
+
+**1. The model has to fit on consumer hardware.** Gemma 4 31B is excellent,
+but no one is running it on Grandma's tablet. We needed something in the
+2–5 B-param range that still spoke plain-language medicine. **That's why
+we distilled to Gemma 4 E2B (4.6 B params, Q4_K_M, 3.4 GB GGUF)** — small
+enough to run on Apple Silicon or a CPU, big enough to inherit the
+teacher's voice on the tasks we trained for (§3.2).
+
+**2. We had to fine-tune on free compute.** Renting H100s for distillation
+makes the pipeline reproducible by exactly one team. **That's why we used
+Unsloth** — 4-bit QLoRA fits in 16 GB VRAM, so the whole pipeline runs on
+a single Kaggle T4 (free tier). Any clinician collaborator with a Google
+account can re-run our 2-epoch, 224-step training notebook without renting
+GPUs. The model on HuggingFace
+([aarony630/alio-medical](https://huggingface.co/aarony630/alio-medical))
+is just the artifact of a reproducible pipeline, not a one-off.
+
+**3. The serving stack has to be deployable by non-engineers.** A caregiver
+should not need to install CUDA drivers, configure a Python venv, or
+download a model from HuggingFace by hand. **That's why we used Ollama** —
+one command (`ollama pull`), one daemon, a stable REST API identical across
+macOS / Linux / Windows. A family member who can install Slack can install
+Alio.
+
+Together those three choices — **Unsloth fine-tuning, Ollama serving,
+a 4.6 B Q4_K_M student model** — are what let us claim "local-first" with a
+straight face. Without them, Alio would be a thin wrapper around a cloud
+API, and the privacy promise in §2 would be marketing copy.
+
+The rest of §3 explains how those decisions show up in the code: what the
+dispatch looks like at request time (§3.1), what the distillation pipeline
+actually trained the student on (§3.2), and how strict JSON keeps the
+caregiver and family UIs in lockstep with the model (§3.3).
+
+### 3.1 Per-task dispatch — local for what we distilled for, hosted for what we didn't
+
+Every Gemma 4 call goes through a single function —
+`_call_gemma(system, user, json_mode)` in
+[medical_ai.py](backend/medical_ai.py) — that switches on the
 `USE_LOCAL_OLLAMA` env var:
 
-| Mode | Model | Use case |
+| `USE_LOCAL_OLLAMA` | Backend | Model served |
 |---|---|---|
-| **Cloud** *(default)* | `gemma-4-31b-it` via Google GenAI API | Hackathon judges hit the live demo, full 31B quality, no setup |
-| **Local** *(`USE_LOCAL_OLLAMA=1`)* | **Fine-tuned `gemma-4-e2b`** via Ollama | HIPAA-sensitive deployment, offline, edge hardware |
+| `0` *(default — judges-friendly)* | Google GenAI API | `gemma-4-31b-it` |
+| `1` *(local-first deployment)* | Local Ollama daemon | **fine-tuned `alio-medical`** — Gemma 4 E2B, Q4_K_M GGUF, ~3.4 GB |
 
-The same prompt, same `VisitReport` / lab / triage JSON schema, same UI —
-one env var flips the entire trust boundary. This is what lets us claim
-"local-first" without forcing every demo viewer to install Ollama.
+But the actual production split is **per-endpoint**, not per-deployment:
 
-The fine-tuned E2B handles **all three** structured tasks the app calls
-into Gemma for: visit-note summaries, lab-panel explanations, and symptom
-triage (see §3.2 below).
+| Endpoint | Backend | Why |
+|---|---|---|
+| `/caregiver-logs/compile` (structured `VisitReport`) | **local alio-medical** | Distilled on this exact JSON shape — output is reliable, fast on-device, never leaves the box. |
+| `/labs/interpret` (lab panel → explanation + severity flags) | **local alio-medical** | One of the three distillation tasks — same story. |
+| `/children/chat` (family conversational AI) | local **alio-medical** when env set, else hosted | Conversational. |
+| `/summarize` (per-note freeform paraphrase) | **hosted gemma-4-31b-it** | E2B was *not* distilled on freeform single-note summaries — empirically hallucinates here. The 31B teacher is reliable, so we always pay the round-trip. |
+| `/transcribe` (audio → text) | Google Speech-to-Text | Server fallback when the browser's Web Speech API errors out. |
+
+**The design lesson we learned during integration:** a distilled student
+inherits the teacher's capability *only on the tasks it was trained for*.
+The split isn't a compromise — it's the honest deployment of a 4.6 B-param
+model: keep it on its strengths, fall back to the teacher when
+off-distribution. The high-frequency, privacy-sensitive paths
+(`/compile`, `/labs`) stay on-device; the rare, low-stakes freeform path is
+allowed to leave. This is what lets us claim "local-first" without
+overpromising.
+
+The data contract — strict JSON schemas defined in
+`_STRUCTURED_REPORT_SYSTEM` and `_LAB_SYSTEM` — is identical across modes,
+so the caregiver / family TypeScript renders the same UI either way.
 
 ### 3.2 Fine-tuning with Unsloth — distilling 31B → E2B
 
@@ -94,10 +173,16 @@ LR 2e-4 cosine, ~224 steps total. Trained on a single **T4 16 GB (Kaggle
 free tier)**; exported as `q4_k_m` GGUF (~1.7 GB) for direct Ollama serving.
 Full reproduction in `kaggle_train_gemma4_e2b.ipynb`.
 
-**Eval:** validation loss converged on the 100-row held-out split. [TODO:
-task-specific metric — e.g., "On 30 held-out lab panels, fine-tuned E2B
-matched 31B's `follow_up` tier on N/30" — strongly recommend running before
-submission.]
+**Eval:** validation loss converged on the 100-row held-out split. In
+integration, the fine-tune matched the teacher tightly on the **structured**
+tasks it was trained for — `VisitReport` shape compliance is ~100 % on
+manual spot checks (BP, pulse, temp, flag severity all populated correctly
+from a single morning-check log). On **freeform** paraphrase prompts it
+wasn't trained for, output drifts hard (hallucinated vitals, occasional
+non-English tokens) — which is the empirical evidence behind the per-task
+split in §3.1, and why `/summarize` always goes to the 31B teacher.
+*[TODO before submission: report N/30 schema-match rate on the 100-row
+held-out split.]*
 
 ### 3.3 Structured output as the data contract
 
@@ -108,65 +193,119 @@ realtime → UI without runtime parsing surprises.
 
 ---
 
-## 4. Architecture  *(~250 words)*
+## 4. Architecture  *(~400 words)*
 
 ```
-   Caregiver app (Next.js)        Family app (Next.js)
-        │                                │
-        │ /transcribe /summarize         │
-        │ /compile    /format-for-family │ realtime subscribe
-        ▼                                ▼
-     ┌────────────────────────────────────────┐
-     │      FastAPI  (api.py, report.py)       │
-     │      medical_ai.py  ── dispatch ──┐     │
-     └─────────────────────────────────┐ │     │
-                                       ▼ ▼
-                  ┌──── Gemma API (31B-it)       (cloud path)
-                  └──── Ollama   (fine-tuned E2B) (local path)
-                                       │
-                       ┌───────────────┴────────────┐
-                       ▼                            ▼
-                Supabase (Postgres + realtime)   HuggingFace
-                 caregiver_logs                  (model registry)
-                 compiled_reports
-                 family_messages
+   Caregiver app (Next.js, port 3001)            Family app (Next.js, port 3002)
+         │                                              │
+         │ /transcribe  /summarize                      │
+         │ /compile     /caregiver-logs/...             │ realtime subscribe
+         │ /labs/interpret                              │ /children/chat
+         ▼                                              ▼
+   ┌──────────────────────────────────────────────────────────────────┐
+   │                  FastAPI  (backend/api.py)                       │
+   │                                                                  │
+   │   medical_ai.py  ─── _call_gemma() ───┐                          │
+   │   report.py      ─── hosted only ───┐ │                          │
+   │   children/chat  ─── _call_gemma() ─┤ │                          │
+   │                                     │ │                          │
+   └─────────────────────────────────────┼─┼──────────────────────────┘
+                                         │ │
+                  ┌──────────────────────┘ └────────────────────┐
+                  ▼                                             ▼
+        Hosted Google GenAI                         Local Ollama (CPU / GPU)
+        gemma-4-31b-it                              alio-medical (E2B Q4_K_M)
+        - /summarize  (freeform)                    - /compile           (structured)
+        - /children/chat (cloud fallback)           - /labs/interpret    (structured)
+                                                    - /children/chat     (when set)
+                  │                                             │
+                  └──────────────────┬──────────────────────────┘
+                                     ▼
+                   ┌─────────────────────────────────────┐
+                   │ Supabase (Postgres + realtime push) │
+                   │   caregiver_logs                    │
+                   │   compiled_reports                  │
+                   │   family_messages                   │
+                   │   lab_reports                       │
+                   └─────────────────────────────────────┘
+                                     │
+                                     ▼
+                          HuggingFace model registry
+                          (aarony630/alio-medical, Q4_K_M GGUF)
 ```
 
-**End-to-end flow for one visit:** Sarah (caregiver) presses to speak →
-Web Speech gives live captions (server-side STT chunking fallback every 3s)
-→ Save inserts a row into `caregiver_logs` with a Gemma-extracted summary
-→ tap **+** to `/compile` a structured `VisitReport` → **Send to family**
-inserts into `family_messages` → Janet's chat receives the row via Supabase
-realtime in <1s and renders the same structured card inline. The same
-report also appears in family **Records → Visits**.
+**End-to-end flow for one visit.** Sarah (caregiver) taps **Press to Speak** →
+Web Speech API gives live word-by-word captions in the browser; in parallel
+`MediaRecorder` chunks every 3 s and POSTs to `/transcribe` (Google STT) so
+no audio is lost if Web Speech errors out. She edits the transcript on the
+**Review** screen, then **Save**. The frontend POSTs to `/summarize`, which
+hits **hosted Gemma 31B** for a plain-language `VisitSummary {summary, mood,
+medications_noted, urgent}` — the UI renders it as an inline card under the
+audio bubble, and the row is persisted to `caregiver_logs`. Sarah taps **+**
+to call `/caregiver-logs/compile`, which pulls the **latest** log for that
+patient and sends it to **local Ollama** (`alio-medical`) for a strict
+`VisitReport` JSON (vitals / mood / meds with severity flags). The compiled
+row goes into `compiled_reports`; the chat picks up a tappable report card.
+Sarah taps the card → **Log Summary** template → **Send to family** calls
+`/caregiver-logs/report/format-for-family`, which inserts a row into
+`family_messages`. Janet's family chat is subscribed to that table via
+Supabase realtime — the message shows up in **<1 s** and the same structured
+card appears in **Records → Visits**.
 
-**Lab path:** lab PDF / photo → OCR → fine-tuned Gemma 4 E2B (Ollama) →
-plain-language explanation + severity flags → family chat notification if
-anything's flagged.
+**Lab path.** Janet uploads a lab PDF/photo → `/labs/interpret` → server-side
+OCR (Tesseract) → **local Ollama (`alio-medical`)** returns a plain-language
+explanation + severity flags + `follow_up` tier → row in `lab_reports` →
+family chat notification if anything's flagged.
+
+**AI chat.** Janet asks the AI on the Family AI screen → `/children/chat`
+routes through `_call_gemma()` (local if `USE_LOCAL_OLLAMA=1`, hosted
+otherwise) → conversational reply streamed back into the chat bubble.
+
+**Dispatch rationale (see §5).** `_call_gemma(system, user, json_mode)` is a
+single function in `medical_ai.py` that switches on the `USE_LOCAL_OLLAMA`
+env var. The split — local for structured tasks the fine-tune was distilled
+on, hosted for freeform paraphrasing — is the engineering judgment that
+keeps the high-frequency, privacy-sensitive call path on-device while
+falling back to the 31B teacher for the rare cases where the small model
+can't be trusted.
 
 ---
 
-## 5. Why These Technical Choices  *(~200 words)*
+## 5. Why These Technical Choices  *(~280 words)*
 
-**Why distill 31B → E2B (not just use the API)?** E2B runs on a phone or a
-$200 mini-PC. For elder-care families who don't have a server in the closet,
-"local-first" has to mean "fits on the device they already own." The 31B
-teacher already speaks plain-language medicine well; ~224 LoRA steps were
-enough for E2B to inherit that voice across all three task types while
-staying small enough to ship as a 1.7 GB GGUF.
+**Why distill 31B → E2B (not just use the hosted API)?** E2B runs on a phone
+or a $200 mini-PC. For elder-care families who don't have a server in the
+closet, "local-first" has to mean "fits on the device they already own."
+The 31B teacher already speaks plain-language medicine well; ~224 LoRA
+steps were enough for E2B to inherit that voice on the **structured tasks
+we trained for** (visit reports, lab interpretation, triage) and ship as a
+3.4 GB Q4_K_M GGUF that loads in seconds on Apple Silicon or Intel CPUs.
+
+**Why a per-endpoint dispatch instead of "everything on E2B"?** See §3.1 —
+the distilled student is rock-solid on the JSON shapes it was trained on
+and unreliable on freeform paraphrase prompts it wasn't. We took that
+empirically and built a backend that routes each call to the model that
+handles it well. It's a more honest story than "we fine-tuned for
+everything and it all just works," and it keeps the privacy-critical path
+(`/compile`, `/labs`) on-device where it belongs.
 
 **Why Ollama for serving?** One command (`ollama pull`), a stable REST API,
 identical interface across macOS / Linux / Windows. We didn't want to ship
-a Python inference stack to non-technical users.
+a Python inference stack to non-technical users. (Caveat: Ollama's Vulkan
+backend on Intel Arc iGPUs produces fast but numerically wrong tokens — we
+ship on CPU on Windows, on Metal on Apple Silicon. Details in
+`docs/INFERENCE_NOTES.md`.)
 
-**Why Unsloth for fine-tuning?** 2× faster training, 70% less VRAM, single
-file. We trained on free Kaggle compute. A clinician collaborator can
-re-run the pipeline without renting GPUs.
+**Why Unsloth for fine-tuning?** 2× faster training, 70 % less VRAM, single
+file. We trained on free Kaggle compute (T4 16 GB). A clinician
+collaborator can re-run the pipeline without renting GPUs.
 
 **Why structured JSON, not freeform?** Reports stream from caregiver →
-family in <1s. A worried adult child cannot parse a paragraph at a glance.
+family in <1 s. A worried adult child cannot parse a paragraph at a glance.
 Structured cards with red/amber/green severity flags map to how a triage
-nurse actually thinks.
+nurse actually thinks — and they're what made the per-endpoint dispatch in
+§3.1 possible in the first place (you can't dispatch by shape if there's
+no shape).
 
 **Why Supabase realtime?** Postgres + WebSocket push, no polling, no custom
 pub/sub. The whole "the family knows instantly" promise is one

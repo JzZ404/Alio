@@ -145,7 +145,7 @@ export default function FamilyRecordsPage({ onOpenVisit }: { onOpenVisit?: (id: 
       </div>
 
       {/* Owner summary card + records list — scrollable */}
-      <div className="absolute bottom-[110px] left-0 right-0 top-[163px] overflow-y-auto px-[25px]">
+      <div className="absolute bottom-[40px] left-0 right-0 top-[163px] overflow-y-auto px-[25px] pb-[24px]">
         {/* Purple summary card */}
         <div className="flex h-[70px] items-center gap-[12px] rounded-[12px] bg-brand-primary px-[12px] pr-[16px]">
           <span className="flex size-[48px] shrink-0 items-center justify-center rounded-[10px] bg-brand-tint-1">
@@ -170,10 +170,11 @@ export default function FamilyRecordsPage({ onOpenVisit }: { onOpenVisit?: (id: 
           ) : (
             <>
               {showVisits &&
-                visits.map((v) => (
+                visits.map((v, i) => (
                   <li key={v.id}>
                     <VisitRecordItem
                       row={v}
+                      unread={i === 0}
                       onClick={() => onOpenVisit ? onOpenVisit(v.id) : undefined}
                     />
                   </li>

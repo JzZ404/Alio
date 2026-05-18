@@ -264,7 +264,7 @@ export default function FamilyAICheckPage() {
           disabled={loading}
         />
       ) : (
-        <div className="absolute bottom-[95px] left-[25px] right-[25px] z-10 flex items-center justify-between">
+        <div className="absolute bottom-[20px] left-[25px] right-[25px] z-10 flex items-center justify-between">
           <IconBox size={48} aria-label="Open keyboard" onClick={() => setKeyboardOpen(true)}>
             <IconKeyboard className="size-6 text-gray-100" />
           </IconBox>
@@ -313,20 +313,36 @@ function VoiceView({ view, transcript, micError, loading }: { view: View; transc
       </div>
 
       {micError && (
-        <p className="absolute left-[40px] right-[40px] top-[540px] text-center text-sm text-red-500">{micError}</p>
+        <p className="absolute left-1/2 bottom-[120px] w-[311px] -translate-x-1/2 text-center text-sm text-red-500">{micError}</p>
       )}
 
       {recording && transcript && (
-        <p className="absolute left-[40px] right-[40px] top-[540px] text-center text-base leading-snug text-gray-100">
-          {transcript.split(' ').map((word, i, arr) => {
-            const isLastFew = i >= arr.length - 4;
-            return (
-              <span key={i} className={isLastFew ? 'text-gray-100' : 'text-gray-60'}>
-                {word}{' '}
-              </span>
-            );
-          })}
-        </p>
+        <div className="absolute left-1/2 bottom-[120px] w-[311px] -translate-x-1/2 text-center text-[18px] leading-[26px] font-medium">
+          {(() => {
+            // Chunk into ~5-word lines so each line fits the 311px blob width.
+            // Show the last 4 lines, fade older lines whole — line-by-line.
+            const words = transcript.trim().split(/\s+/);
+            const wordsPerLine = 5;
+            const lines: string[] = [];
+            for (let i = 0; i < words.length; i += wordsPerLine) {
+              lines.push(words.slice(i, i + wordsPerLine).join(' '));
+            }
+            const tail = lines.slice(-4);
+            return tail.map((line, i) => {
+              const distFromEnd = tail.length - 1 - i;
+              const color =
+                distFromEnd === 0 ? 'text-gray-100'
+                : distFromEnd === 1 ? 'text-gray-100 opacity-70'
+                : distFromEnd === 2 ? 'text-gray-100 opacity-45'
+                                    : 'text-gray-100 opacity-25';
+              return (
+                <div key={i} className={color}>
+                  {line}
+                </div>
+              );
+            });
+          })()}
+        </div>
       )}
     </>
   );
@@ -359,7 +375,7 @@ function MessageInput({
 }) {
   const hasText = value.trim().length > 0;
   return (
-    <div className="absolute bottom-[95px] left-[16px] right-[16px] z-10 flex items-center gap-[10px]">
+    <div className="absolute bottom-[20px] left-[16px] right-[16px] z-10 flex items-center gap-[10px]">
       <div className="flex h-[44px] flex-1 items-center gap-[8px] rounded-full bg-white px-[14px] shadow-sm">
         <input
           type="text"

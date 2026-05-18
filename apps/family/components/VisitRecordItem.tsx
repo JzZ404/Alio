@@ -12,9 +12,11 @@ import type { CompiledReportRow } from '@/lib/supabase';
 export function VisitRecordItem({
   row,
   onClick,
+  unread = false,
 }: {
   row: CompiledReportRow;
   onClick?: () => void;
+  unread?: boolean;
 }) {
   const date = formatLongDate(row.visit_date);
   const title = `Visit · ${row.patient_name}`;
@@ -28,8 +30,14 @@ export function VisitRecordItem({
         'transition-colors active:bg-brand-border',
       )}
     >
-      <span className="flex size-[48px] shrink-0 items-center justify-center rounded-[10px] bg-white">
+      <span className="relative flex size-[48px] shrink-0 items-center justify-center rounded-[10px] bg-white">
         <IconMedicalRecord className="size-[24px] text-brand-primary" />
+        {unread && (
+          <span
+            aria-label="Unread"
+            className="absolute -right-[2px] -top-[2px] size-[12px] rounded-full bg-[#F65E69] ring-2 ring-brand-tint-1"
+          />
+        )}
       </span>
       <div className="flex flex-1 flex-col gap-[4px] text-left leading-none">
         <span className="text-[14px] font-bold text-[#28292C]">{title}</span>
