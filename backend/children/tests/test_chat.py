@@ -2,11 +2,11 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 
-PATIENT_ID = "erin-chen"
+PATIENT_ID = "erin-yeung"
 
 SAMPLE_INFO = {
     "id": PATIENT_ID,
-    "name": "Erin Chen",
+    "name": "Erin Yeung",
     "medications": [{"name": "Lisinopril", "time": "8:00 AM", "with_food": True}],
     "appointments": [{"doctor": "Dr. Smith", "type": "Cardiology", "date": "2026-05-20", "time": "10:00 AM", "location": "UW Medical"}],
 }

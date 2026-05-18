@@ -49,7 +49,7 @@ export default function TabsLayout({ children }: { children: ReactNode }) {
 
   return (
     <MobileFrame>
-      <div className="relative overflow-hidden" style={{ height: '100svh' }}>
+      <div className="relative h-full overflow-hidden">
         <div className="absolute inset-0 bottom-[85px] overflow-y-auto">
           {subPage?.type === 'chat'   && <ChatDetail   id={subPage.id} onBack={() => setSubPage(null)} />}
           {subPage?.type === 'report' && <ReportDetail id={subPage.id} onBack={() => setSubPage(null)} />}
@@ -59,7 +59,7 @@ export default function TabsLayout({ children }: { children: ReactNode }) {
           {!subPage && active === 'profiles' && <ProfilesTab />}
         </div>
 
-        {!subPage && (
+        {(
           <nav
             className="absolute flex items-stretch rounded-full border border-white/80 bg-white/40 shadow-[0_2px_22px_rgba(0,0,0,0.15)] backdrop-blur-2xl bottom-4 left-1/2 -translate-x-1/2"
             style={{ width: NAV_W, height: NAV_H, padding: PAD, position: 'absolute' }}

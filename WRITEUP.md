@@ -7,7 +7,7 @@
 
 ## The 2 AM phone call
 
-Erin Chen is 78. She lives alone in Portland. Her daughter Janet lives in Seattle. Janet would visit every weekend if she could — but she can't, so Sarah Mitchell visits Erin three times a week as a professional caregiver, and Janet gets... whatever Sarah has time to text her.
+Erin Yeung is 78. She lives alone in Portland. Her daughter Janet lives in Seattle. Janet would visit every weekend if she could — but she can't, so Sarah Lee visits Erin three times a week as a professional caregiver, and Janet gets... whatever Sarah has time to text her.
 
 Today, what she gets is: *"Mom did great today!"*
 
@@ -99,7 +99,7 @@ Three things distinguish Alio from "talk to a model about elder care":
 
 ## What's next
 
-- **Auth + multi-patient.** Today everything is hardcoded to `caregiver-001 + erin-chen`. Supabase Auth + RLS by `auth.uid()` is one PR away.
+- **Auth + multi-patient.** Today everything is hardcoded to `caregiver-001 + erin-yeung`. Supabase Auth + RLS by `auth.uid()` is one PR away.
 - **Inline editing on the report template.** The edit pencils are visible but inert; wiring them closes the loop.
 - **Streaming STT for long visits.** Chunk polling re-uploads the full accumulated audio each time. For 5-minute monologues we'd switch to a websocket against Google's streaming STT API.
 

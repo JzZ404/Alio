@@ -107,7 +107,7 @@ cd apps/family    && ./node_modules/.bin/next dev -p 3002
 ## 6. Smoke test
 
 Open http://localhost:3001/logs (caregiver). You should see:
-- Patient pill "Erin Chen" in the top-left
+- Patient pill "Erin Yeung" in the top-left
 - "Hi, I am listening" + the gradient blob in the middle
 - Press to Speak button at the bottom
 
@@ -143,10 +143,10 @@ Full troubleshooting list: [backend/README.md](backend/README.md#troubleshooting
 
 Hardcoded identities to swap in `apps/caregiver/app/(tabs)/logs/page.tsx`:
 - `CAREGIVER_ID = 'caregiver-001'`
-- `CAREGIVER_NAME = 'Sarah Mitchell'`
+- `CAREGIVER_NAME = 'Sarah Lee'`
 
 And in `apps/family/app/(tabs)/chat/[id]/page.tsx`:
-- `SUPABASE_THREAD_FOR['sarah-caregiver'] = 'caregiver-001__erin-chen'`
+- `SUPABASE_THREAD_FOR['sarah-caregiver'] = 'caregiver-001__erin-yeung'`
 
 When auth lands, replace all of these with values from `auth.uid()`.
 

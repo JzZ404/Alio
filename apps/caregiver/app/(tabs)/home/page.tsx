@@ -23,7 +23,7 @@ export default function CaregiverHomePage() {
 
   return (
     <div
-      className="relative h-full min-h-screen overflow-y-auto pb-32 sm:h-[852px] sm:min-h-0"
+      className="relative h-full overflow-y-auto pb-32"
       style={{
         background:
           'linear-gradient(135deg, #E3E5F1 0%, #EAEAF2 50%, #D3D5EC 100%)',
@@ -70,23 +70,6 @@ export default function CaregiverHomePage() {
           )}
         </button>
       </header>
-
-      {/* Lab Report upload — quick entry point to the fine-tuned model */}
-      <button
-        type="button"
-        onClick={() => router.push('/labs')}
-        className="mx-[20px] mt-[24px] flex items-center gap-3 rounded-2xl bg-white/70 px-4 py-3 shadow-sm transition-colors active:bg-white/90"
-        style={{ width: 'calc(100% - 40px)' }}
-      >
-        <span className="flex size-11 items-center justify-center rounded-xl bg-brand-primary/15 text-2xl">
-          🧪
-        </span>
-        <span className="flex flex-1 flex-col items-start leading-tight">
-          <span className="text-[15px] font-bold text-gray-100">Upload Lab Report</span>
-          <span className="text-[12px] text-gray-60">PDF or photo · explained in plain language, offline</span>
-        </span>
-        <span className="text-xl text-gray-60">→</span>
-      </button>
 
       {/* Section title + add */}
       <div className="mt-[28px] flex items-center justify-between px-[20px]">

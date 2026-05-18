@@ -68,7 +68,7 @@ create index if not exists compiled_reports_lookup_idx
 -- patients — patient profile: name, medications, appointments
 -- =============================================================
 create table if not exists patients (
-  id text primary key,               -- e.g. 'erin-chen'
+  id text primary key,               -- e.g. 'erin-yeung'
   name text not null,
   medications jsonb not null default '[]',
   appointments jsonb not null default '[]',

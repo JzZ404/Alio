@@ -22,7 +22,7 @@ import { VisitRecordItem } from '@/components/VisitRecordItem';
 
 // Hardcoded for the prototype (single patient). Replace with real identity
 // when auth lands.
-const PATIENT_ID = 'erin-chen';
+const PATIENT_ID = 'erin-yeung';
 
 type FilterTab = 'All' | RecordType | 'Visit';
 const FILTERS: FilterTab[] = ['All', 'Visit', 'Lab report', 'Prescription', 'Other'];
@@ -80,7 +80,7 @@ export default function FamilyRecordsPage({ onOpenVisit }: { onOpenVisit?: (id: 
 
   return (
     <div
-      className="relative h-full min-h-screen overflow-hidden sm:h-[852px] sm:min-h-0"
+      className="relative h-full overflow-hidden"
       style={{
         background:
           'linear-gradient(135deg, #E3E5F1 0%, #EAEAF2 50%, #D3D5EC 100%)',

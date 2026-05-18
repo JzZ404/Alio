@@ -12,7 +12,7 @@ import { SAMPLE_CHAT_THREADS } from '@alio/mock-data';
 export default function CaregiverChatPage({ onOpenThread }: { onOpenThread?: (id: string) => void } = {}) {
   return (
     <div
-      className="relative h-full min-h-screen overflow-hidden sm:h-[852px] sm:min-h-0"
+      className="relative h-full overflow-hidden"
       style={{
         background:
           'linear-gradient(135deg, #E3E5F1 0%, #EAEAF2 50%, #D3D5EC 100%)',

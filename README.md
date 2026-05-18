@@ -90,7 +90,7 @@ Architecture / data flow / table reference: see [ARCHITECTURE.md](ARCHITECTURE.m
 
 Each app has its own tab bar. Different sets per portal.
 
-**Caregiver portal** (port 3001) — Sarah Mitchell's view
+**Caregiver portal** (port 3001) — Sarah Lee's view
 - `/home` — patient schedule with expandable patient cards
 - `/logs` — voice-first visit log → live captions → review → Save → structured
   report via the **+** button → tappable card in chat → opens
@@ -98,7 +98,7 @@ Each app has its own tab bar. Different sets per portal.
 - `/chat` — care circle threads + `/chat/[id]` 1:1
 - `/profiles` — placeholder
 
-**Family portal** (port 3002) — Janet's view of Mom (Erin Chen)
+**Family portal** (port 3002) — Janet's view of Mom (Erin Yeung)
 - `/home` — caregiver status card + Today's Status vitals + calendar +
   upcoming appointments
 - `/ai-check` — voice / message conversation with the AI assistant
@@ -146,7 +146,7 @@ The generator (`scripts/generate-icons.mjs`) normalizes hardcoded colors to
 - ✅ Phase 1 UI prototype: caregiver Home + Logs + Chat, family Home + AI Check
 - ✅ Phase 2 backend wiring: FastAPI + Gemma + Supabase, structured visit
   reports end-to-end, realtime family chat
-- ⏳ Phase 3: real auth (replace hardcoded `caregiver-001` / `erin-chen`),
+- ⏳ Phase 3: real auth (replace hardcoded `caregiver-001` / `erin-yeung`),
   multi-patient, elder portal, edit-section affordances on the report template
 
 ## Attribution

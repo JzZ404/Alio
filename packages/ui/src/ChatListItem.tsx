@@ -20,7 +20,7 @@ const SUBTITLE_GRAY = '#A8A8A8';
  */
 export function ChatListItem({ thread, onOpen }: { thread: ChatThread; onOpen?: (id: string) => void }) {
   const subtitleColor = thread.isTyping ? '#5E69F6' : SUBTITLE_GRAY;
-  const className = "w-full relative flex h-[72px] items-center gap-[16px] overflow-hidden rounded-[12px] bg-brand-tint-1 pb-[8px] pl-[12px] pr-[16px] pt-[8px] transition-colors active:bg-brand-border/50";
+  const className = "w-full text-left relative flex h-[72px] items-center gap-[16px] overflow-hidden rounded-[12px] bg-brand-tint-1 pb-[8px] pl-[12px] pr-[16px] pt-[8px] transition-colors active:bg-brand-border/50";
   const inner = (<>
       <Avatar
         isGroup={thread.isGroup}
@@ -29,9 +29,9 @@ export function ChatListItem({ thread, onOpen }: { thread: ChatThread; onOpen?: 
         groupSrcs={thread.groupAvatars}
         name={thread.name}
       />
-      <div className="flex min-w-0 flex-1 flex-col gap-[8px]">
-        <div className="flex items-center gap-[4px]">
-          <span className="truncate text-[14px] text-black">{thread.name}</span>
+      <div className="flex h-[43px] min-w-0 flex-1 flex-col justify-between">
+        <div className="flex items-center gap-[4px] leading-none">
+          <span className="truncate text-[14px] leading-none text-black">{thread.name}</span>
           {thread.pinned && (
             <IconPinFilled className="size-[12px] shrink-0 text-brand-primary" />
           )}
@@ -44,10 +44,12 @@ export function ChatListItem({ thread, onOpen }: { thread: ChatThread; onOpen?: 
         <span className="text-[12px] leading-none tabular-nums" style={{ color: SUBTITLE_GRAY }}>
           {thread.timestamp}
         </span>
-        {thread.unreadCount > 0 && (
+        {thread.unreadCount > 0 ? (
           <span className="flex size-[17px] items-center justify-center rounded-full bg-brand-primary text-[12px] leading-none text-white">
             {thread.unreadCount}
           </span>
+        ) : (
+          <span className="size-[17px]" aria-hidden />
         )}
       </div>
   </>);
