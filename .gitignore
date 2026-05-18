@@ -79,3 +79,13 @@ outputs/
 .superpowers/
 .mcp.json
 skills-lock.json
+# Python (children/ module)
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Runtime-generated data files (children chatbot)
+report_*.json
+med_log_*.txt
+chat_history.json
