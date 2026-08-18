@@ -28,6 +28,19 @@ export const colors = {
   },
 } as const;
 
+/**
+ * Voice gradient — the purple → pink ramp behind "Hi, I am listening" on the
+ * caregiver Logs and family AI Check voice screens. Dark indigo at both ends so
+ * the animated version can slide the background position and loop seamlessly.
+ */
+export const voiceGradient = {
+  indigo: '#2B1B72',
+  primary: '#5E69F6',
+  lavender: '#A29BFE',
+  pink: '#F4B6C8',
+  orchid: '#D496F5',
+} as const;
+
 export const fontFamily = {
   sans: ['var(--font-century-gothic)', 'system-ui', 'sans-serif'],
 } as const;

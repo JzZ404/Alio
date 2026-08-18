@@ -302,6 +302,10 @@
     },
     "TodayStatusCard": {
       "cardMode": "column"
+    },
+    "VoiceListeningView": {
+      "cardMode": "single",
+      "viewport": "440x760"
     }
   },
   "readmeHeader": ".design-sync/conventions.md"

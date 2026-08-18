@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import clsx from 'clsx';
 import { IconClose, IconUpload, IconCalendar } from './icons';
+import { Button } from './Button';
 import type { RecordType, MedicalRecord } from '@alio/mock-data';
 
 const TYPES: RecordType[] = ['Lab report', 'Prescription', 'Other'];
@@ -147,20 +148,12 @@ export function AddRecordModal({
 
         {/* Actions */}
         <div className="mt-[20px] flex gap-[10px]">
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-[48px] flex-1 rounded-[12px] bg-brand-tint-1 text-[14px] font-bold text-gray-100 transition-colors active:bg-brand-border"
-          >
+          <Button variant="secondary" onClick={onClose} className="flex-1">
             Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={!title.trim()}
-            className="h-[48px] flex-1 rounded-[12px] bg-brand-primary text-[14px] font-bold text-white transition-transform active:scale-95 disabled:opacity-50"
-          >
+          </Button>
+          <Button type="submit" disabled={!title.trim()} className="flex-1">
             Save
-          </button>
+          </Button>
         </div>
       </form>
     </div>

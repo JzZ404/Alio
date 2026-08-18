@@ -60,6 +60,46 @@ browser's serif default. Symptom: card text looks like Times.
   every icon and will falsely match all 290).
 - **New icons added later are auto-included** as cards unless added to the exclusion map.
 
+## Button + VoiceListeningView extraction (second pass)
+
+`packages/ui` originally had no labeled-button primitive — 28 raw `<button>` elements across 14
+components, with three different specs for what was visually the same control. `Button` now owns
+that: variants primary/secondary/accent/danger, sizes md 48px / sm 42px, radius from the `lg`
+token. Refactored call sites: `AddRecordModal` (Cancel/Save), `TodayStatusCard` (View Notes),
+`PressToSpeakButton` (now composes Button for both its states).
+
+Two things that bit during the refactor, both visible only in the render diff:
+
+- **View Notes wrapped to two lines.** The Figma width is a fixed 101px; bold text plus the
+  primitive's `px-6` no longer fit. Fixed by giving `Button` `whitespace-nowrap` (labels should
+  never wrap) and passing `px-0` at that one call site. Its look intentionally changed from
+  42px/normal/black to the canonical 48px/bold/gray-100.
+- **PressToSpeakButton got narrower.** Its original `px-9` is wider than `Button`'s `px-6`, so the
+  call site passes `px-9` explicitly to keep the pill's original geometry.
+
+Icon-only buttons (`IconBox`, `FloatingAddButton`) and in-row controls (call/chat circles,
+chevrons, checkbox rows) were deliberately left alone — they are not labeled buttons.
+
+`VoiceListeningView` extracts the voice state that `apps/caregiver/logs` and `apps/family/ai-check`
+duplicated verbatim: gradient headline + `GradientBlob` + live transcript, driven by `listening`.
+Both apps now delegate to it. Its gradient hexes moved into `packages/theme` as `voiceGradient`
+tokens, exposed through the preset as `bg-voice-idle` / `bg-voice-listening` / `bg-flow` /
+`animate-voice-flow`.
+
+**Preset-defined utilities need safelisting.** `animate-blob-pulse` is defined in the preset but
+used nowhere in source, so Tailwind emitted nothing and the name in `conventions.md` would have
+resolved to nothing. The voice/motion names are now explicitly safelisted in
+`tailwind.ds.config.ts`. Anything documented but not used in source needs the same treatment.
+
+**Grades do not track component source.** `package-capture.mjs` keys grades on the preview `.tsx`
+and preview-affecting config, so `AddRecordModal` / `TodayStatusCard` / `PressToSpeakButton` all
+printed `carried forward` after their implementations changed. Verify refactors by diffing
+`_screenshots/*.png` before and after yourself — the grade lifecycle will not catch it.
+
+**Pre-existing type error fixed.** `tailwind-preset.ts` assigned the `as const` readonly tuple
+`fontFamily.sans` to Tailwind's mutable `string[]`, so `pnpm -r typecheck` failed on `main` before
+any of this work. Now spread (`[...fontFamily.sans]`).
+
 ## Preview conventions
 
 - Content comes from `@alio/mock-data` fixtures (SAMPLE_*, INITIAL_CONVERSATION) or real app usage.
@@ -78,6 +118,14 @@ browser's serif default. Symptom: card text looks like Times.
   CSS pulse animation, which a screenshot cannot capture. Both cells are correct.
 - Interaction-only states are not previewed: `ModeDropdown` and `PatientSwitcher` open their menus
   from internal state with no prop to force them open, so only the closed state is carded.
+
+## Known gaps
+
+- `GradientBlob` still hardcodes its four radial-gradient hexes inline (`#B7AEFE`, `#F9B5C9`,
+  `#FFC9A7`, `#C5C9F8`) rather than reading tokens. Left alone deliberately — moving them is a
+  no-visual-change refactor, but it was out of scope for the button/voice extraction.
+- `AppointmentItem` is exported and carded but used by nothing: `CalendarWidget` renders its
+  Upcoming rows with its own inline markup instead of composing it.
 
 ## Re-sync risks — what can go stale
 

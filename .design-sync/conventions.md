@@ -13,6 +13,10 @@ Two positioning rules that will otherwise bite:
 - **`TabBar` positions itself `absolute`.** It must sit inside a positioned ancestor (`MobileFrame` is one). Pass placement via `className`, e.g. `className="bottom-4 left-1/2 -translate-x-1/2"`.
 - **`UploadWheel` and `AddRecordModal` are overlays** (`absolute` / `inset-0`). They also need a positioned parent, normally the same frame as the screen behind them.
 
+**Use `Button` for every labeled action** — `variant="primary"` (Save/confirm), `"secondary"` (Cancel/dismiss), `"accent"` (the lime voice action), `"danger"` (stop recording); `size="md"` 48px default or `"sm"` 42px. Don't hand-roll `<button className="...">`; the variant owns color, radius and press feedback, and `className` is for layout only (`flex-1`, a fixed width). Icon-only buttons are `IconBox` (tinted square/pill) or `FloatingAddButton` (the lime FAB) instead.
+
+`VoiceListeningView` is the whole AI voice state — gradient headline, breathing blob, live transcript — driven by one `listening` prop. It positions itself absolutely, so it also needs a positioned parent.
+
 `TabBar`, `ChatListItem` and `LogListItem` render real links. Outside a Next app the bundle renders them as plain `<a href>`, and `TabBar`'s active tab resolves to `/home`; set `window.__ALIO_PATHNAME__` to highlight a different tab.
 
 ### Styling idiom: Tailwind utilities from the Alio preset
@@ -28,6 +32,8 @@ Style your own layout with Tailwind classes. **Use these families** — they are
 | Type scale | `text-xs` 10px, `text-sm` 12px, `text-base` 14px, `text-md` 16px, `text-lg` 18px, `text-xl` 20px, `text-2xl` 24px |
 | Radii | `rounded-sm` 3px, `rounded`/`rounded-md` 8px, `rounded-lg` 12px, `rounded-xl` 14px, `rounded-2xl` 24px, `rounded-full` |
 | Type face | `font-sans` = Century Gothic (the brand face, shipped with the bundle); weights `font-normal` / `font-bold` |
+| Voice gradient | `bg-voice-idle` (static ramp), `bg-voice-listening` + `bg-flow` + `animate-voice-flow` (the sliding version) |
+| Motion | `animate-voice-flow`, `animate-blob-pulse` |
 | Breakpoints | `sm` 640, `md` 768, `lg` 1024 |
 
 Screen backgrounds are `bg-gray-30`; cards are `bg-gray-10` (white) or `bg-brand-tint-1`; the hero status card is `bg-brand-primary` with white text. Standard Tailwind spacing, flex/grid, sizing, shadow and opacity utilities are available too.
@@ -55,6 +61,11 @@ Screen backgrounds are `bg-gray-30`; cards are `bg-gray-10` (white) or `bg-brand
     <div className="grid grid-cols-2 gap-2">
       <VitalTile label="Heart Rate" value="120 bpm" Icon={IconHeartRate} />
       <VitalTile label="Blood Stutas" value="116/70" Icon={IconBloodPressure} />
+    </div>
+
+    <div className="flex gap-2">
+      <Button variant="secondary" className="flex-1">Not now</Button>
+      <Button className="flex-1">View report</Button>
     </div>
   </div>
 

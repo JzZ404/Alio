@@ -1,4 +1,5 @@
 import clsx from 'clsx';
+import { Button } from './Button';
 import { IconRiVoiceAiFill } from './icons';
 
 /**
@@ -18,31 +19,15 @@ export function PressToSpeakButton({
 }) {
   if (variant === 'recording') {
     return (
-      <button
-        type="button"
-        onClick={onClick}
-        className={clsx(
-          'flex h-12 items-center justify-center gap-2 rounded-lg bg-alert px-9 py-2.5',
-          'transition-transform active:scale-95',
-          className,
-        )}
-      >
-        <span className="text-base font-bold text-white">Done</span>
-      </button>
+      <Button variant="danger" onClick={onClick} className={clsx('px-9', className)}>
+        Done
+      </Button>
     );
   }
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={clsx(
-        'flex h-12 items-center justify-center gap-3 rounded-lg bg-brand-accent px-9 py-2.5',
-        'transition-transform active:scale-95',
-        className,
-      )}
-    >
+    <Button variant="accent" onClick={onClick} className={clsx('px-9', className)}>
       <IconRiVoiceAiFill className="size-6 text-brand-active" />
-      <span className="text-base font-bold text-brand-active">Press to Speak</span>
-    </button>
+      Press to Speak
+    </Button>
   );
 }

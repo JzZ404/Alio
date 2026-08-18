@@ -13,6 +13,14 @@ import { tailwindPreset } from '../packages/theme/src/tailwind-preset';
  */
 const config: Config = {
   safelist: [
+    // Voice/motion vocabulary documented in conventions.md — the preset defines
+    // these but source only uses some, so safelist them or the agent's classes
+    // silently resolve to nothing.
+    'bg-voice-idle',
+    'bg-voice-listening',
+    'bg-flow',
+    'animate-voice-flow',
+    'animate-blob-pulse',
     { pattern: /^(bg|text|border|fill|stroke|ring|divide|outline)-(brand|gray|alert|info|white|black|transparent)(-(DEFAULT|primary|active|accent|tint-1|tint-2|border|10|30|60|80|90|100))?$/ },
     { pattern: /^(p|px|py|pt|pr|pb|pl|m|mx|my|mt|mr|mb|ml|gap|gap-x|gap-y|space-x|space-y|inset|top|right|bottom|left)-(0|0\.5|1|1\.5|2|2\.5|3|3\.5|4|5|6|7|8|9|10|11|12|14|16|20|24|28|32|auto|px)$/ },
     { pattern: /^(w|h|min-w|min-h|max-w|max-h|size)-(0|1|2|3|4|5|6|7|8|9|10|11|12|14|16|20|24|28|32|40|48|56|64|72|80|96|full|screen|auto|fit|min|max|px|1\/2|1\/3|2\/3|1\/4|3\/4)$/ },

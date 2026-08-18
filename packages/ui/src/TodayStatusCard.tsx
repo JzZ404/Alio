@@ -1,4 +1,5 @@
 import { VitalTile } from './VitalTile';
+import { Button } from './Button';
 import {
   IconBloodPressure,
   IconHeartRate,
@@ -66,13 +67,9 @@ export function TodayStatusCard({
           <p className="text-[14px] font-normal leading-tight">Last visit by {lastVisitBy}</p>
           <p className="text-[16px] font-bold leading-tight">Today, {lastVisitTime}</p>
         </div>
-        <button
-          type="button"
-          onClick={onViewNotes}
-          className="flex h-[42px] w-[101px] items-center justify-center rounded-[12px] bg-brand-tint-1 text-[14px] font-normal text-black transition-transform active:scale-95"
-        >
+        <Button variant="secondary" onClick={onViewNotes} className="w-[101px] shrink-0 px-0">
           View Notes
-        </button>
+        </Button>
       </div>
     </div>
   );

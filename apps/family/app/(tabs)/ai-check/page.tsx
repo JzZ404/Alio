@@ -6,7 +6,7 @@ import clsx from 'clsx';
 import {
   IconBox,
   PressToSpeakButton,
-  GradientBlob,
+  VoiceListeningView,
   ModeDropdown,
   ChatBubble,
   UploadWheel,
@@ -209,41 +209,8 @@ export default function FamilyAICheckPage() {
 // ----- Voice view (idle + recording) ---------------------------------------
 
 function VoiceView({ view, transcript }: { view: View; transcript: string }) {
-  const recording = view === 'voice-recording';
   return (
-    <>
-      <p
-        className={clsx(
-          'absolute left-1/2 top-[180px] -translate-x-1/2 whitespace-nowrap bg-clip-text text-xl font-bold text-transparent',
-          // Purple → pink only: dark deep indigo at the ends, brand purple,
-          // soft lavender, then light pastel pink as the brightest stop.
-          // Varying lightness + saturation produces the "saturation pulse"
-          // without leaving the purple/pink family.
-          recording
-            ? 'animate-[listening-gradient_3.6s_ease-in-out_infinite] bg-[length:300%_100%] bg-[linear-gradient(90deg,#2B1B72_0%,#5E69F6_22%,#A29BFE_45%,#F4B6C8_60%,#D496F5_78%,#2B1B72_100%)]'
-            : 'bg-gradient-to-r from-[#2B1B72] from-[10%] via-[#5E69F6] via-[55%] to-[#F4B6C8] to-[100%]',
-        )}
-      >
-        Hi, I am listening
-      </p>
-
-      <div className="absolute left-1/2 top-[220px] h-[310px] w-[311px] -translate-x-1/2">
-        <GradientBlob active={recording} className="h-full w-full" />
-      </div>
-
-      {recording && transcript && (
-        <p className="absolute left-[40px] right-[40px] top-[540px] text-center text-base leading-snug text-gray-100">
-          {transcript.split(' ').map((word, i, arr) => {
-            const isLastFew = i >= arr.length - 4;
-            return (
-              <span key={i} className={isLastFew ? 'text-gray-100' : 'text-gray-60'}>
-                {word}{' '}
-              </span>
-            );
-          })}
-        </p>
-      )}
-    </>
+    <VoiceListeningView listening={view === 'voice-recording'} transcript={transcript} />
   );
 }
 
