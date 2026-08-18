@@ -1,0 +1,11 @@
+{
+  "_comment": "Used only by design-sync (cfg.tsconfig). Its `paths` redirect Next framework imports to browser shims so the DS bundle runs outside a Next app. The app/package builds never read this file.",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "jsx": "react-jsx",
+    "paths": {
+      "next/link": ["./shims/next-link.tsx"],
+      "next/navigation": ["./shims/next-navigation.ts"]
+    }
+  }
+}

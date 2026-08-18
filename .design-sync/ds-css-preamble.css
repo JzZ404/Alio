@@ -1,0 +1,12 @@
+/**
+ * Prepended to the design-system stylesheet (packages/ui/.ds-css/ds.css).
+ *
+ * The Next apps define --font-century-gothic through next/font/local. Outside
+ * Next there is no next/font, so the DS points the variable at the family that
+ * packages/theme/src/fonts.css declares via @font-face. Without this every
+ * `font-family: var(--font-century-gothic), ...` declaration is invalid and
+ * text falls back to the browser's serif default.
+ */
+:root {
+  --font-century-gothic: 'Century Gothic';
+}

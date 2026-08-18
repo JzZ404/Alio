@@ -1,0 +1,28 @@
+/**
+ * Century Gothic @font-face declarations.
+ *
+ * The Next apps load these same .ttf files through `next/font/local`, which
+ * generates the `--font-century-gothic` variable at runtime. This file is the
+ * plain-CSS equivalent for consumers outside Next (design-system bundles,
+ * static previews) so `var(--font-century-gothic)` resolves there too.
+ */
+
+@font-face {
+  font-family: 'Century Gothic';
+  src: url('../fonts/CenturyGothic-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Century Gothic';
+  src: url('../fonts/CenturyGothic-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --font-century-gothic: 'Century Gothic';
+}
