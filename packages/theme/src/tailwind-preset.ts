@@ -26,7 +26,9 @@ export const tailwindPreset: Partial<Config> = {
         info: colors.info.blue,
       },
       fontFamily: {
-        sans: fontFamily.sans,
+        // Spread: tokens.ts declares fontFamily `as const`, and Tailwind's
+        // FontFamily type wants a mutable string[].
+        sans: [...fontFamily.sans],
       },
       fontSize: fontSize as never,
       borderRadius: borderRadius as never,
