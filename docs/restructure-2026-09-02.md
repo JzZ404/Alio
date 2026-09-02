@@ -75,12 +75,14 @@ Five branches were removed. **The first three had zero commits not already in
 | `integration` | `6358600` | Yunxiao Du | Fully merged, zero files missing from main |
 | `claude/keen-goldwasser-727084` | `0837729` | jwei2000-code | Orphan history (no merge base). Original `feat/feat1` Streamlit + `feat/feat2` Next.js prototype |
 | `feat/ai-visit-log` | `c184e33` | Joyce Zhou | Orphan, one commit, one file: a `README.md` containing `# Alio` |
+| `feat/caregiver` | `25ee37b` | aarony630 | Closed after everything useful was harvested onto main — see below |
 
-The two orphan branches are preserved as **annotated tags on origin**:
+Three branches are preserved as **annotated tags on origin**:
 
 ```bash
 git checkout archive/keen-goldwasser   # 0837729, 47 files
 git checkout archive/ai-visit-log      # c184e33
+git checkout archive/feat-caregiver    # 25ee37b
 ```
 
 The three merged branches need no tag — their tips are ordinary commits in
@@ -99,12 +101,26 @@ and `api.py` / `report.py` had evolved further on main.
 |---|---|
 | `renew-ui-sep02` | jwei2000-code's active UI rework. Verified: still merges into the restructured main with **zero conflicts** |
 | `chore/design-sync` | Deliberately untouched — reference material for the Claude Design sticker sheet, to be re-synced fresh after the UI rework lands |
-| `feat/caregiver` | Still holds the Gemma trademark attribution, which main lacks. See below |
-| `integrate-local-model` | Unfinished Vercel deploy config. See below |
+| `integrate-local-model` | Vercel monorepo config as files, an alternative to the dashboard setup already deploying the apps. Its `backend/vercel.json` would additionally host the FastAPI backend, which contradicts the root `.vercelignore`. Left for Yunxiao Du to settle |
+
+### What was harvested from `feat/caregiver` before closing it
+
+| Taken | Where it landed |
+|---|---|
+| Gemma attribution section | `README.md` + `backend/README.md` (`2d3b824`) |
+| Gemma attribution for the published HF model card | `train/publish_to_hf.py` (`f9f3b54`) |
+| Dorothy Chen → Erin Yeung, Sarah Mitchell → Sarah Lee | docs, `schema.sql` comments, chat test fixtures (`2d3b824`) |
+| `tailwind-preset.ts` readonly-tuple fix | Applied independently in `1fd2311` |
+
+Left behind deliberately: its `WRITEUP.md` is an **older** draft than main's (79
+lines differ); its `mock-data` edit swaps "Janet: Will visit Sunday" to "Robert:",
+which contradicts main's three-person Sarah/Janet/Erin workflow; and its
+`MessageView onOpenReport` fix was already on main in a better form (main threads
+the resolved `openReport`, keeping the router fallback).
 
 ---
 
-## The 8 commits
+## The commits
 
 | SHA | What |
 |---|---|
@@ -116,8 +132,11 @@ and `api.py` / `report.py` had evolved further on main.
 | `1fd2311` | Fix the `packages/theme` typecheck error |
 | `927459d` | Untrack `.DS_Store`; repoint ignore rules at `train/data/` |
 | `bf7b732` | File the feature briefs under `docs/features/` |
+| `8635e58` | This document |
+| `2d3b824` | Gemma attribution in both READMEs; finish the Erin/Sarah rename |
+| `f9f3b54` | Gemma attribution on the published HF model card |
 
-Each commit message carries the full reasoning. `git log 2837055^..bf7b732`.
+Each commit message carries the full reasoning. `git log 2837055^..f9f3b54`.
 
 ---
 
@@ -166,11 +185,13 @@ say `cd backend && uvicorn api:app`.
 
 ## Deliberately not done
 
-- **The `apps/caregiver` typecheck error.** Next's generated `PageProps` rejects
-  `LogsPage`'s `{ onOpenReport?: ... } = {}` props. It predates this cleanup,
-  `next.config.js` sets `ignoreBuildErrors: true` so deploys are unaffected, and
-  those files are being rewritten on `renew-ui-sep02` right now. Left for that
-  branch's owner.
+- **7 `PageProps` typecheck errors** — 3 in `apps/caregiver`, 4 in `apps/family`.
+  Next's generated route types reject the optional props the tab pages take
+  (`onOpenReport`, `onOpenThread`, `onOpenVisit`, `onBack`, `id`), which is the
+  state-based-navigation pattern this app uses. One root cause, one fix pattern.
+  It predates this cleanup, `next.config.js` sets `ignoreBuildErrors: true` so
+  builds and deploys are unaffected, and those files are being rewritten on
+  `renew-ui-sep02` right now. Left for that branch's owner.
 - **Deduplicating the app assets.** All 11 files in `apps/caregiver/public/` are
   byte-identical to `apps/family/public/` (including `person1.avif` at 783KB
   twice). This looks like waste but is **structurally required**: Next serves
