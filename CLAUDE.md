@@ -116,6 +116,7 @@ The look and feel of "alive" matters. The data underneath doesn't.
 ## Active references
 
 - **PLAN.md** — current build plan, phase status, open decisions. Read when user asks "where are we" or scope shifts.
+- **docs/restructure-2026-09-02.md** — the Sept 2 branch cleanup and root restructure: where every file moved, which branches were deleted and how to recover them, what changed in the icon generator and .gitignore. **Read this first if a path, script, or branch you expected is missing.**
 - **Memory** at `~/.claude/projects/-Users-jz-Documents-aliooo/memory/` — cross-session context.
 
 ## Session start ritual
