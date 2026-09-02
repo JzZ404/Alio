@@ -12,7 +12,7 @@ import {
   TaskCard,
   ChatBubble,
   IconSearch,
-  IconChatswitch,
+  IconHistory,
   IconKeyboard,
   IconPlus,
   IconMicrophone,
@@ -488,7 +488,7 @@ export default function LogsPage({
             onClick={openHistory}
             className="flex size-[42px] items-center justify-center rounded-[12px] bg-brand-primary transition-transform active:scale-95"
           >
-            <IconChatswitch className="size-6 text-white" />
+            <IconHistory className="size-6 text-white" />
           </button>
         </div>
       </header>
