@@ -1,7 +1,10 @@
 # Alio — Backend
 
 FastAPI service that turns the caregiver's voice notes into structured visit
-reports for the family, using Google's Gemma model and Supabase for storage.
+reports for the family, using Google's Gemma 4 model and Supabase for storage.
+
+> *Gemma is a trademark of Google LLC. Alio is not endorsed by or affiliated
+> with Google.*
 
 The frontend lives in `../apps/{caregiver,family}` and talks to this server at
 `http://localhost:8000` (configurable via `NEXT_PUBLIC_API_URL` in each app's
@@ -95,7 +98,7 @@ Two prompt shapes:
   `explain_report_question`) — system prompt with explicit schema +
   `response_mime_type="application/json"` → parsed via `_parse_json_response`
 
-The structured-report prompt includes a worked example (a fictitious Dorothy
+The structured-report prompt includes a worked example (a fictitious Erin
 visit) to anchor Gemma's tone and label format. If you change the
 `VisitReport` shape on the frontend, update both the schema text AND the
 example in `_STRUCTURED_REPORT_SYSTEM`.

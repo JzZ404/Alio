@@ -100,7 +100,7 @@ Use these names when designing or talking about a screen. Each row is a recipe: 
 | **Section title (H3)** | `text-base font-bold` | 14/20, bold | "Upcoming" list header, caregiver name in expanded card, log list item titles. Smaller grouping headings. |
 | **Button** | `text-base font-bold` | 14/20, bold, often white or `text-brand-active` | "Press to Speak", "Done", "View Notes". Always bold. |
 | **Body** | `text-md` | 16/22, regular | Default paragraph copy. Currently sparse — used in dropdown "voice"/"message" label. Use for new long-form copy. |
-| **Body small / Caption** | `text-sm text-gray-60` | 12/16, regular, muted | "Coming soon" subtitles, "Sarah Mitchell" subtitle under caregiver headline. Default for secondary metadata. |
+| **Body small / Caption** | `text-sm text-gray-60` | 12/16, regular, muted | "Coming soon" subtitles, "Sarah Lee" subtitle under caregiver headline. Default for secondary metadata. |
 | **Body small (bold)** | `text-sm font-bold` | 12/16, bold | Audio bubble transcript, task labels, calendar weekday letters + dates. Bold when emphasized or selectable. |
 | **Eyebrow** | `text-sm font-bold text-white/70` (on dark) / `text-gray-60` (on light) | 12/16, bold, muted | "Today's Status" label above the hero on the purple card. Small label above a main heading. |
 | **Caption (micro)** | `text-xs font-bold` | 10/14, bold | Vital chip label, date chip month ("May"), stepper step labels ("On Way", "Arrived"). |

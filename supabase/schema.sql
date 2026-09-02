@@ -47,7 +47,7 @@ alter publication supabase_realtime add table family_messages;
 
 -- =============================================================
 -- compiled_reports — structured visit reports filled in by Gemma
---                    (the data behind the "Dorothy's Report" card)
+--                    (the data behind the "Erin's Report" card)
 -- =============================================================
 create table if not exists compiled_reports (
   id uuid primary key default gen_random_uuid(),
@@ -68,7 +68,7 @@ create index if not exists compiled_reports_lookup_idx
 -- patients — patient profile: name, medications, appointments
 -- =============================================================
 create table if not exists patients (
-  id text primary key,               -- e.g. 'dorothy-chen'
+  id text primary key,               -- e.g. 'erin-yeung'
   name text not null,
   medications jsonb not null default '[]',
   appointments jsonb not null default '[]',

@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 
-PATIENT_ID = "dorothy-chen"
+PATIENT_ID = "erin-yeung"
 
 SAMPLE_INFO = {
     "id": PATIENT_ID,
@@ -24,7 +24,7 @@ SAMPLE_REPORT = {
 SAMPLE_LOG = {
     "visit_date": "2026-05-14",
     "created_at": "2026-05-14T09:12:00",
-    "transcript": "Dorothy was in good spirits today.",
+    "transcript": "Erin was in good spirits today.",
     "summary": "Good spirits, ate full meal.",
     "mood": "calm",
     "medications_noted": ["Lisinopril"],
@@ -169,12 +169,12 @@ def _mock_gemma(reply: str):
 def test_send_message_returns_model_response():
     from children.chat import send_message
     sb = _mock_supabase()
-    gemma = _mock_gemma("Dorothy has been calm and stable.")
+    gemma = _mock_gemma("Erin has been calm and stable.")
     with patch("children.chat._get_supabase", return_value=sb), \
          patch("children.chat.genai.Client", return_value=gemma), \
          patch.dict("os.environ", {"GOOGLE_API_KEY": "fake-key", "SUPABASE_URL": "http://x", "SUPABASE_KEY": "y"}):
-        result = send_message(PATIENT_ID, "How is Dorothy?")
-    assert result == "Dorothy has been calm and stable."
+        result = send_message(PATIENT_ID, "How is Erin?")
+    assert result == "Erin has been calm and stable."
 
 
 def test_send_message_saves_new_turns():
