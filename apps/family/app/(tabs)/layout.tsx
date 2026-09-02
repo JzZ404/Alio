@@ -13,10 +13,15 @@ const ChatTab        = dynamic(() => import('./chat/page'),              { ssr: 
 const RecordsTab     = dynamic(() => import('./records/page'),           { ssr: false });
 const ChatDetail     = dynamic(() => import('./chat/[id]/page'),         { ssr: false });
 const RecordDetail   = dynamic(() => import('./records/visit/[id]/page'),{ ssr: false });
+const AIChatHistory  = dynamic(() => import('./ai-check/history/page'),   { ssr: false });
 
 const TABS = ['home', 'ai-check', 'chat', 'records'] as const;
 type Tab = typeof TABS[number];
-type SubPage = { type: 'chat'; id: string } | { type: 'record'; id: string } | null;
+type SubPage =
+  | { type: 'chat'; id: string }
+  | { type: 'record'; id: string }
+  | { type: 'ai-history' }
+  | null;
 
 const NAV_W = 365;
 const NAV_H = 69;
@@ -56,7 +61,8 @@ export default function TabsLayout({ children }: { children: ReactNode }) {
           {subPage?.type === 'chat'   && <ChatDetail   id={subPage.id} onBack={() => setSubPage(null)} />}
           {subPage?.type === 'record' && <RecordDetail id={subPage.id} onBack={() => setSubPage(null)} />}
           {!subPage && active === 'home'     && <HomeTab />}
-          {!subPage && active === 'ai-check' && <AICheckTab />}
+          {subPage?.type === 'ai-history' && <AIChatHistory onBack={() => setSubPage(null)} />}
+          {!subPage && active === 'ai-check' && <AICheckTab onOpenHistory={() => setSubPage({ type: 'ai-history' })} />}
           {!subPage && active === 'chat'     && <ChatTab    onOpenThread={(id) => setSubPage({ type: 'chat',   id })} />}
           {!subPage && active === 'records'  && <RecordsTab onOpenVisit ={(id) => setSubPage({ type: 'record', id })} />}
         </div>

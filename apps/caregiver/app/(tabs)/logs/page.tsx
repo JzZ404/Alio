@@ -49,7 +49,6 @@ export default function LogsPage({
   const [conversation, setConversation] = useState<ConversationTurn[]>(INITIAL_CONVERSATION);
   const [activePatientId, setActivePatientId] = useState(SAMPLE_PATIENTS[0].id);
   const [error, setError] = useState('');
-  const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const [compileState, setCompileState] = useState<CompileState>('idle');
 
@@ -374,7 +373,6 @@ export default function LogsPage({
   /** Bottom-left toggle in text mode — returns to the voice action bar from
    * either the keyboard overlay or the message conversation. */
   function handleSwitchToVoice() {
-    setKeyboardOpen(false);
     setView('voice-idle');
   }
 
@@ -390,7 +388,6 @@ export default function LogsPage({
       { kind: 'user-text', id: `turn-${ts}`, text },
     ]);
     setDraft('');
-    setKeyboardOpen(false);
     setView('message');
     setRecordState('saving');
 
@@ -530,7 +527,7 @@ export default function LogsPage({
             {recordState === 'saving' ? 'Saving…' : 'Save'}
           </button>
         </div>
-      ) : view === 'message' || keyboardOpen ? (
+      ) : view === 'message' ? (
         <div className="absolute bottom-[20px] left-[25px] right-[25px] z-10 flex items-center gap-[10px]">
           {/* Mode toggle — mirrors the keyboard button's slot in voice mode, so
            * the control stays put when you switch between the two. */}
@@ -575,7 +572,7 @@ export default function LogsPage({
           <IconBox
             size={48}
             aria-label="Switch to keyboard input"
-            onClick={() => setKeyboardOpen(true)}
+            onClick={() => setView('message')}
           >
             <IconKeyboard className="size-6 text-gray-100" />
           </IconBox>

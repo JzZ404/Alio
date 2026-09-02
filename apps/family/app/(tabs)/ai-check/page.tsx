@@ -11,7 +11,7 @@ import {
   ChatBubble,
   UploadWheel,
   IconSearch,
-  IconChat,
+  IconHistory,
   IconKeyboard,
   IconPlus,
   IconMicrophone,
@@ -37,15 +37,17 @@ async function askAI(message: string): Promise<string> {
 
 type View = 'voice-idle' | 'voice-recording' | 'message';
 
-export default function FamilyAICheckPage() {
+export default function FamilyAICheckPage({
+  onOpenHistory,
+}: { onOpenHistory?: () => void } = {}) {
   const router = useRouter();
+  const openHistory = onOpenHistory ?? (() => router.push('/ai-check/history'));
   const [view, setView] = useState<View>('voice-idle');
   const [transcript, setTranscript] = useState('');
   const [conversation, setConversation] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [draft, setDraft] = useState('');
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [micError, setMicError] = useState('');
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -68,7 +70,6 @@ export default function FamilyAICheckPage() {
    * either the keyboard overlay or the message conversation. */
   function handleSwitchToVoice() {
     setUploadOpen(false);
-    setKeyboardOpen(false);
     setView('voice-idle');
   }
 
@@ -213,7 +214,7 @@ export default function FamilyAICheckPage() {
     if (!text || loading) return;
     setConversation((prev) => [...prev, { id: `m-${Date.now()}`, sender: 'me', text }]);
     setDraft('');
-    if (view !== 'message') { setKeyboardOpen(false); setView('message'); }
+    if (view !== 'message') setView('message');
     setLoading(true);
     try {
       const reply = await askAI(text);
@@ -247,8 +248,8 @@ export default function FamilyAICheckPage() {
           <IconBox size={42} aria-label="Search">
             <IconSearch className="size-6 text-gray-100" />
           </IconBox>
-          <IconBox size={42} aria-label="Open chat history" onClick={() => router.push('/chat')}>
-            <IconChat className="size-6 text-gray-100" />
+          <IconBox size={42} aria-label="Open AI chat history" onClick={openHistory}>
+            <IconHistory className="size-6 text-gray-100" />
           </IconBox>
         </div>
       </header>
@@ -259,7 +260,7 @@ export default function FamilyAICheckPage() {
         <MessageView turns={conversation} loading={loading} />
       )}
 
-      {view === 'message' || keyboardOpen ? (
+      {view === 'message' ? (
         <MessageInput
           value={draft}
           onChange={setDraft}
@@ -273,7 +274,7 @@ export default function FamilyAICheckPage() {
         />
       ) : (
         <div className="absolute bottom-[20px] left-[25px] right-[25px] z-10 flex items-center justify-between">
-          <IconBox size={48} aria-label="Switch to keyboard input" onClick={() => setKeyboardOpen(true)}>
+          <IconBox size={48} aria-label="Switch to keyboard input" onClick={() => setView('message')}>
             <IconKeyboard className="size-6 text-gray-100" />
           </IconBox>
           {view === 'voice-recording' ? (

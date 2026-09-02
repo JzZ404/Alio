@@ -84,6 +84,17 @@ export const LOGS_HISTORY: LogHistoryItem[] = [
   { id: 'log-6', patientName: "Erin's Log", date: '2026/5/11 10:33' },
 ];
 
+/** Past Alio conversations on the Family AI tab. Same row shape as the
+ * caregiver log history, but each entry is a question the family asked. */
+export const AI_CHAT_HISTORY: LogHistoryItem[] = [
+  { id: 'ai-1', patientName: 'Blood pressure this week', date: '2026/5/16 21:12' },
+  { id: 'ai-2', patientName: 'Metformin side effects',   date: '2026/5/15 08:47' },
+  { id: 'ai-3', patientName: 'Why is she eating less?',  date: '2026/5/14 19:20' },
+  { id: 'ai-4', patientName: 'Lab results explained',    date: '2026/5/13 12:05' },
+  { id: 'ai-5', patientName: 'Sleep pattern change',     date: '2026/5/12 22:38' },
+  { id: 'ai-6', patientName: 'Questions for Dr. Rowan',  date: '2026/5/11 09:15' },
+];
+
 // =============================================================
 // Recording — simulated transcript text reveal
 // =============================================================
