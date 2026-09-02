@@ -1,6 +1,6 @@
 /* AUTO-GENERATED — DO NOT EDIT.
- * Source: /Users/jz/Documents/aliooo/icons/
- * Regenerate: node scripts/generate-icons.mjs
+ * Source: packages/ui/icons/
+ * Regenerate: pnpm icons:generate
  */
 import type { SVGProps } from 'react';
 

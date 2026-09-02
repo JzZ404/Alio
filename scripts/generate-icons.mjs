@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Generates React components from SVG files in /icons/.
+ * Generates React components from the SVG files in packages/ui/icons/.
  * - Caesarzkn UI icons: "Icon Name=Search, Style=False, Size=24px.svg" → IconSearch (outline) / IconSearchFilled
  * - Medical icons: "Stethoscope.svg" → IconStethoscope
  * Normalizes black/dark fills + strokes to `currentColor` so they recolor via CSS `color`.
@@ -8,10 +8,12 @@
  * Run: node scripts/generate-icons.mjs
  */
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const SRC_DIR = '/Users/jz/Documents/aliooo/icons';
-const OUT_DIR = '/Users/jz/Documents/aliooo/packages/ui/src/icons';
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const SRC_DIR = join(REPO_ROOT, 'packages/ui/icons');
+const OUT_DIR = join(REPO_ROOT, 'packages/ui/src/icons');
 
 function toPascalCase(name) {
   return name
@@ -87,12 +89,27 @@ function main() {
 
   const ui = [];
   const medical = [];
-  const seenNames = new Set();
   const skipped = [];
+
+  // custom.tsx wins. Its icons are hand-corrected versions of SVGs that are
+  // still sitting in the source folder — keyboard.svg carries a hardcoded
+  // #5E69F6 stroke this script does not normalize, and chatswitch.svg has a
+  // 12x12 viewBox that needs scaling. Generating them again would re-export
+  // the same names the barrel already takes from './custom' (TS2308) and
+  // reintroduce the bugs the hand-authored copies fix.
+  const customSrc = readFileSync(join(OUT_DIR, 'custom.tsx'), 'utf8');
+  const handAuthored = new Set(
+    [...customSrc.matchAll(/export function (Icon\w+)/g)].map((m) => m[1]),
+  );
+  const seenNames = new Set(handAuthored);
 
   for (const file of files) {
     try {
       const { name, category } = parseFilename(file);
+      if (handAuthored.has(name)) {
+        skipped.push({ file, reason: `hand-authored in custom.tsx: ${name}` });
+        continue;
+      }
       if (seenNames.has(name)) {
         skipped.push({ file, reason: `duplicate name: ${name}` });
         continue;
@@ -113,8 +130,8 @@ function main() {
   medical.sort((a, b) => a.name.localeCompare(b.name));
 
   const header = `/* AUTO-GENERATED — DO NOT EDIT.
- * Source: /Users/jz/Documents/aliooo/icons/
- * Regenerate: node scripts/generate-icons.mjs
+ * Source: packages/ui/icons/
+ * Regenerate: pnpm icons:generate
  */
 import type { SVGProps } from 'react';
 
