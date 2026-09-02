@@ -58,7 +58,7 @@ A locally-runnable assistant that:
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**Single dispatch point — [medical_ai.py:_call_gemma()](medical_ai.py)** routes
+**Single dispatch point — [medical_ai.py:_call_gemma()](backend/medical_ai.py)** routes
 between hosted Gemma 4 31B (cloud) and local fine-tuned Gemma 4 E2B (via Ollama)
 based on `USE_LOCAL_OLLAMA` env var. Lets us flip between cloud baseline and
 local demo with one variable, and keeps the rest of the app unchanged.
@@ -74,7 +74,7 @@ teacher** to label inputs, then train E2B (the **student**) to imitate it.
 Cheaper, faster, and produces task-specific data matching the exact JSON schemas
 the app consumes.
 
-[build_training_data.py](build_training_data.py) generates the dataset from three sources:
+[build_training_data.py](train/build_training_data.py) generates the dataset from three sources:
 
 | Source | Input | Output | Pairs |
 |---|---|---|---|
@@ -88,7 +88,7 @@ the app consumes.
 
 - **Parallelism:** `ThreadPoolExecutor` with 16 workers + a global token-bucket
   rate limiter (300 RPM on paid tier)
-- **Resumable:** Content-based checkpoint (`data/build_checkpoint.jsonl`); dedup
+- **Resumable:** Content-based checkpoint (`train/data/build_checkpoint.jsonl`); dedup
   by user-message text, *not* by `hash()` (Python's hash is randomized per
   process — burned us once)
 - **Format:** ShareGPT-style chat conversations (`system` / `human` / `gpt` roles)
@@ -189,18 +189,18 @@ ollama create alio-medical -f Modelfile
 ollama run alio-medical
 ```
 
-[medical_ai.py](medical_ai.py) routes all four AI call sites
+[medical_ai.py](backend/medical_ai.py) routes all four AI call sites
 (`triage_conversation`, `explain_report_question`, `compile_caregiver_logs`,
 `compile_structured_report`) through a single `_call_gemma()` dispatcher:
 
 ```bash
 # Default: hosted Gemma 4 31B (high quality, requires internet)
-python app.py
+cd backend && uvicorn api:app --port 8000 --env-file .env
 
 # Local fine-tuned mode (demo / production)
 $env:USE_LOCAL_OLLAMA=1
 $env:OLLAMA_MODEL=alio-medical
-python app.py
+cd backend && uvicorn api:app --port 8000 --env-file .env
 ```
 
 **Verified end-to-end during development** — flipped the env var while data gen
@@ -210,10 +210,11 @@ the fine-tuned E2B was ready).
 
 ### Frontend
 
-Next.js app under [nextjs/next-app/](nextjs/next-app/) — caregiver UI for voice
-logging, family chat for receiving compiled reports, symptom-check UI for triage.
+Two Next.js apps — [apps/caregiver/](apps/caregiver/) for voice logging and
+[apps/family/](apps/family/) for receiving compiled reports, chat, and the
+symptom-check UI for triage. Shared components live in [packages/ui/](packages/ui/).
 Supabase backs the data layer (`caregiver_logs`, `family_messages`,
-`compiled_reports` tables). API server in [nextjs/api.py](nextjs/api.py) (FastAPI).
+`compiled_reports` tables). API server in [backend/api.py](backend/api.py) (FastAPI).
 
 ---
 
@@ -277,10 +278,10 @@ modern GPU (the model is 3.4 GB q4_k_m GGUF, fits in 4 GB VRAM).
 
 ### Full pipeline (training from scratch, for transparency)
 
-1. `python build_training_data.py` — needs `GOOGLE_API_KEY` and Kaggle medical transcriptions dataset → produces `data/train.jsonl` + `data/val.jsonl`
-2. Upload JSONLs as Kaggle dataset; open [kaggle_train_gemma4_e2b.ipynb](kaggle_train_gemma4_e2b.ipynb); run all
+1. `cd train && python build_training_data.py` — needs `GOOGLE_API_KEY` and Kaggle medical transcriptions dataset → produces `train/data/train.jsonl` + `train/data/val.jsonl`
+2. Upload JSONLs as Kaggle dataset; open [kaggle_train_gemma4_e2b.ipynb](train/kaggle_train_gemma4_e2b.ipynb); run all
 3. Download GGUF + Modelfile from the Kaggle notebook's output
-4. `ollama create alio-medical -f Modelfile` (or push to HF: `python scripts/publish_to_hf.py`)
+4. `ollama create alio-medical -f Modelfile` (or push to HF: `python train/publish_to_hf.py`)
 5. `$env:USE_LOCAL_OLLAMA=1; $env:OLLAMA_MODEL=alio-medical; python -m uvicorn api:app` — app now runs offline against the fine-tuned model
 
 ---
