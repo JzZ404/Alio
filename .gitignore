@@ -61,13 +61,13 @@ __pycache__/
 # Downloaded GGUF files (~4GB total)
 Unsloth/
 # Build logs + resumable scratch
-data/build.log
-data/build.err
-data/build_checkpoint.jsonl
+train/data/build.log
+train/data/build.err
+train/data/build_checkpoint.jsonl
 # Kaggle datasets (fetched at build time, not committed)
-data/mtsamples.csv
-data/lab_test_results_public.csv
-data/metadata.json
+train/data/mtsamples.csv
+train/data/lab_test_results_public.csv
+train/data/metadata.json
 # HuggingFace / training output
 outputs/
 # Local server stdout/stderr (backend + Next.js dev)
