@@ -235,6 +235,8 @@ producing a result, the chunk poller activates automatically (watchdog).
 - **No multi-day report compilation.** `compile` filters
   `visit_date = current_date`. Add a date param for "compile yesterday's
   visit".
-- **No tests yet.** The Gemma repo has pytest tests for the report module
-  (`tests/test_report.py` etc.); those would port over to `backend/tests/`
-  with minor import tweaks.
+- **Thin test coverage.** `backend/tests/test_report.py` (8 tests, ported from
+  the Gemma repo — save/load/list, transcription, summarization) and
+  `backend/children/tests/test_chat.py` (13 tests) are the whole suite: run
+  `pytest` from `backend/`. `medical_ai.py` — compile, triage, lab
+  interpretation — has none.
