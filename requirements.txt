@@ -1,3 +1,0 @@
-google-genai
-streamlit>=1.29.0
-SpeechRecognition
