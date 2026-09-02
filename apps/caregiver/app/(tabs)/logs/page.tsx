@@ -13,7 +13,6 @@ import {
   ChatBubble,
   IconSearch,
   IconChatswitch,
-  IconMicrophoneFilled,
   IconKeyboard,
   IconPlus,
   IconMicrophone,
@@ -33,9 +32,16 @@ type View = 'voice-idle' | 'voice-recording' | 'voice-review' | 'message';
 type RecordState = 'idle' | 'recording' | 'saving';
 type CompileState = 'idle' | 'compiling';
 
-export default function LogsPage({ onOpenReport }: { onOpenReport?: (id: string) => void } = {}) {
+export default function LogsPage({
+  onOpenReport,
+  onOpenHistory,
+}: {
+  onOpenReport?: (id: string) => void;
+  onOpenHistory?: () => void;
+} = {}) {
   const router = useRouter();
   const openReport = onOpenReport ?? ((id: string) => router.push(`/logs/report/${id}`));
+  const openHistory = onOpenHistory ?? (() => router.push('/logs/history'));
   const [view, setView] = useState<View>('voice-idle');
   const [recordState, setRecordState] = useState<RecordState>('idle');
   const [liveTranscript, setLiveTranscript] = useState('');
@@ -365,6 +371,13 @@ export default function LogsPage({ onOpenReport }: { onOpenReport?: (id: string)
     setView('voice-idle');
   }
 
+  /** Bottom-left toggle in text mode — returns to the voice action bar from
+   * either the keyboard overlay or the message conversation. */
+  function handleSwitchToVoice() {
+    setKeyboardOpen(false);
+    setView('voice-idle');
+  }
+
   async function handleSendText() {
     const text = draft.trim();
     if (!text || recordState !== 'idle') return;
@@ -467,22 +480,15 @@ export default function LogsPage({ onOpenReport }: { onOpenReport?: (id: string)
           <IconBox size={42} aria-label="Search">
             <IconSearch className="size-6 text-gray-100" />
           </IconBox>
-          {/* Mode-switch button — toggles voice ↔ message.
-           * Voice mode  → shows IconChatswitch  → tap goes to message view.
-           * Message mode → shows microphone icon → tap goes back to voice. */}
+          {/* Past AI log sessions. Mode switching lives on the bottom-left
+           * keyboard/mic toggle, so this slot opens the history list. */}
           <button
             type="button"
-            aria-label={
-              view === 'message' ? 'Switch to voice mode' : 'Switch to message mode'
-            }
-            onClick={() => setView(view === 'message' ? 'voice-idle' : 'message')}
+            aria-label="Open log history"
+            onClick={openHistory}
             className="flex size-[42px] items-center justify-center rounded-[12px] bg-brand-primary transition-transform active:scale-95"
           >
-            {view === 'message' ? (
-              <IconMicrophoneFilled className="size-6 text-white" />
-            ) : (
-              <IconChatswitch className="size-6 text-white" />
-            )}
+            <IconChatswitch className="size-6 text-white" />
           </button>
         </div>
       </header>
@@ -525,7 +531,16 @@ export default function LogsPage({ onOpenReport }: { onOpenReport?: (id: string)
           </button>
         </div>
       ) : view === 'message' || keyboardOpen ? (
-        <div className="absolute bottom-[20px] left-[16px] right-[16px] z-10 flex items-center gap-[10px]">
+        <div className="absolute bottom-[20px] left-[25px] right-[25px] z-10 flex items-center gap-[10px]">
+          {/* Mode toggle — mirrors the keyboard button's slot in voice mode, so
+           * the control stays put when you switch between the two. */}
+          <IconBox
+            size={48}
+            aria-label="Switch to voice mode"
+            onClick={handleSwitchToVoice}
+          >
+            <IconMicrophone className="size-6 text-gray-100" />
+          </IconBox>
           <div className="flex h-[44px] flex-1 items-center gap-[8px] rounded-full bg-white px-[14px] shadow-sm">
             <input
               type="text"
@@ -539,16 +554,6 @@ export default function LogsPage({ onOpenReport }: { onOpenReport?: (id: string)
             />
             <button
               type="button"
-              aria-label={keyboardOpen ? 'Back to voice mode' : 'Voice input'}
-              onClick={keyboardOpen ? () => setKeyboardOpen(false) : undefined}
-              className={`flex size-[24px] items-center justify-center ${
-                keyboardOpen ? 'text-brand-primary' : 'text-gray-60'
-              }`}
-            >
-              <IconMicrophone className="size-[18px]" />
-            </button>
-            <button
-              type="button"
               aria-label="Send"
               onClick={handleSendText}
               disabled={!draft.trim()}
@@ -557,20 +562,19 @@ export default function LogsPage({ onOpenReport }: { onOpenReport?: (id: string)
               <IconArrowUp className="size-[16px] text-white" />
             </button>
           </div>
-          <button
-            type="button"
+          <IconBox
+            size={48}
             aria-label="Compile today's logs and review"
             onClick={handleCompile}
-            className="flex size-[44px] items-center justify-center rounded-[12px] bg-white shadow-sm transition-colors active:bg-brand-tint-1"
           >
-            <IconPlus className="size-[22px] text-gray-100" />
-          </button>
+            <IconPlus className="size-6 text-gray-100" />
+          </IconBox>
         </div>
       ) : (
         <div className="absolute bottom-[20px] left-[25px] right-[25px] z-10 flex items-center justify-between">
           <IconBox
             size={48}
-            aria-label="Open keyboard"
+            aria-label="Switch to keyboard input"
             onClick={() => setKeyboardOpen(true)}
           >
             <IconKeyboard className="size-6 text-gray-100" />

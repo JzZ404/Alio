@@ -12,10 +12,15 @@ const ChatTab      = dynamic(() => import('./chat/page'),             { ssr: fal
 const ProfilesTab  = dynamic(() => import('./profiles/page'),         { ssr: false });
 const ChatDetail   = dynamic(() => import('./chat/[id]/page'),        { ssr: false });
 const ReportDetail = dynamic(() => import('./logs/report/[id]/page'), { ssr: false });
+const LogsHistory  = dynamic(() => import('./logs/history/page'),     { ssr: false });
 
 const TABS = ['home', 'logs', 'chat', 'profiles'] as const;
 type Tab = typeof TABS[number];
-type SubPage = { type: 'chat'; id: string } | { type: 'report'; id: string } | null;
+type SubPage =
+  | { type: 'chat'; id: string }
+  | { type: 'report'; id: string }
+  | { type: 'logs-history' }
+  | null;
 
 const NAV_W = 365;
 const NAV_H = 69;
@@ -53,8 +58,12 @@ export default function TabsLayout({ children }: { children: ReactNode }) {
         <div className="absolute inset-0 bottom-[85px] overflow-y-auto">
           {subPage?.type === 'chat'   && <ChatDetail   id={subPage.id} onBack={() => setSubPage(null)} />}
           {subPage?.type === 'report' && <ReportDetail id={subPage.id} onBack={() => setSubPage(null)} />}
+          {subPage?.type === 'logs-history' && <LogsHistory onBack={() => setSubPage(null)} />}
           {!subPage && active === 'home'     && <HomeTab />}
-          {!subPage && active === 'logs'     && <LogsTab    onOpenReport={(id) => setSubPage({ type: 'report', id })} />}
+          {!subPage && active === 'logs'     && <LogsTab
+            onOpenReport={(id) => setSubPage({ type: 'report', id })}
+            onOpenHistory={() => setSubPage({ type: 'logs-history' })}
+          />}
           {!subPage && active === 'chat'     && <ChatTab    onOpenThread={(id) => setSubPage({ type: 'chat',   id })} />}
           {!subPage && active === 'profiles' && <ProfilesTab />}
         </div>

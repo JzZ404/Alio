@@ -10,6 +10,10 @@ import {
 } from './icons';
 import type { CaregiverStatus, Caregiver } from '@alio/mock-data';
 
+/** Width of one step column. The circle is centred inside it, so half of this
+ * is also the distance from the row edge to the first/last circle centre. */
+const STEP_W = 60;
+
 const STEPS: { key: CaregiverStatus; label: string }[] = [
   { key: 'on-the-way', label: 'On way' },
   { key: 'arrived', label: 'Arrived' },
@@ -131,17 +135,26 @@ function ProgressStepper({ activeIdx, className }: { activeIdx: number; classNam
   // Active step's fill reaches the active circle center.
   const fillPct = activeIdx <= 0 ? 0 : (activeIdx / (STEPS.length - 1)) * 100;
 
+  // Track spans centre-to-centre of the first and last circles, so it never
+  // pokes out past them. Each <li> is STEP_W wide with the circle centred, so
+  // the first centre sits at STEP_W / 2 from the left (and likewise the right).
+  const INSET = STEP_W / 2;
+
   return (
     <div className={clsx('relative', className)}>
-      {/* Track + fill (positioned at vertical center of the circles) */}
+      {/* Track + fill (vertically centred on the circles: 28/2 - 3/2 = 12.5px) */}
       <div
-        className="absolute left-3 right-3 top-[13px] h-[3px] rounded-full"
-        style={{ background: TRACK_BG }}
+        className="absolute top-[12.5px] h-[3px] rounded-full"
+        style={{ left: INSET, right: INSET, background: TRACK_BG }}
         aria-hidden
       />
       <div
-        className="absolute left-3 top-[13px] h-[3px] rounded-full transition-[width] duration-300 ease-out"
-        style={{ width: `calc((100% - 24px) * ${fillPct / 100})`, background: TRACK_FILL }}
+        className="absolute top-[12.5px] h-[3px] rounded-full transition-[width] duration-300 ease-out"
+        style={{
+          left: INSET,
+          width: `calc((100% - ${STEP_W}px) * ${fillPct / 100})`,
+          background: TRACK_FILL,
+        }}
         aria-hidden
       />
 
@@ -150,7 +163,11 @@ function ProgressStepper({ activeIdx, className }: { activeIdx: number; classNam
           const state: 'done' | 'active' | 'future' =
             i < activeIdx ? 'done' : i === activeIdx ? 'active' : 'future';
           return (
-            <li key={step.key} className="flex flex-col items-center gap-1 w-[60px]">
+            <li
+              key={step.key}
+              className="flex flex-col items-center gap-1"
+              style={{ width: STEP_W }}
+            >
               <StepCircle state={state} index={i} />
               <span
                 className="text-[10.4px] capitalize"

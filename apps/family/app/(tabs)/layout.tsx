@@ -5,6 +5,7 @@ import { MobileFrame } from '@alio/ui';
 import { usePathname } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { IconHome, IconMicrophone, IconChat, IconMedicalRecord } from '@alio/ui';
+import { RecordsProvider } from '@/lib/records-store';
 
 const HomeTab        = dynamic(() => import('./home/page'),              { ssr: false });
 const AICheckTab     = dynamic(() => import('./ai-check/page'),          { ssr: false });
@@ -49,6 +50,7 @@ export default function TabsLayout({ children }: { children: ReactNode }) {
 
   return (
     <MobileFrame>
+      <RecordsProvider>
       <div className="relative h-full overflow-hidden">
         <div className="absolute inset-0 bottom-[85px] overflow-y-auto">
           {subPage?.type === 'chat'   && <ChatDetail   id={subPage.id} onBack={() => setSubPage(null)} />}
@@ -85,6 +87,7 @@ export default function TabsLayout({ children }: { children: ReactNode }) {
           </nav>
         )}
       </div>
+      </RecordsProvider>
     </MobileFrame>
   );
 }

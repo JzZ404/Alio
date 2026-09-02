@@ -12,12 +12,11 @@ import {
   IconMedicalRecord,
 } from '@alio/ui';
 import {
-  SAMPLE_RECORDS,
   RECORDS_OWNER,
-  type MedicalRecord,
   type RecordType,
 } from '@alio/mock-data';
 import { supabase, type CompiledReportRow } from '@/lib/supabase';
+import { useRecords } from '@/lib/records-store';
 import { VisitRecordItem } from '@/components/VisitRecordItem';
 
 // Hardcoded for the prototype (single patient). Replace with real identity
@@ -40,7 +39,7 @@ const FILTER_LABELS: Record<FilterTab, string> = {
  * AddRecordModal. Header positioned at top-60 to match Logs/AI/Chat screens.
  */
 export default function FamilyRecordsPage({ onOpenVisit }: { onOpenVisit?: (id: string) => void } = {}) {
-  const [records, setRecords] = useState<MedicalRecord[]>(SAMPLE_RECORDS);
+  const { records, addRecord } = useRecords();
   const [visits, setVisits] = useState<CompiledReportRow[]>([]);
   const [activeFilter, setActiveFilter] = useState<FilterTab>('All');
   const [modalOpen, setModalOpen] = useState(false);
@@ -70,13 +69,6 @@ export default function FamilyRecordsPage({ onOpenVisit }: { onOpenVisit?: (id: 
         : records.filter((r) => r.type === activeFilter);
 
   const totalCount = filteredRecords.length + (showVisits ? visits.length : 0);
-
-  const handleSave = (rec: Omit<MedicalRecord, 'id'>) => {
-    setRecords((prev) => [
-      { ...rec, id: `r-${Date.now()}` },
-      ...prev,
-    ]);
-  };
 
   return (
     <div
@@ -193,7 +185,7 @@ export default function FamilyRecordsPage({ onOpenVisit }: { onOpenVisit?: (id: 
       <AddRecordModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        onSave={handleSave}
+        onSave={addRecord}
       />
     </div>
   );

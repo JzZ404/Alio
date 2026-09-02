@@ -6,7 +6,9 @@ import {
   TodayStatusCard,
   CalendarWidget,
   FloatingAddButton,
+  AddRecordModal,
 } from '@alio/ui';
+import { useRecords } from '@/lib/records-store';
 import {
   SAMPLE_CAREGIVER,
   SAMPLE_VITALS,
@@ -20,12 +22,8 @@ export default function FamilyHomePage() {
   // Default to "on-the-way" — user can toggle to demonstrate the expanded state.
   // (A real flow would update this from a websocket / GPS event.)
   const [status, setStatus] = useState<CaregiverStatus>('on-the-way');
-
-  // Demo toggle: clicking the FAB cycles the caregiver status through the 4 states.
-  const cycleStatus = () => {
-    const order: CaregiverStatus[] = ['on-the-way', 'arrived', 'in-progress', 'complete'];
-    setStatus(order[(order.indexOf(status) + 1) % order.length]);
-  };
+  const [addOpen, setAddOpen] = useState(false);
+  const { addRecord } = useRecords();
 
   return (
     <div
@@ -58,11 +56,19 @@ export default function FamilyHomePage() {
         <CalendarWidget month={SAMPLE_CALENDAR} appointments={SAMPLE_APPOINTMENTS} />
       </div>
 
-      {/* FAB — pinned to bottom right, above the tab bar */}
+      {/* FAB — pinned to bottom right, above the tab bar. Opens the same
+       * Add Record sheet the Records tab uses, so the family can upload a lab
+       * report or prescription without leaving Home. */}
       <FloatingAddButton
-        onClick={cycleStatus}
-        aria-label="Cycle caregiver status (demo)"
+        onClick={() => setAddOpen(true)}
+        aria-label="Add record"
         className="fixed bottom-[100px] right-5 sm:absolute"
+      />
+
+      <AddRecordModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onSave={addRecord}
       />
     </div>
   );

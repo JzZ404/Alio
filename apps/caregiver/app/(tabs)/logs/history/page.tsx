@@ -10,8 +10,9 @@ import {
 } from '@alio/ui';
 import { LOGS_HISTORY } from '@alio/mock-data';
 
-export default function LogsHistoryPage() {
+export default function LogsHistoryPage({ onBack }: { onBack?: () => void } = {}) {
   const router = useRouter();
+  const back = onBack ?? (() => router.push('/logs'));
   return (
     <div
       className="relative h-full overflow-hidden"
@@ -22,7 +23,7 @@ export default function LogsHistoryPage() {
     >
       {/* Top header — back / dates / search */}
       <header className="absolute left-[25px] right-[25px] top-[60px] z-10 flex items-center justify-between">
-        <IconBox size={42} aria-label="Back" onClick={() => router.push('/logs')}>
+        <IconBox size={42} aria-label="Back" onClick={back}>
           <IconArrowLeft className="size-6 text-gray-100" />
         </IconBox>
 

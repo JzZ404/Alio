@@ -64,6 +64,14 @@ export default function FamilyAICheckPage() {
     else setView('message');
   };
 
+  /** Bottom-left toggle in text mode — returns to the voice action bar from
+   * either the keyboard overlay or the message conversation. */
+  function handleSwitchToVoice() {
+    setUploadOpen(false);
+    setKeyboardOpen(false);
+    setView('voice-idle');
+  }
+
   async function handlePressToSpeak() {
     setMicError('');
     setUploadOpen(false);
@@ -256,7 +264,7 @@ export default function FamilyAICheckPage() {
           value={draft}
           onChange={setDraft}
           onSend={handleSendText}
-          onMicClick={keyboardOpen ? () => setKeyboardOpen(false) : undefined}
+          onSwitchToVoice={handleSwitchToVoice}
           uploadOpen={uploadOpen}
           onOpenUpload={() => setUploadOpen(true)}
           onCloseUpload={() => setUploadOpen(false)}
@@ -265,7 +273,7 @@ export default function FamilyAICheckPage() {
         />
       ) : (
         <div className="absolute bottom-[20px] left-[25px] right-[25px] z-10 flex items-center justify-between">
-          <IconBox size={48} aria-label="Open keyboard" onClick={() => setKeyboardOpen(true)}>
+          <IconBox size={48} aria-label="Switch to keyboard input" onClick={() => setKeyboardOpen(true)}>
             <IconKeyboard className="size-6 text-gray-100" />
           </IconBox>
           {view === 'voice-recording' ? (
@@ -368,14 +376,19 @@ function MessageView({ turns, loading }: { turns: ChatMessage[]; loading: boolea
 }
 
 function MessageInput({
-  value, onChange, onSend, onMicClick, uploadOpen, onOpenUpload, onCloseUpload, onUploadPick, disabled,
+  value, onChange, onSend, onSwitchToVoice, uploadOpen, onOpenUpload, onCloseUpload, onUploadPick, disabled,
 }: {
-  value: string; onChange: (v: string) => void; onSend: () => void; onMicClick?: () => void;
+  value: string; onChange: (v: string) => void; onSend: () => void; onSwitchToVoice: () => void;
   uploadOpen: boolean; onOpenUpload: () => void; onCloseUpload: () => void; onUploadPick: (kind: UploadKind) => void; disabled?: boolean;
 }) {
   const hasText = value.trim().length > 0;
   return (
-    <div className="absolute bottom-[20px] left-[16px] right-[16px] z-10 flex items-center gap-[10px]">
+    <div className="absolute bottom-[20px] left-[25px] right-[25px] z-10 flex items-center gap-[10px]">
+      {/* Mode toggle — mirrors the keyboard button's slot in voice mode, so the
+       * control stays put when you switch between the two. */}
+      <IconBox size={48} aria-label="Switch to voice mode" onClick={onSwitchToVoice}>
+        <IconMicrophone className="size-6 text-gray-100" />
+      </IconBox>
       <div className="flex h-[44px] flex-1 items-center gap-[8px] rounded-full bg-white px-[14px] shadow-sm">
         <input
           type="text"
@@ -386,10 +399,6 @@ function MessageInput({
           disabled={disabled}
           className="flex-1 bg-transparent text-[14px] text-gray-100 placeholder:text-gray-60 outline-none disabled:opacity-50"
         />
-        <button type="button" aria-label={onMicClick ? 'Back to voice mode' : 'Voice input'} onClick={onMicClick}
-          className={`flex size-[24px] items-center justify-center ${onMicClick ? 'text-brand-primary' : 'text-gray-60'}`}>
-          <IconMicrophone className="size-[18px]" />
-        </button>
         <button type="button" aria-label="Send" onClick={onSend} disabled={!hasText || disabled}
           className="flex size-[28px] items-center justify-center rounded-full bg-brand-primary transition-transform active:scale-95 disabled:opacity-40">
           <IconArrowUp className="size-[16px] text-white" />
@@ -399,10 +408,9 @@ function MessageInput({
         {uploadOpen ? (
           <UploadWheel open={uploadOpen} onClose={onCloseUpload} onPick={onUploadPick} className="bottom-0 right-0" />
         ) : (
-          <button type="button" aria-label="More actions" onClick={onOpenUpload}
-            className="flex size-[44px] items-center justify-center rounded-[12px] bg-white shadow-sm transition-colors active:bg-brand-tint-1">
-            <IconPlus className="size-[22px] text-gray-100" />
-          </button>
+          <IconBox size={48} aria-label="More actions" onClick={onOpenUpload}>
+            <IconPlus className="size-6 text-gray-100" />
+          </IconBox>
         )}
       </div>
     </div>
