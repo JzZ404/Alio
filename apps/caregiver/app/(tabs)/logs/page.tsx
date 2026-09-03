@@ -543,8 +543,8 @@ export default function LogsPage({
       </header>
 
       {/* Main background — today's report, filling in as notes land. */}
-      {/* Bottom clearance: sheet handle 44 + input 56 + compile row 42 + gaps. */}
-      <div className="absolute bottom-[168px] left-0 right-0 top-[122px] overflow-y-auto px-[22px] pt-[10px] pb-[16px]">
+      {/* Bottom clearance for the collapsed sheet (148px). */}
+      <div className="absolute bottom-[156px] left-0 right-0 top-[122px] overflow-y-auto px-[22px] pt-[10px] pb-[16px]">
         <VisitReportDraft
           patientName={activePatient?.name ?? 'Patient'}
           dateLabel={new Date().toLocaleDateString('en-US', {
@@ -569,8 +569,8 @@ export default function LogsPage({
         )}
       </div>
 
-      {/* Conversation — a drawer under the input. Pull it up to read, leave it
-        * shut to keep the report the main thing on screen. */}
+      {/* Conversation + input in one surface: the sheet grows from behind the
+        * input bar, so the control the caregiver is holding never moves. */}
       {view !== 'voice-review' && (
         <PullUpSheet
           open={panelOpen}
@@ -578,11 +578,35 @@ export default function LogsPage({
           title="Alio"
           count={conversation.length}
           className="absolute bottom-0 left-0 right-0 z-10"
-          expandedHeight="52vh"
+          expandedHeight="58vh"
+          footer={
+            <>
+              {/* Finish the visit: compile the notes and hand them to the
+                * family. Labelled, because "+" reads as "add another thing". */}
+              <button
+                type="button"
+                onClick={handleCompile}
+                disabled={compileState !== 'idle' || recordState !== 'idle'}
+                className="mb-[10px] ml-auto flex items-center gap-[7px] rounded-full bg-brand-primary px-[14px] py-[8px] text-[13px] font-bold text-white shadow-[0_2px_12px_rgba(94,105,246,0.35)] transition-transform active:scale-95 disabled:opacity-50"
+              >
+                <IconSendMessage className="size-[16px] text-white" />
+                Send to family
+              </button>
+              <HoldToTalkBar
+                mode={barMode}
+                value={draft}
+                onChange={setDraft}
+                onHoldStart={handlePressToSpeak}
+                onHoldEnd={handleDone}
+                onTap={() => setTyping(true)}
+                onSend={handleSendText}
+                onExitTyping={() => setTyping(false)}
+                disabled={recordState === 'saving'}
+              />
+            </>
+          }
         >
           <ConversationTurns turns={conversation} onOpenReport={openReport} />
-          {/* Clearance for the input bar + compile button floating above. */}
-          <div className="h-[128px] shrink-0" aria-hidden />
         </PullUpSheet>
       )}
 
@@ -596,34 +620,6 @@ export default function LogsPage({
           onDiscard={handleDiscardReview}
           onSave={handleSaveReview}
         />
-      )}
-
-      {/* Persistent input. Hold to talk, tap to type. */}
-      {view !== 'voice-review' && (
-        <div className="absolute bottom-[64px] left-[16px] right-[16px] z-20">
-          {/* Finish the visit: compile the notes into a report and hand it to
-            * the family. Labelled, because "+" reads as "add another thing". */}
-          <button
-            type="button"
-            onClick={handleCompile}
-            disabled={compileState !== 'idle' || recordState !== 'idle'}
-            className="mb-[10px] ml-auto flex items-center gap-[7px] rounded-full bg-brand-primary px-[14px] py-[8px] text-[13px] font-bold text-white shadow-[0_2px_12px_rgba(94,105,246,0.35)] transition-transform active:scale-95 disabled:opacity-50"
-          >
-            <IconSendMessage className="size-[16px] text-white" />
-            Send to family
-          </button>
-          <HoldToTalkBar
-            mode={barMode}
-            value={draft}
-            onChange={setDraft}
-            onHoldStart={handlePressToSpeak}
-            onHoldEnd={handleDone}
-            onTap={() => setTyping(true)}
-            onSend={handleSendText}
-            onExitTyping={() => setTyping(false)}
-            disabled={recordState === 'saving'}
-          />
-        </div>
       )}
 
       {compileState === 'compiling' && (
