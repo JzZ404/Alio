@@ -31,5 +31,14 @@ export { AddRecordModal } from './AddRecordModal';
 // Upload wheel — floating attachment picker for AI / chat screens
 export { UploadWheel, type UploadKind } from './UploadWheel';
 
+// Log screen — report-as-background plus the hold-to-talk input
+export { HoldToTalkBar, type BarMode } from './HoldToTalkBar';
+export {
+  VisitReportDraft,
+  EMPTY_DRAFT,
+  type ReportDraft,
+  type DraftSeverity,
+} from './VisitReportDraft';
+
 // Caesarzkn icons — 288 generated icon components + custom
 export * from './icons';

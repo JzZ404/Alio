@@ -5,18 +5,19 @@ import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
 import {
   IconBox,
-  PressToSpeakButton,
-  GradientBlob,
   PatientSwitcher,
   AudioBubble,
   TaskCard,
   ChatBubble,
+  HoldToTalkBar,
+  VisitReportDraft,
+  EMPTY_DRAFT,
+  type ReportDraft,
+  type BarMode,
   IconSearch,
   IconHistory,
-  IconKeyboard,
-  IconPlus,
-  IconMicrophone,
-  IconArrowUp,
+  IconClose,
+  IconChatswitch,
 } from '@alio/ui';
 import {
   INITIAL_CONVERSATION,
@@ -28,9 +29,28 @@ import { supabase } from '@/lib/supabase';
 
 const CAREGIVER_ID = 'caregiver-001';
 
-type View = 'voice-idle' | 'voice-recording' | 'voice-review' | 'message';
+type View = 'voice-idle' | 'voice-recording' | 'voice-review';
 type RecordState = 'idle' | 'recording' | 'saving';
 type CompileState = 'idle' | 'compiling';
+
+/** Pull vitals out of the caregiver's own words so the report card can fill in
+ * before the server-side compile runs. Deliberately loose — a miss just leaves
+ * the field waiting. */
+function extractVitals(text: string): string | null {
+  const parts: string[] = [];
+  const bp = text.match(/(\d{2,3})\s*(?:\/|over)\s*(\d{2,3})/i);
+  if (bp) parts.push(`${bp[1]}/${bp[2]}`);
+  const pulse = text.match(/(\d{2,3})\s*(?:bpm|beats)/i);
+  if (pulse) parts.push(`${pulse[1]} bpm`);
+  const temp = text.match(/(\d{2,3}(?:\.\d)?)\s*(?:°|degrees|\bF\b)/i);
+  if (temp) parts.push(`${temp[1]}°F`);
+  return parts.length ? parts.join('   ') : null;
+}
+
+function medsLine(meds: string[]): string | null {
+  if (!meds.length) return null;
+  return meds.length === 1 ? `${meds[0]} noted` : `${meds.length} medications noted`;
+}
 
 export default function LogsPage({
   onOpenReport,
@@ -51,6 +71,32 @@ export default function LogsPage({
   const [error, setError] = useState('');
   const [draft, setDraft] = useState('');
   const [compileState, setCompileState] = useState<CompileState>('idle');
+  // The conversation is an overlay now, not a screen. `typing` swaps the
+  // hold-to-talk pill for a text field without moving anything else.
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [typing, setTyping] = useState(false);
+  const [report, setReport] = useState<ReportDraft>(EMPTY_DRAFT);
+
+  /** Fold one note's result into today's report. Existing values win, so a
+   * later vague note can't wipe an earlier specific one. */
+  function fillReport(
+    transcript: string,
+    summary: Awaited<ReturnType<typeof api.summarize>>,
+  ) {
+    setReport((prev) => {
+      const meds = summary.medications_noted ?? [];
+      return {
+        vitals: prev.vitals ?? extractVitals(transcript),
+        mood: prev.mood ?? (summary.mood || null),
+        meds: prev.meds ?? medsLine(meds),
+        medsTaken:
+          prev.medsTaken.length > 0
+            ? prev.medsTaken
+            : meds.map((name) => ({ name, taken: true })),
+        severity: summary.urgent ? 'urgent' : prev.severity,
+      };
+    });
+  }
 
   // SpeechRecognition is non-standard; type as any to avoid lib pollution.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -180,7 +226,7 @@ export default function LogsPage({
         visitTime: result.visit_time,
       };
       setConversation((prev) => [...prev, turn]);
-      setView('message');
+      setPanelOpen(true);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not compile logs.');
     } finally {
@@ -190,6 +236,7 @@ export default function LogsPage({
 
   const activePatient = SAMPLE_PATIENTS.find((p) => p.id === activePatientId);
   const recording = view === 'voice-recording' && recordState === 'recording';
+  const barMode: BarMode = recording ? 'recording' : typing ? 'typing' : 'idle';
   // Saving on the voice screen = the /transcribe fallback; on the review
   // screen it's the summarize+persist step (label not shown there anyway).
   const busyLabel = recordState === 'saving' ? 'Transcribing…' : '';
@@ -370,12 +417,6 @@ export default function LogsPage({
     setView('voice-idle');
   }
 
-  /** Bottom-left toggle in text mode — returns to the voice action bar from
-   * either the keyboard overlay or the message conversation. */
-  function handleSwitchToVoice() {
-    setView('voice-idle');
-  }
-
   async function handleSendText() {
     const text = draft.trim();
     if (!text || recordState !== 'idle') return;
@@ -388,7 +429,8 @@ export default function LogsPage({
       { kind: 'user-text', id: `turn-${ts}`, text },
     ]);
     setDraft('');
-    setView('message');
+    setTyping(false);
+    setPanelOpen(true);
     setRecordState('saving');
 
     try {
@@ -406,6 +448,7 @@ export default function LogsPage({
         urgent: !!summary.urgent,
       };
       setConversation((prev) => [...prev, aiTurn]);
+      fillReport(text, summary);
       await persistLog(text, summary);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not reach the AI service.');
@@ -447,8 +490,10 @@ export default function LogsPage({
         urgent: !!summary.urgent,
       };
       setConversation((prev) => [...prev, aiTurn]);
+      fillReport(transcript, summary);
       await persistLog(transcript, summary);
       setEditingTranscript('');
+      setPanelOpen(true);
       setView('voice-idle');
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not reach the AI service.');
@@ -490,104 +535,77 @@ export default function LogsPage({
         </div>
       </header>
 
-      {view === 'message' ? (
-        <MessageView turns={conversation} onOpenReport={openReport} />
-      ) : view === 'voice-review' ? (
-        <VoiceReviewView
-          value={editingTranscript}
-          onChange={setEditingTranscript}
-          saving={recordState === 'saving'}
-          error={error}
+      {/* Main background — today's report, filling in as notes land. */}
+      <div className="absolute bottom-[96px] left-0 right-0 top-[122px] overflow-y-auto px-[22px] pt-[10px] pb-[16px]">
+        <VisitReportDraft
+          patientName={activePatient?.name ?? 'Patient'}
+          dateLabel={new Date().toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          })}
+          draft={report}
+          filling={recordState === 'saving'}
         />
-      ) : (
-        <VoiceView
-          recording={recording}
-          liveTranscript={liveTranscript}
-          busyLabel={busyLabel}
-          error={error}
+
+        {error && (
+          <p className="mt-4 text-center text-[13px] text-red-600">{error}</p>
+        )}
+
+        {/* Live caption while the pill is held. */}
+        {recording && liveTranscript && (
+          <p className="mt-4 rounded-[14px] bg-white/70 p-[14px] text-[15px] leading-[21px] text-gray-100">
+            {liveTranscript}
+          </p>
+        )}
+      </div>
+
+      {/* Conversation — a reference panel docked above the input, not a screen. */}
+      {panelOpen && view !== 'voice-review' && (
+        <ConversationPanel
+          turns={conversation}
+          onOpenReport={openReport}
+          onClose={() => setPanelOpen(false)}
         />
       )}
 
-      {view === 'voice-review' ? (
-        <div className="absolute bottom-[20px] left-[25px] right-[25px] z-10 flex items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={handleDiscardReview}
-            disabled={recordState === 'saving'}
-            className="flex-1 rounded-full border border-gray-300 bg-white py-3 font-semibold text-gray-100 disabled:opacity-50"
-          >
-            Discard
-          </button>
-          <button
-            type="button"
-            onClick={handleSaveReview}
-            disabled={recordState === 'saving' || !editingTranscript.trim()}
-            className="flex-1 rounded-full bg-[#C0DA5A] py-3 font-semibold text-[#1F2782] disabled:opacity-50"
-          >
-            {recordState === 'saving' ? 'Saving…' : 'Save'}
-          </button>
-        </div>
-      ) : view === 'message' ? (
-        <div className="absolute bottom-[20px] left-[25px] right-[25px] z-10 flex items-center gap-[10px]">
-          {/* Mode toggle — mirrors the keyboard button's slot in voice mode, so
-           * the control stays put when you switch between the two. */}
-          <IconBox
-            size={48}
-            aria-label="Switch to voice mode"
-            onClick={handleSwitchToVoice}
-          >
-            <IconMicrophone className="size-6 text-gray-100" />
-          </IconBox>
-          <div className="flex h-[44px] flex-1 items-center gap-[8px] rounded-full bg-white px-[14px] shadow-sm">
-            <input
-              type="text"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSendText();
-              }}
-              placeholder="Type a note..."
-              className="flex-1 bg-transparent text-[14px] text-gray-100 placeholder:text-gray-60 outline-none"
-            />
+      {/* Review sheet — the one moment that takes over, because the caregiver
+        * is editing what will be saved. */}
+      {view === 'voice-review' && (
+        <ReviewSheet
+          value={editingTranscript}
+          onChange={setEditingTranscript}
+          saving={recordState === 'saving'}
+          onDiscard={handleDiscardReview}
+          onSave={handleSaveReview}
+        />
+      )}
+
+      {/* Persistent input. Hold to talk, tap to type. */}
+      {view !== 'voice-review' && (
+        <div className="absolute bottom-[20px] left-[16px] right-[16px] z-20">
+          {!panelOpen && conversation.length > 0 && (
             <button
               type="button"
-              aria-label="Send"
-              onClick={handleSendText}
-              disabled={!draft.trim()}
-              className="flex size-[28px] items-center justify-center rounded-full bg-brand-primary transition-transform active:scale-95 disabled:opacity-50"
+              onClick={() => setPanelOpen(true)}
+              className="mb-[10px] ml-auto flex items-center gap-[6px] rounded-full bg-white/80 px-[12px] py-[6px] text-[12px] font-bold text-gray-100 shadow-sm backdrop-blur-sm transition-transform active:scale-95"
             >
-              <IconArrowUp className="size-[16px] text-white" />
+              <IconChatswitch className="size-[14px] text-brand-primary" />
+              {conversation.length}
             </button>
-          </div>
-          <IconBox
-            size={48}
-            aria-label="Compile today's logs and review"
-            onClick={handleCompile}
-          >
-            <IconPlus className="size-6 text-gray-100" />
-          </IconBox>
-        </div>
-      ) : (
-        <div className="absolute bottom-[20px] left-[25px] right-[25px] z-10 flex items-center justify-between">
-          <IconBox
-            size={48}
-            aria-label="Switch to keyboard input"
-            onClick={() => setView('message')}
-          >
-            <IconKeyboard className="size-6 text-gray-100" />
-          </IconBox>
-          {recording ? (
-            <PressToSpeakButton variant="recording" onClick={handleDone} className="w-[216px]" />
-          ) : (
-            <PressToSpeakButton variant="idle" onClick={handlePressToSpeak} className="w-[216px]" />
           )}
-          <IconBox
-            size={48}
-            aria-label="Compile today's logs and review"
-            onClick={handleCompile}
-          >
-            <IconPlus className="size-6 text-gray-100" />
-          </IconBox>
+          <HoldToTalkBar
+            mode={barMode}
+            value={draft}
+            onChange={setDraft}
+            onHoldStart={handlePressToSpeak}
+            onHoldEnd={handleDone}
+            onTap={() => setTyping(true)}
+            onSend={handleSendText}
+            onExitTyping={() => setTyping(false)}
+            onPlus={handleCompile}
+            disabled={recordState === 'saving'}
+          />
         </div>
       )}
 
@@ -602,116 +620,20 @@ export default function LogsPage({
   );
 }
 
-function VoiceView({
-  recording,
-  liveTranscript,
-  busyLabel,
-  error,
-}: {
-  recording: boolean;
-  liveTranscript: string;
-  busyLabel: string;
-  error: string;
-}) {
-  return (
-    <>
-      <p
-        className={clsx(
-          'absolute left-1/2 top-[180px] -translate-x-1/2 whitespace-nowrap bg-clip-text text-xl font-bold text-transparent',
-          recording
-            ? 'animate-[listening-gradient_3.6s_ease-in-out_infinite] bg-[length:300%_100%] bg-[linear-gradient(90deg,#2B1B72_0%,#5E69F6_22%,#A29BFE_45%,#F4B6C8_60%,#D496F5_78%,#2B1B72_100%)]'
-            : 'bg-gradient-to-r from-[#2B1B72] from-[10%] via-[#5E69F6] via-[55%] to-[#F4B6C8] to-[100%]',
-        )}
-      >
-        {busyLabel || 'Hi, I am listening'}
-      </p>
 
-      <div className="absolute left-1/2 top-[220px] h-[310px] w-[311px] -translate-x-1/2">
-        <GradientBlob active={recording || Boolean(busyLabel)} className="h-full w-full" />
-      </div>
-
-      {liveTranscript && (
-        <div className="absolute left-1/2 bottom-[120px] w-[311px] -translate-x-1/2 text-center text-[18px] leading-[26px] font-medium">
-          {(() => {
-            // Chunk the transcript into ~5-word lines so each line fits the
-            // 311px blob width, then show only the last 4 lines. Fade older
-            // lines whole — line-by-line, not word-by-word.
-            const words = liveTranscript.trim().split(/\s+/);
-            const wordsPerLine = 5;
-            const lines: string[] = [];
-            for (let i = 0; i < words.length; i += wordsPerLine) {
-              lines.push(words.slice(i, i + wordsPerLine).join(' '));
-            }
-            const tail = lines.slice(-4);
-            return tail.map((line, i) => {
-              const distFromEnd = tail.length - 1 - i;
-              const color =
-                distFromEnd === 0 ? 'text-gray-100'
-                : distFromEnd === 1 ? 'text-gray-100 opacity-70'
-                : distFromEnd === 2 ? 'text-gray-100 opacity-45'
-                                    : 'text-gray-100 opacity-25';
-              return (
-                <div key={i} className={color}>
-                  {line}
-                </div>
-              );
-            });
-          })()}
-        </div>
-      )}
-
-      {error && (
-        <p className="absolute left-[24px] right-[24px] bottom-[170px] text-center text-sm text-red-600">
-          {error}
-        </p>
-      )}
-    </>
-  );
-}
-
-function VoiceReviewView({
-  value,
-  onChange,
-  saving,
-  error,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  saving: boolean;
-  error: string;
-}) {
-  return (
-    <>
-      <p className="absolute left-1/2 top-[180px] -translate-x-1/2 whitespace-nowrap bg-gradient-to-r from-[#2B1B72] from-[10%] via-[#5E69F6] via-[55%] to-[#F4B6C8] to-[100%] bg-clip-text text-xl font-bold text-transparent">
-        Review &amp; edit
-      </p>
-
-      <div className="absolute left-[24px] right-[24px] top-[230px] bottom-[170px]">
-        <textarea
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          disabled={saving}
-          autoFocus
-          placeholder="Nothing was transcribed. Type your note here, or discard."
-          className="h-full w-full resize-none rounded-3xl bg-white/80 px-4 py-3 text-base leading-relaxed text-gray-100 placeholder:text-gray-60 outline-none backdrop-blur-sm focus:bg-white disabled:opacity-60"
-        />
-      </div>
-
-      {error && (
-        <p className="absolute left-[24px] right-[24px] bottom-[150px] text-center text-sm text-red-600">
-          {error}
-        </p>
-      )}
-    </>
-  );
-}
-
-function MessageView({
+/**
+ * ConversationPanel — the exchange with Alio, docked above the input as a
+ * reference sheet. The report stays visible behind it, so the caregiver never
+ * loses sight of the document the conversation is filling in.
+ */
+function ConversationPanel({
   turns,
   onOpenReport,
+  onClose,
 }: {
   turns: ConversationTurn[];
   onOpenReport: (id: string) => void;
+  onClose: () => void;
 }) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -719,11 +641,23 @@ function MessageView({
   }, [turns.length]);
 
   return (
-    <div
-      ref={scrollRef}
-      className="absolute left-0 right-0 top-[122px] bottom-[170px] overflow-y-auto px-4 py-2"
-    >
-      <div className="flex flex-col gap-3">
+    <div className="absolute bottom-[92px] left-[16px] right-[16px] z-10 max-h-[46%] overflow-hidden rounded-[20px] bg-white/70 shadow-[0_8px_32px_rgba(0,0,0,0.12)] backdrop-blur-xl">
+      <div className="flex items-center justify-between px-[16px] pt-[12px] pb-[8px]">
+        <span className="text-[13px] font-bold text-gray-100">Alio</span>
+        <button
+          type="button"
+          aria-label="Hide conversation"
+          onClick={onClose}
+          className="flex size-[26px] items-center justify-center rounded-full bg-brand-tint-1 transition-transform active:scale-95"
+        >
+          <IconClose className="size-[14px] text-gray-100" />
+        </button>
+      </div>
+      <div
+        ref={scrollRef}
+        className="max-h-[calc(46vh-46px)] overflow-y-auto px-[12px] pb-[14px]"
+      >
+        <div className="flex flex-col gap-3">
         {turns.map((turn) => {
           if (turn.kind === 'user-audio') {
             return (
@@ -757,6 +691,58 @@ function MessageView({
           }
           return <SummaryBubble key={turn.id} turn={turn} />;
         })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * ReviewSheet — the one step that takes the screen over, because the caregiver
+ * is editing text that is about to be saved on their name.
+ */
+function ReviewSheet({
+  value,
+  onChange,
+  saving,
+  onDiscard,
+  onSave,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  saving: boolean;
+  onDiscard: () => void;
+  onSave: () => void;
+}) {
+  return (
+    <div className="absolute bottom-0 left-0 right-0 z-30 rounded-t-[24px] bg-white px-[20px] pb-[24px] pt-[16px] shadow-[0_-6px_28px_rgba(0,0,0,0.16)]">
+      <div className="mx-auto mb-[14px] h-[4px] w-[38px] rounded-full bg-gray-30" />
+      <p className="text-[16px] font-bold text-gray-100">Review &amp; edit</p>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={saving}
+        autoFocus
+        placeholder="Nothing was transcribed. Type your note here, or discard."
+        className="mt-[12px] h-[180px] w-full resize-none rounded-[16px] bg-brand-tint-1 px-[14px] py-[12px] text-[15px] leading-relaxed text-gray-100 placeholder:text-gray-60 outline-none focus:ring-2 focus:ring-brand-primary disabled:opacity-60"
+      />
+      <div className="mt-[16px] flex gap-[10px]">
+        <button
+          type="button"
+          onClick={onDiscard}
+          disabled={saving}
+          className="h-[48px] flex-1 rounded-[12px] bg-brand-tint-1 text-[14px] font-bold text-gray-100 transition-colors active:bg-brand-border disabled:opacity-50"
+        >
+          Discard
+        </button>
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={saving || !value.trim()}
+          className="h-[48px] flex-1 rounded-[12px] bg-brand-primary text-[14px] font-bold text-white transition-transform active:scale-95 disabled:opacity-50"
+        >
+          {saving ? 'Saving…' : 'Save'}
+        </button>
       </div>
     </div>
   );
