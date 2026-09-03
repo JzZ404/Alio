@@ -38,7 +38,9 @@ export {
   EMPTY_DRAFT,
   type ReportDraft,
   type DraftSeverity,
+  type DraftField,
 } from './VisitReportDraft';
+export { PullUpSheet } from './PullUpSheet';
 
 // Caesarzkn icons — 288 generated icon components + custom
 export * from './icons';

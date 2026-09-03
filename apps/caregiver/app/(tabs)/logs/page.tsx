@@ -11,13 +11,14 @@ import {
   ChatBubble,
   HoldToTalkBar,
   VisitReportDraft,
+  PullUpSheet,
   EMPTY_DRAFT,
   type ReportDraft,
+  type DraftField,
   type BarMode,
   IconSearch,
   IconHistory,
-  IconClose,
-  IconChatswitch,
+  IconSendMessage,
 } from '@alio/ui';
 import {
   INITIAL_CONVERSATION,
@@ -86,6 +87,7 @@ export default function LogsPage({
     setReport((prev) => {
       const meds = summary.medications_noted ?? [];
       return {
+        summary: summary.summary || prev.summary,
         vitals: prev.vitals ?? extractVitals(transcript),
         mood: prev.mood ?? (summary.mood || null),
         meds: prev.meds ?? medsLine(meds),
@@ -96,6 +98,11 @@ export default function LogsPage({
         severity: summary.urgent ? 'urgent' : prev.severity,
       };
     });
+  }
+
+  /** Caregiver correction — a cleared field goes back to waiting. */
+  function handleEditField(field: DraftField, value: string) {
+    setReport((prev) => ({ ...prev, [field]: value.trim() || null }));
   }
 
   // SpeechRecognition is non-standard; type as any to avoid lib pollution.
@@ -536,7 +543,8 @@ export default function LogsPage({
       </header>
 
       {/* Main background — today's report, filling in as notes land. */}
-      <div className="absolute bottom-[96px] left-0 right-0 top-[122px] overflow-y-auto px-[22px] pt-[10px] pb-[16px]">
+      {/* Bottom clearance: sheet handle 44 + input 56 + compile row 42 + gaps. */}
+      <div className="absolute bottom-[168px] left-0 right-0 top-[122px] overflow-y-auto px-[22px] pt-[10px] pb-[16px]">
         <VisitReportDraft
           patientName={activePatient?.name ?? 'Patient'}
           dateLabel={new Date().toLocaleDateString('en-US', {
@@ -546,6 +554,7 @@ export default function LogsPage({
           })}
           draft={report}
           filling={recordState === 'saving'}
+          onEdit={handleEditField}
         />
 
         {error && (
@@ -560,13 +569,21 @@ export default function LogsPage({
         )}
       </div>
 
-      {/* Conversation — a reference panel docked above the input, not a screen. */}
-      {panelOpen && view !== 'voice-review' && (
-        <ConversationPanel
-          turns={conversation}
-          onOpenReport={openReport}
-          onClose={() => setPanelOpen(false)}
-        />
+      {/* Conversation — a drawer under the input. Pull it up to read, leave it
+        * shut to keep the report the main thing on screen. */}
+      {view !== 'voice-review' && (
+        <PullUpSheet
+          open={panelOpen}
+          onOpenChange={setPanelOpen}
+          title="Alio"
+          count={conversation.length}
+          className="absolute bottom-0 left-0 right-0 z-10"
+          expandedHeight="52vh"
+        >
+          <ConversationTurns turns={conversation} onOpenReport={openReport} />
+          {/* Clearance for the input bar + compile button floating above. */}
+          <div className="h-[128px] shrink-0" aria-hidden />
+        </PullUpSheet>
       )}
 
       {/* Review sheet — the one moment that takes over, because the caregiver
@@ -583,17 +600,18 @@ export default function LogsPage({
 
       {/* Persistent input. Hold to talk, tap to type. */}
       {view !== 'voice-review' && (
-        <div className="absolute bottom-[20px] left-[16px] right-[16px] z-20">
-          {!panelOpen && conversation.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setPanelOpen(true)}
-              className="mb-[10px] ml-auto flex items-center gap-[6px] rounded-full bg-white/80 px-[12px] py-[6px] text-[12px] font-bold text-gray-100 shadow-sm backdrop-blur-sm transition-transform active:scale-95"
-            >
-              <IconChatswitch className="size-[14px] text-brand-primary" />
-              {conversation.length}
-            </button>
-          )}
+        <div className="absolute bottom-[64px] left-[16px] right-[16px] z-20">
+          {/* Finish the visit: compile the notes into a report and hand it to
+            * the family. Labelled, because "+" reads as "add another thing". */}
+          <button
+            type="button"
+            onClick={handleCompile}
+            disabled={compileState !== 'idle' || recordState !== 'idle'}
+            className="mb-[10px] ml-auto flex items-center gap-[7px] rounded-full bg-brand-primary px-[14px] py-[8px] text-[13px] font-bold text-white shadow-[0_2px_12px_rgba(94,105,246,0.35)] transition-transform active:scale-95 disabled:opacity-50"
+          >
+            <IconSendMessage className="size-[16px] text-white" />
+            Send to family
+          </button>
           <HoldToTalkBar
             mode={barMode}
             value={draft}
@@ -603,7 +621,6 @@ export default function LogsPage({
             onTap={() => setTyping(true)}
             onSend={handleSendText}
             onExitTyping={() => setTyping(false)}
-            onPlus={handleCompile}
             disabled={recordState === 'saving'}
           />
         </div>
@@ -621,43 +638,21 @@ export default function LogsPage({
 }
 
 
-/**
- * ConversationPanel — the exchange with Alio, docked above the input as a
- * reference sheet. The report stays visible behind it, so the caregiver never
- * loses sight of the document the conversation is filling in.
- */
-function ConversationPanel({
+/** The exchange with Alio, rendered inside the pull-up sheet. */
+function ConversationTurns({
   turns,
   onOpenReport,
-  onClose,
 }: {
   turns: ConversationTurn[];
   onOpenReport: (id: string) => void;
-  onClose: () => void;
 }) {
-  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const endRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    endRef.current?.scrollIntoView({ block: 'end' });
   }, [turns.length]);
 
   return (
-    <div className="absolute bottom-[92px] left-[16px] right-[16px] z-10 max-h-[46%] overflow-hidden rounded-[20px] bg-white/70 shadow-[0_8px_32px_rgba(0,0,0,0.12)] backdrop-blur-xl">
-      <div className="flex items-center justify-between px-[16px] pt-[12px] pb-[8px]">
-        <span className="text-[13px] font-bold text-gray-100">Alio</span>
-        <button
-          type="button"
-          aria-label="Hide conversation"
-          onClick={onClose}
-          className="flex size-[26px] items-center justify-center rounded-full bg-brand-tint-1 transition-transform active:scale-95"
-        >
-          <IconClose className="size-[14px] text-gray-100" />
-        </button>
-      </div>
-      <div
-        ref={scrollRef}
-        className="max-h-[calc(46vh-46px)] overflow-y-auto px-[12px] pb-[14px]"
-      >
-        <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 pt-[4px]">
         {turns.map((turn) => {
           if (turn.kind === 'user-audio') {
             return (
@@ -691,8 +686,7 @@ function ConversationPanel({
           }
           return <SummaryBubble key={turn.id} turn={turn} />;
         })}
-        </div>
-      </div>
+      <div ref={endRef} />
     </div>
   );
 }
