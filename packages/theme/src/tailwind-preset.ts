@@ -23,6 +23,14 @@ export const tailwindPreset: Partial<Config> = {
           100: colors.gray[100],
         },
         alert: colors.alert.red,
+        glass: {
+          plate: colors.glass.plate,
+          selected: colors.glass.selected,
+          shade: colors.glass.shade,
+          'edge-bright': colors.glass.edgeBright,
+          'edge-soft': colors.glass.edgeSoft,
+          'edge-dark': colors.glass.edgeDark,
+        },
         info: colors.info.blue,
       },
       backgroundImage: {

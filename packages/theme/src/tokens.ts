@@ -23,6 +23,22 @@ export const colors = {
   alert: {
     red: '#FF3B30',
   },
+  /** Layered translucency for the bottom nav — Figma 411:6936 "Bar".
+   * The selected tab is a dark scrim, not a light chip: on glass, "pressed in"
+   * reads as a recess. */
+  glass: {
+    /** Calibrated against pixels sampled from the design, not copied from its
+     * layer values. Figma stacks a 37% white plate, a grey tint and two
+     * plus-lighter rims; CSS composites plus-lighter differently, so copying
+     * the literals lands grey. Sampled targets: bar body rgb(221,222,234) over
+     * a page of rgb(213,215,236), selected slot rgb(198,199,210). */
+    plate: 'rgba(232, 232, 236, 0.55)',
+    selected: 'rgba(0, 0, 0, 0.10)',
+    shade: 'rgba(0, 0, 0, 0.06)',
+    edgeBright: 'rgba(255, 255, 255, 0.85)',
+    edgeSoft: 'rgba(255, 255, 255, 0.35)',
+    edgeDark: 'rgba(0, 0, 0, 0.05)',
+  },
   info: {
     blue: '#1C4EAB',
   },

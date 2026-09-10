@@ -1,6 +1,7 @@
 export { MobileFrame } from './MobileFrame';
 export { IconBox } from './IconBox';
 export { TabBar } from './TabBar';
+export { GlassNav, type GlassNavTab } from './GlassNav';
 export { PressToSpeakButton } from './PressToSpeakButton';
 export { GradientBlob } from './GradientBlob';
 export { ModeDropdown, type LogsMode } from './ModeDropdown';
