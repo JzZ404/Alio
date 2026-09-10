@@ -6,8 +6,9 @@ import clsx from 'clsx';
 /** How far you have to drag before the sheet changes state. */
 const SNAP_PX = 48;
 
-/** Height of the grab handle strip. */
-const HANDLE_H = 30;
+/** Height of the grab handle strip. Mostly hit area — the grabber itself
+ * sits at its bottom edge so it reads as belonging to the pill below. */
+const HANDLE_H = 26;
 
 /**
  * PullUpSheet — one surface that wraps the control it belongs to.
@@ -80,17 +81,25 @@ export function PullUpSheet({
     const dy = dragY;
     startY.current = null;
     setDragY(0);
-    if (!open && dy < -SNAP_PX) onOpenChange(true);
-    else if (open && dy > SNAP_PX) onOpenChange(false);
+    // Inclusive: at exactly the threshold the surface is fully revealed, so
+    // releasing there has to commit or the visual is lying.
+    if (!open && dy <= -SNAP_PX) onOpenChange(true);
+    else if (open && dy >= SNAP_PX) onOpenChange(false);
   };
+
+  // The surface follows the drag rather than appearing at the snap: pulling up
+  // from shut fades it in, dragging down from open fades it out.
+  const reveal = open
+    ? Math.max(0, Math.min(1, 1 - dragY / (SNAP_PX * 2)))
+    : Math.max(0, Math.min(1, -dragY / SNAP_PX));
 
   return (
     <div
       className={clsx(
-        'flex flex-col overflow-hidden rounded-t-2xl transition-colors',
-        open
-          ? 'bg-brand-tint-2/90 shadow-[0_-6px_28px_rgba(10,10,10,0.10)] backdrop-blur-xl'
-          : 'bg-transparent',
+        // No `relative` here: callers position this element themselves, and a
+        // second position utility would override theirs. The absolute surface
+        // layer below anchors to whatever positioning they applied.
+        'flex flex-col overflow-hidden rounded-t-2xl',
         !dragging && 'transition-[height] duration-200 ease-out',
         className,
       )}
@@ -100,6 +109,14 @@ export function PullUpSheet({
           : `${collapsedHeight - dragY}px`,
       }}
     >
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 z-0 rounded-t-2xl bg-brand-tint-2/90 shadow-[0_-6px_28px_rgba(10,10,10,0.10)] backdrop-blur-xl"
+        style={{
+          opacity: reveal,
+          transition: dragging ? undefined : 'opacity 200ms ease-out',
+        }}
+      />
       {/* Grab handle — drag to resize, tap to toggle. */}
       <button
         type="button"
@@ -112,16 +129,16 @@ export function PullUpSheet({
         onPointerLeave={endDrag}
         onClick={() => onOpenChange(!open)}
         style={{ height: HANDLE_H }}
-        className="relative flex w-full shrink-0 touch-none select-none items-center justify-center gap-[7px]"
+        className="relative z-10 flex w-full shrink-0 touch-none select-none items-end justify-center pb-[6px]"
       >
         <span className="h-[4px] w-[38px] rounded-full bg-gray-30" />
       </button>
 
       {/* Conversation — only reachable once the sheet is up. */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-[12px]">{children}</div>
+      <div className="relative z-10 min-h-0 flex-1 overflow-y-auto px-[12px]">{children}</div>
 
       {/* The control the sheet wraps. Always visible; forms the bottom edge. */}
-      <div ref={footerRef} className="shrink-0 px-[12px] pb-[14px] pt-[10px]">
+      <div ref={footerRef} className="relative z-10 shrink-0 px-[12px] pb-[14px] pt-[4px]">
         {footer}
       </div>
     </div>
