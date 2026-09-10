@@ -104,7 +104,9 @@ export function VoiceDock({
       <div
         className={clsx(
           'flex h-[52px] items-center gap-[10px] rounded-full px-[8px] transition-colors',
-          'shadow-[0_6px_20px_rgba(10,10,10,0.12)]',
+          // Lift, not a band: a large Y offset smears the shadow onto whatever
+          // is behind and reads as a filled strip rather than a raised pill.
+          'shadow-[0_2px_10px_rgba(10,10,10,0.08)]',
           recording ? 'bg-brand-tint-1' : 'bg-gray-10',
         )}
       >
