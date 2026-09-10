@@ -2,11 +2,31 @@
 
 import { useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
-import { IconPills, IconMedicalRecord, IconHeart, IconEdit, IconClose } from './icons';
-import { EMPTY_REPORT_DRAFT, type DraftSeverity, type ReportDraft } from '@alio/mock-data';
+import {
+  IconPills,
+  IconMedicalRecord,
+  IconHeart,
+  IconBloodPressure,
+  IconHeartRate,
+  IconThermometer,
+  IconEdit,
+  IconClose,
+} from './icons';
+import {
+  EMPTY_REPORT_DRAFT,
+  type DraftSeverity,
+  type ReportDraft,
+  type VitalReadings,
+} from '@alio/mock-data';
 
-/** The editable fields, so callers can switch on which one changed. */
-export type DraftField = 'summary' | 'vitals' | 'mood' | 'meds';
+/** The free-text fields. Vitals are structured, so they edit separately. */
+export type DraftField = 'summary' | 'mood' | 'meds';
+
+const VITAL_ROWS = [
+  { key: 'bp' as const, label: 'Blood pressure', Icon: IconBloodPressure, placeholder: '116/70' },
+  { key: 'pulse' as const, label: 'Heart rate', Icon: IconHeartRate, placeholder: '72 bpm' },
+  { key: 'temp' as const, label: 'Temperature', Icon: IconThermometer, placeholder: '98.4°F' },
+];
 
 export const EMPTY_DRAFT = EMPTY_REPORT_DRAFT;
 
@@ -31,6 +51,7 @@ export function VisitReportDraft({
   draft,
   filling,
   onEdit,
+  onEditVitals,
   className,
 }: {
   patientName: string;
@@ -40,9 +61,11 @@ export function VisitReportDraft({
   /** True while a note is being processed — pending fields pulse. */
   filling?: boolean;
   onEdit?: (field: DraftField, value: string) => void;
+  onEditVitals?: (v: VitalReadings) => void;
   className?: string;
 }) {
-  const filledCount = [draft.vitals, draft.mood, draft.meds].filter(Boolean).length;
+  const anyVital = Boolean(draft.vitals.bp || draft.vitals.pulse || draft.vitals.temp);
+  const filledCount = [anyVital, Boolean(draft.mood), Boolean(draft.meds)].filter(Boolean).length;
 
   return (
     <div className={clsx('flex flex-col', className)}>
@@ -65,13 +88,10 @@ export function VisitReportDraft({
       />
 
       <div className="mt-[12px] flex flex-col gap-[12px]">
-        <DraftCard
-          title="Vitals"
-          icon={<IconHeart className="size-[18px] text-brand-primary" />}
-          value={draft.vitals}
-          hint="Blood pressure, pulse, temperature"
+        <VitalsCard
+          vitals={draft.vitals}
           filling={filling}
-          onEdit={onEdit ? (v) => onEdit('vitals', v) : undefined}
+          onEdit={onEditVitals}
         />
         <DraftCard
           title="Mood & Energy"
@@ -104,6 +124,130 @@ export function VisitReportDraft({
           }
         />
       </div>
+    </div>
+  );
+}
+
+/**
+ * VitalsCard — three readings kept visually apart.
+ *
+ * Each one keeps its own icon, label and value, because a caregiver skimming
+ * the report needs to see which number is the blood pressure without parsing a
+ * run-on string.
+ */
+function VitalsCard({
+  vitals,
+  filling,
+  onEdit,
+}: {
+  vitals: VitalReadings;
+  filling?: boolean;
+  onEdit?: (v: VitalReadings) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(vitals);
+  const empty = !vitals.bp && !vitals.pulse && !vitals.temp;
+
+  if (editing && onEdit) {
+    return (
+      <div className="rounded-[16px] bg-white p-[16px] ring-2 ring-brand-primary">
+        <div className="flex items-center justify-between">
+          <span className="text-[14px] font-bold text-gray-100">Vitals</span>
+          <button
+            type="button"
+            aria-label="Cancel edit"
+            onClick={() => setEditing(false)}
+            className="flex size-[26px] items-center justify-center rounded-full bg-brand-tint-1 transition-transform active:scale-95"
+          >
+            <IconClose className="size-[14px] text-gray-100" />
+          </button>
+        </div>
+
+        <div className="mt-[12px] flex flex-col gap-[10px]">
+          {VITAL_ROWS.map(({ key, label, Icon, placeholder }) => (
+            <label key={key} className="flex items-center gap-[10px]">
+              <span className="flex size-[30px] shrink-0 items-center justify-center rounded-[8px] bg-brand-tint-2">
+                <Icon className="size-[18px] text-brand-primary" />
+              </span>
+              <span className="w-[100px] shrink-0 text-[12px] font-bold text-gray-60">{label}</span>
+              <input
+                type="text"
+                value={draft[key] ?? ''}
+                onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
+                placeholder={placeholder}
+                className="h-[36px] min-w-0 flex-1 rounded-[10px] bg-brand-tint-1 px-[10px] text-[14px] font-bold text-gray-100 placeholder:font-normal placeholder:text-gray-60 outline-none"
+              />
+            </label>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            onEdit({
+              bp: draft.bp?.trim() || null,
+              pulse: draft.pulse?.trim() || null,
+              temp: draft.temp?.trim() || null,
+            });
+            setEditing(false);
+          }}
+          className="mt-[12px] h-[38px] w-full rounded-[10px] bg-brand-primary text-[13px] font-bold text-gray-10 transition-transform active:scale-95"
+        >
+          Save
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={clsx(
+        'rounded-[16px] p-[16px] transition-colors',
+        empty ? 'border border-dashed border-brand-border bg-white/40' : 'bg-white',
+      )}
+    >
+      <div className="flex items-center gap-[8px]">
+        <span className="flex size-[30px] items-center justify-center rounded-[9px] bg-brand-tint-1">
+          <IconHeart className="size-[18px] text-brand-primary" />
+        </span>
+        <span className="text-[14px] font-bold text-gray-100">Vitals</span>
+        {onEdit && (
+          <button
+            type="button"
+            aria-label="Edit Vitals"
+            onClick={() => {
+              setDraft(vitals);
+              setEditing(true);
+            }}
+            className="ml-auto flex size-[26px] items-center justify-center rounded-full bg-brand-tint-1 transition-transform active:scale-95"
+          >
+            <IconEdit className="size-[14px] text-brand-primary" />
+          </button>
+        )}
+      </div>
+
+      {empty ? (
+        <p className={clsx('mt-[10px] text-[14px] text-gray-60', filling && 'animate-pulse')}>
+          {filling ? 'Listening for this…' : 'Blood pressure, pulse, temperature'}
+        </p>
+      ) : (
+        <div className="mt-[12px] grid grid-cols-3 gap-[8px]">
+          {VITAL_ROWS.map(({ key, label, Icon }) => (
+            <div
+              key={key}
+              className="flex flex-col items-start gap-[6px] rounded-[12px] bg-brand-tint-2 p-[10px]"
+            >
+              <span className="flex size-[24px] items-center justify-center rounded-[7px] bg-gray-10">
+                <Icon className="size-[15px] text-brand-primary" />
+              </span>
+              <span className="text-[10px] font-bold leading-none text-gray-60">{label}</span>
+              <span className="text-[14px] font-bold leading-none text-gray-100">
+                {vitals[key] ?? '—'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

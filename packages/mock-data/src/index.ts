@@ -101,10 +101,21 @@ export const AI_CHAT_HISTORY: LogHistoryItem[] = [
 
 export type DraftSeverity = 'none' | 'watch' | 'urgent';
 
+/** Three readings, kept apart so each keeps its own label. Joined into one
+ * string they are unreadable — "116/70 72 bpm 98.4" tells you nothing about
+ * which number is which. */
+export type VitalReadings = {
+  bp: string | null;
+  pulse: string | null;
+  temp: string | null;
+};
+
+export const EMPTY_VITALS: VitalReadings = { bp: null, pulse: null, temp: null };
+
 export type ReportDraft = {
   /** The line the family reads first. */
   summary: string | null;
-  vitals: string | null;
+  vitals: VitalReadings;
   mood: string | null;
   meds: string | null;
   medsTaken: { name: string; taken: boolean }[];
@@ -114,7 +125,7 @@ export type ReportDraft = {
 /** Start of a visit: nothing said yet. */
 export const EMPTY_REPORT_DRAFT: ReportDraft = {
   summary: null,
-  vitals: null,
+  vitals: EMPTY_VITALS,
   mood: null,
   meds: null,
   medsTaken: [],
@@ -126,7 +137,7 @@ export const EMPTY_REPORT_DRAFT: ReportDraft = {
 export const SAMPLE_REPORT_DRAFT: ReportDraft = {
   summary:
     'Erin had a quiet afternoon. She ate about half her lunch and asked to lie down early — a little less energy than the past few days.',
-  vitals: '116/70   72 bpm   98.4°F',
+  vitals: { bp: '116/70', pulse: '72 bpm', temp: '98.4°F' },
   mood: 'Calm but tired. Napped from 2 to 3.',
   meds: '2 medications noted',
   medsTaken: [

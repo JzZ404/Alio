@@ -24,6 +24,7 @@ import {
   SAMPLE_REPORT_DRAFT,
   type ConversationTurn,
   type ReportDraft,
+  type VitalReadings,
 } from '@alio/mock-data';
 import { api, ApiError } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
@@ -37,15 +38,15 @@ type CompileState = 'idle' | 'compiling';
 /** Pull vitals out of the caregiver's own words so the report card can fill in
  * before the server-side compile runs. Deliberately loose — a miss just leaves
  * the field waiting. */
-function extractVitals(text: string): string | null {
-  const parts: string[] = [];
+function extractVitals(text: string): VitalReadings {
   const bp = text.match(/(\d{2,3})\s*(?:\/|over)\s*(\d{2,3})/i);
-  if (bp) parts.push(`${bp[1]}/${bp[2]}`);
   const pulse = text.match(/(\d{2,3})\s*(?:bpm|beats)/i);
-  if (pulse) parts.push(`${pulse[1]} bpm`);
   const temp = text.match(/(\d{2,3}(?:\.\d)?)\s*(?:°|degrees|\bF\b)/i);
-  if (temp) parts.push(`${temp[1]}°F`);
-  return parts.length ? parts.join('   ') : null;
+  return {
+    bp: bp ? `${bp[1]}/${bp[2]}` : null,
+    pulse: pulse ? `${pulse[1]} bpm` : null,
+    temp: temp ? `${temp[1]}°F` : null,
+  };
 }
 
 function medsLine(meds: string[]): string | null {
@@ -91,9 +92,16 @@ export default function LogsPage({
   ) {
     setReport((prev) => {
       const meds = summary.medications_noted ?? [];
+      const heard = extractVitals(transcript);
       return {
         summary: summary.summary || prev.summary,
-        vitals: prev.vitals ?? extractVitals(transcript),
+        // Per reading, so a note that only mentions temperature does not wipe
+        // the blood pressure from an earlier one.
+        vitals: {
+          bp: prev.vitals.bp ?? heard.bp,
+          pulse: prev.vitals.pulse ?? heard.pulse,
+          temp: prev.vitals.temp ?? heard.temp,
+        },
         mood: prev.mood ?? (summary.mood || null),
         meds: prev.meds ?? medsLine(meds),
         medsTaken:
@@ -108,6 +116,10 @@ export default function LogsPage({
   /** Caregiver correction — a cleared field goes back to waiting. */
   function handleEditField(field: DraftField, value: string) {
     setReport((prev) => ({ ...prev, [field]: value.trim() || null }));
+  }
+
+  function handleEditVitals(vitals: VitalReadings) {
+    setReport((prev) => ({ ...prev, vitals }));
   }
 
   // SpeechRecognition is non-standard; type as any to avoid lib pollution.
@@ -570,6 +582,7 @@ export default function LogsPage({
           draft={report}
           filling={recordState === 'saving'}
           onEdit={handleEditField}
+          onEditVitals={handleEditVitals}
         />
       </div>
 
