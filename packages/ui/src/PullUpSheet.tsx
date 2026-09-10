@@ -141,7 +141,19 @@ export function PullUpSheet({
       </button>
 
       {/* Conversation — only reachable once the sheet is up. */}
-      <div className="relative z-10 min-h-0 flex-1 overflow-y-auto px-[12px]">{children}</div>
+      {/* The conversation fades with the surface it sits on. Left at full
+        * opacity it hangs over the report mid-transition with nothing behind
+        * it, which reads as two screens double-exposed. */}
+      <div
+        className="relative z-10 min-h-0 flex-1 overflow-y-auto px-[12px]"
+        style={{
+          opacity: reveal,
+          pointerEvents: reveal < 0.5 ? 'none' : undefined,
+          transition: dragging ? undefined : 'opacity 200ms ease-out',
+        }}
+      >
+        {children}
+      </div>
 
       {/* The control the sheet wraps. Always visible; forms the bottom edge. */}
       <div ref={footerRef} className="relative z-10 shrink-0 px-[12px] pb-[14px] pt-[4px]">
