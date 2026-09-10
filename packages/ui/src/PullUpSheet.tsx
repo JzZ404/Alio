@@ -23,7 +23,7 @@ export function PullUpSheet({
   label,
   children,
   footer,
-  expandedHeight = '58vh',
+  expandedHeight = '42vh',
   onHeightChange,
   className,
 }: {

@@ -546,7 +546,7 @@ export default function LogsPage({
 
       {/* Main background — today's report, filling in as notes land. */}
       <div
-        style={{ bottom: dockHeight + 56 }}
+        style={{ bottom: dockHeight + 68 }}
         className="absolute left-0 right-0 top-[122px] overflow-y-auto px-[22px] pt-[10px] pb-[16px]"
       >
         <VisitReportDraft
@@ -573,11 +573,12 @@ export default function LogsPage({
           type="button"
           onClick={handleCompile}
           disabled={compileState !== 'idle' || recordState !== 'idle'}
+          aria-label="Send to family"
+          title="Send to family"
           style={{ bottom: dockHeight + 12 }}
-          className="absolute right-[16px] z-20 flex items-center gap-[7px] rounded-full bg-brand-primary px-[14px] py-[8px] text-sm font-bold text-gray-10 shadow-[0_2px_12px_rgba(94,105,246,0.35)] transition-transform active:scale-95 disabled:opacity-50"
+          className="absolute right-[20px] z-20 flex size-[48px] items-center justify-center rounded-full bg-gray-10 shadow-[0_2px_14px_rgba(10,10,10,0.14)] transition-transform active:scale-95 disabled:opacity-50"
         >
-          <IconSendMessage className="size-[16px] text-gray-10" />
-          Send to family
+          <IconSendMessage className="size-[22px] text-brand-primary" />
         </button>
       )}
 
@@ -590,7 +591,7 @@ export default function LogsPage({
           label="conversation"
           onHeightChange={setDockHeight}
           className="absolute bottom-0 left-0 right-0 z-10"
-          expandedHeight="58vh"
+          expandedHeight="42vh"
           footer={
             <VoiceDock
               mode={barMode}
