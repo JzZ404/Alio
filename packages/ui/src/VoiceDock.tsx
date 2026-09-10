@@ -1,21 +1,24 @@
 'use client';
 
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
-import { IconClose, IconMicrophone, IconArrowUp } from './icons';
+import { IconPlus, IconMicrophone, IconArrowUp, IconChevronLeft } from './icons';
 
 /** Below this, a press counts as a tap (open the keyboard); above it, the press
  * is a hold and starts recording. */
 const HOLD_MS = 200;
 
+/** Drag this far left during a hold to throw the note away instead of sending. */
+const CANCEL_PX = 90;
+
 export type DockMode = 'idle' | 'recording' | 'typing';
 
 /**
- * VoiceDock — the controls for talking to Alio.
+ * VoiceDock — the bar you talk into.
  *
- * Sits directly on its container's surface: no pill, no card of its own. The
- * caption reads above the row and the row itself is close / press-target / mic,
- * so the whole bottom area is one continuous thing to speak into.
+ * One slim pill: attachments on the left, the press target across the middle,
+ * mic on the right. Hold the pill to record and release to send; a quick tap
+ * opens the keyboard instead. Dragging left mid-hold cancels.
  */
 export function VoiceDock({
   mode,
@@ -24,9 +27,10 @@ export function VoiceDock({
   caption,
   onHoldStart,
   onHoldEnd,
+  onCancel,
   onTap,
   onSend,
-  onClose,
+  onPlus,
   placeholder = 'Hold to talk, tap to type',
   disabled,
   className,
@@ -34,21 +38,27 @@ export function VoiceDock({
   mode: DockMode;
   value: string;
   onChange: (v: string) => void;
-  /** Live transcript or prompt shown above the controls. */
+  /** Live transcript, or what Alio wants to say back. Sits above the pill. */
   caption?: string;
   onHoldStart: () => void;
   onHoldEnd: () => void;
+  /** Dragged left far enough — throw the recording away. */
+  onCancel: () => void;
   onTap: () => void;
   onSend: () => void;
-  /** Left button — cancels typing or puts the sheet away. Omit when there is
-   * nothing to dismiss; the slot then holds its width so nothing shifts. */
-  onClose?: () => void;
+  onPlus?: () => void;
   placeholder?: string;
   disabled?: boolean;
   className?: string;
 }) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const heldRef = useRef(false);
+  const startXRef = useRef(0);
+  const [cancelArmed, setCancelArmed] = useState(false);
+
+  const recording = mode === 'recording';
+  const typing = mode === 'typing';
+  const elapsed = useElapsed(recording);
 
   const clearTimer = () => {
     if (timerRef.current) {
@@ -57,64 +67,66 @@ export function VoiceDock({
     }
   };
 
-  const handlePointerDown = () => {
+  const handlePointerDown = (e: React.PointerEvent) => {
     if (disabled) return;
     heldRef.current = false;
+    startXRef.current = e.clientX;
+    setCancelArmed(false);
     timerRef.current = setTimeout(() => {
       heldRef.current = true;
       onHoldStart();
     }, HOLD_MS);
   };
 
-  const handlePointerUp = () => {
-    if (disabled) return;
-    clearTimer();
-    if (heldRef.current) {
-      heldRef.current = false;
-      onHoldEnd();
-    } else {
-      onTap();
-    }
-  };
-
-  // Dragging off the press target mid-hold still ends the recording — losing
-  // the pointer should not leave the mic running.
-  const handlePointerLeave = () => {
-    clearTimer();
+  const handlePointerMove = (e: React.PointerEvent) => {
     if (!heldRef.current) return;
-    heldRef.current = false;
-    onHoldEnd();
+    setCancelArmed(e.clientX - startXRef.current < -CANCEL_PX);
   };
 
-  const recording = mode === 'recording';
-  const typing = mode === 'typing';
+  const finishPress = (fired: boolean) => {
+    clearTimer();
+    if (!heldRef.current) {
+      if (fired) onTap();
+      return;
+    }
+    heldRef.current = false;
+    if (cancelArmed) onCancel();
+    else onHoldEnd();
+    setCancelArmed(false);
+  };
 
   return (
-    <div className={clsx('flex flex-col gap-[14px]', className)}>
-      {/* Caption — what Alio heard, or what it is waiting for. */}
-      {(caption || recording) && (
-        <p
-          className={clsx(
-            'px-[6px] text-md leading-[22px]',
-            recording ? 'text-gray-100' : 'text-gray-60',
-          )}
-        >
-          {caption || 'Listening…'}
-        </p>
+    <div className={clsx('flex flex-col gap-[10px]', className)}>
+      {caption && (
+        <p className="px-[14px] text-md leading-[22px] text-gray-80">{caption}</p>
       )}
 
-      <div className="flex items-center gap-[12px]">
-        {onClose ? (
+      <div
+        className={clsx(
+          'flex h-[52px] items-center gap-[10px] rounded-full px-[8px] transition-colors',
+          'shadow-[0_1px_10px_rgba(10,10,10,0.06)]',
+          recording ? 'bg-brand-tint-1' : 'bg-gray-10',
+        )}
+      >
+        {typing ? (
           <button
             type="button"
-            aria-label={typing ? 'Cancel typing' : 'Close'}
-            onClick={onClose}
-            className="flex size-[44px] shrink-0 items-center justify-center rounded-full border border-brand-border transition-transform active:scale-95"
+            aria-label="Back to voice"
+            onClick={() => onChange('')}
+            className="flex size-[36px] shrink-0 items-center justify-center rounded-full border border-brand-border transition-transform active:scale-95"
           >
-            <IconClose className="size-[18px] text-gray-80" />
+            <IconMicrophone className="size-[18px] text-brand-primary" />
           </button>
         ) : (
-          <span className="size-[44px] shrink-0" aria-hidden />
+          <button
+            type="button"
+            aria-label="Attach"
+            onClick={onPlus}
+            disabled={recording}
+            className="flex size-[36px] shrink-0 items-center justify-center rounded-full border border-brand-border transition-transform active:scale-95 disabled:opacity-40"
+          >
+            <IconPlus className="size-[18px] text-brand-primary" />
+          </button>
         )}
 
         {typing ? (
@@ -127,25 +139,40 @@ export function VoiceDock({
               if (e.key === 'Enter') onSend();
             }}
             placeholder="Type a note…"
-            className="h-[44px] min-w-0 flex-1 bg-transparent text-md text-gray-100 placeholder:text-gray-60 outline-none"
+            className="h-full min-w-0 flex-1 bg-transparent text-md text-gray-100 placeholder:text-gray-60 outline-none"
           />
         ) : (
-          /* The press target: hold to record, tap to type. */
+          /* Hold to record, release to send, tap to type. */
           <button
             type="button"
-            aria-label={recording ? 'Release to save note' : placeholder}
+            aria-label={recording ? 'Release to send' : placeholder}
             disabled={disabled}
             onPointerDown={handlePointerDown}
-            onPointerUp={handlePointerUp}
-            onPointerLeave={handlePointerLeave}
-            onPointerCancel={handlePointerLeave}
+            onPointerMove={handlePointerMove}
+            onPointerUp={() => finishPress(true)}
+            onPointerCancel={() => finishPress(false)}
+            onPointerLeave={() => finishPress(false)}
             onContextMenu={(e) => e.preventDefault()}
-            className="flex h-[44px] min-w-0 flex-1 select-none items-center justify-center disabled:opacity-50"
+            className="flex h-full min-w-0 flex-1 select-none touch-none items-center gap-[8px] disabled:opacity-50"
           >
             {recording ? (
-              <DotMatrix active />
+              <>
+                <span className="size-[8px] shrink-0 rounded-full bg-alert" />
+                <span className="shrink-0 text-md tabular-nums text-gray-100">
+                  {formatElapsed(elapsed)}
+                </span>
+                <span
+                  className={clsx(
+                    'flex flex-1 items-center justify-center gap-[2px] text-md',
+                    cancelArmed ? 'font-bold text-alert' : 'text-gray-60',
+                  )}
+                >
+                  <IconChevronLeft className="size-[14px]" />
+                  {cancelArmed ? 'Release to cancel' : 'Slide to cancel'}
+                </span>
+              </>
             ) : (
-              <span className="truncate text-md text-gray-60">{placeholder}</span>
+              <span className="truncate pl-[6px] text-md text-gray-60">{placeholder}</span>
             )}
           </button>
         )}
@@ -156,19 +183,19 @@ export function VoiceDock({
             aria-label="Send"
             onClick={onSend}
             disabled={!value.trim() || disabled}
-            className="flex size-[44px] shrink-0 items-center justify-center rounded-full bg-brand-primary transition-transform active:scale-95 disabled:opacity-40"
+            className="flex size-[36px] shrink-0 items-center justify-center rounded-full bg-brand-primary transition-transform active:scale-95 disabled:opacity-40"
           >
-            <IconArrowUp className="size-[20px] text-gray-10" />
+            <IconArrowUp className="size-[18px] text-gray-10" />
           </button>
         ) : (
           <span
             className={clsx(
-              'flex size-[44px] shrink-0 items-center justify-center rounded-full border transition-colors',
-              recording ? 'border-transparent bg-brand-accent' : 'border-brand-border',
+              'flex size-[36px] shrink-0 items-center justify-center rounded-full transition-colors',
+              recording ? 'bg-brand-accent' : 'bg-brand-primary',
             )}
           >
             <IconMicrophone
-              className={clsx('size-[20px]', recording ? 'text-brand-active' : 'text-gray-80')}
+              className={clsx('size-[18px]', recording ? 'text-brand-active' : 'text-gray-10')}
             />
           </span>
         )}
@@ -177,36 +204,21 @@ export function VoiceDock({
   );
 }
 
-/** Two rows of dots that ripple while recording — decorative, not real audio. */
-function DotMatrix({ active }: { active?: boolean }) {
-  const cols = Array.from({ length: 22 }, (_, i) => i);
-  return (
-    <span className="flex items-center gap-[4px]" aria-hidden>
-      {cols.map((i) => (
-        <span key={i} className="flex flex-col gap-[4px]">
-          <Dot i={i} active={active} />
-          <Dot i={i + 3} active={active} />
-        </span>
-      ))}
-      <style>{`
-        @keyframes alio-dot {
-          0%, 100% { opacity: 0.25; }
-          50%      { opacity: 1; }
-        }
-      `}</style>
-    </span>
-  );
+/** Seconds since recording started; resets when it stops. */
+function useElapsed(running: boolean) {
+  const [secs, setSecs] = useState(0);
+  useEffect(() => {
+    if (!running) {
+      setSecs(0);
+      return;
+    }
+    const started = Date.now();
+    const id = setInterval(() => setSecs(Math.floor((Date.now() - started) / 1000)), 250);
+    return () => clearInterval(id);
+  }, [running]);
+  return secs;
 }
 
-function Dot({ i, active }: { i: number; active?: boolean }) {
-  return (
-    <span
-      className="size-[4px] rounded-full bg-brand-primary"
-      style={
-        active
-          ? { animation: `alio-dot 1400ms ease-in-out ${(i % 8) * 110}ms infinite` }
-          : { opacity: 0.25 }
-      }
-    />
-  );
+function formatElapsed(secs: number) {
+  return `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
 }

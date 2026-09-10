@@ -30,7 +30,7 @@ import { supabase } from '@/lib/supabase';
 
 const CAREGIVER_ID = 'caregiver-001';
 
-type View = 'voice-idle' | 'voice-recording' | 'voice-review';
+type View = 'voice-idle' | 'voice-recording';
 type RecordState = 'idle' | 'recording' | 'saving';
 type CompileState = 'idle' | 'compiling';
 
@@ -66,10 +66,10 @@ export default function LogsPage({
   const [view, setView] = useState<View>('voice-idle');
   const [recordState, setRecordState] = useState<RecordState>('idle');
   const [liveTranscript, setLiveTranscript] = useState('');
-  const [editingTranscript, setEditingTranscript] = useState('');
   const [conversation, setConversation] = useState<ConversationTurn[]>(INITIAL_CONVERSATION);
   const [activePatientId, setActivePatientId] = useState(SAMPLE_PATIENTS[0].id);
-  const [error, setError] = useState('');
+  // What the dock says back — transcription state, or a retry nudge.
+  const [dockCaption, setDockCaption] = useState('');
   const [draft, setDraft] = useState('');
   const [compileState, setCompileState] = useState<CompileState>('idle');
   // The conversation is an overlay now, not a screen. `typing` swaps the
@@ -211,13 +211,13 @@ export default function LogsPage({
     });
     if (insertError) {
       console.warn('Failed to persist caregiver log:', insertError);
-      setError(`Save failed: ${insertError.message}`);
+      setDockCaption(`Save failed: ${insertError.message}`);
     }
   }
 
   async function handleCompile() {
     if (compileState !== 'idle') return;
-    setError('');
+    setDockCaption('');
     setCompileState('compiling');
     try {
       const result = await api.compileLogs(
@@ -237,7 +237,7 @@ export default function LogsPage({
       setConversation((prev) => [...prev, turn]);
       setPanelOpen(true);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not compile logs.');
+      setDockCaption(e instanceof ApiError ? e.message : 'Could not compile logs.');
     } finally {
       setCompileState('idle');
     }
@@ -252,7 +252,7 @@ export default function LogsPage({
 
   async function handlePressToSpeak() {
     if (recordState !== 'idle') return;
-    setError('');
+    setDockCaption('');
     finalTranscriptRef.current = '';
     setLiveTranscript('');
 
@@ -261,7 +261,7 @@ export default function LogsPage({
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
-      setError('Microphone access denied.');
+      setDockCaption('Microphone access denied.');
       return;
     }
     const recorder = new MediaRecorder(stream);
@@ -364,72 +364,121 @@ export default function LogsPage({
     setView('voice-recording');
   }
 
+  /** Release ends the recording and sends it straight through. The caregiver
+   * corrects afterwards by editing the report sections, not by sitting in a
+   * review step with their coat on. */
   async function handleDone() {
     if (recordState !== 'recording') return;
 
-    // Stop SpeechRecognition (if it was running) — null first to skip restart.
     const r = recognitionRef.current;
     recognitionRef.current = null;
     try { r?.stop(); } catch { /* noop */ }
 
-    // Snapshot the live caption text, then stop the recorder synchronously
-    // so we can grab the blob.
     const liveText = (finalTranscriptRef.current || liveTranscript).trim();
     const recorder = recorderRef.current;
     recorderRef.current = null;
+    setLiveTranscript('');
+    setView('voice-idle');
 
     if (liveText) {
-      // Web Speech captured something — use it. No need to transcribe on the
-      // server. Stop the mic and move to review.
       try { recorder?.stop(); } catch { /* noop */ }
       recorder?.stream.getTracks().forEach((t) => t.stop());
-      setEditingTranscript(liveText);
-      setLiveTranscript('');
       setRecordState('idle');
-      setView('voice-review');
+      await commitNote(liveText, true);
       return;
     }
 
-    // Fallback path: Web Speech produced nothing (network error / browser
-    // doesn't support it). Send the recorded audio to FastAPI /transcribe.
-    setLiveTranscript('');
+    // Web Speech heard nothing — fall back to the server transcriber.
     setRecordState('saving');
-    setView('voice-recording'); // show busyLabel "Logging…" over the blob
-    setError('');
+    setDockCaption('Transcribing…');
 
     const blob: Blob = await new Promise((resolve) => {
       if (!recorder) return resolve(new Blob([], { type: 'audio/webm' }));
-      recorder.onstop = () => {
-        resolve(new Blob(chunksRef.current, { type: 'audio/webm' }));
-      };
+      recorder.onstop = () => resolve(new Blob(chunksRef.current, { type: 'audio/webm' }));
       try { recorder.stop(); } catch { resolve(new Blob([], { type: 'audio/webm' })); }
     });
     recorder?.stream.getTracks().forEach((t) => t.stop());
 
     try {
       const { transcript } = await api.transcribe(blob);
-      setEditingTranscript(transcript);
-      setView('voice-review');
+      setRecordState('idle');
+      if (!transcript.trim()) {
+        setDockCaption("I didn't catch that — try again.");
+        return;
+      }
+      await commitNote(transcript.trim(), true);
+    } catch {
+      setRecordState('idle');
+      setDockCaption("I didn't catch that — try again.");
+    }
+  }
+
+  /** Slid left mid-hold — drop the recording without saving anything. */
+  function handleCancelRecording() {
+    const r = recognitionRef.current;
+    recognitionRef.current = null;
+    try { r?.stop(); } catch { /* noop */ }
+    const recorder = recorderRef.current;
+    recorderRef.current = null;
+    try { recorder?.stop(); } catch { /* noop */ }
+    recorder?.stream.getTracks().forEach((t) => t.stop());
+    finalTranscriptRef.current = '';
+    setLiveTranscript('');
+    setRecordState('idle');
+    setView('voice-idle');
+    setDockCaption('');
+  }
+
+  /** Turn one note into a conversation turn, a report update and a saved row.
+   * Used by both the voice release and the typed send — the note is the note
+   * however it arrived. */
+  async function commitNote(transcript: string, spoken: boolean) {
+    const ts = Date.now();
+    setConversation((prev) => [
+      ...prev,
+      spoken
+        ? {
+            kind: 'user-audio',
+            id: `turn-${ts}`,
+            time: new Date().toLocaleTimeString('en-US', {
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: false,
+            }),
+            transcript,
+          }
+        : { kind: 'user-text', id: `turn-${ts}`, text: transcript },
+    ]);
+    setPanelOpen(true);
+    setRecordState('saving');
+    try {
+      const summary = await api.summarize(activePatient?.name ?? 'Patient', transcript, '');
+      setConversation((prev) => [
+        ...prev,
+        {
+          kind: 'ai-summary',
+          id: `turn-${ts}-ai`,
+          summary: summary.summary || '(Note saved — summary not generated.)',
+          mood: summary.mood || '',
+          medicationsNoted: summary.medications_noted ?? [],
+          urgent: !!summary.urgent,
+        },
+      ]);
+      fillReport(transcript, summary);
+      await persistLog(transcript, summary);
+      setDockCaption('');
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not transcribe audio.');
-      setEditingTranscript('');
-      setView('voice-review');
+      setDockCaption(
+        e instanceof ApiError ? e.message : "Saved your note, but Alio couldn't read it just now.",
+      );
     } finally {
       setRecordState('idle');
     }
   }
 
-  function handleDiscardReview() {
-    setEditingTranscript('');
-    setLiveTranscript('');
-    setError('');
-    setView('voice-idle');
-  }
-
   async function handleSendText() {
     const text = draft.trim();
     if (!text || recordState !== 'idle') return;
-    setError('');
     const ts = Date.now();
 
     // Show the typed bubble immediately.
@@ -460,54 +509,7 @@ export default function LogsPage({
       fillReport(text, summary);
       await persistLog(text, summary);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not reach the AI service.');
-    } finally {
-      setRecordState('idle');
-    }
-  }
-
-  async function handleSaveReview() {
-    const transcript = editingTranscript.trim();
-    if (!transcript || recordState !== 'idle') return;
-    setError('');
-    setRecordState('saving');
-    const ts = Date.now();
-    try {
-      const audioTurn: ConversationTurn = {
-        kind: 'user-audio',
-        id: `turn-${ts}`,
-        time: new Date().toLocaleTimeString('en-US', {
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: false,
-        }),
-        transcript,
-      };
-      setConversation((prev) => [...prev, audioTurn]);
-
-      const summary = await api.summarize(
-        activePatient?.name ?? 'Patient',
-        transcript,
-        '',
-      );
-      const aiTurn: ConversationTurn = {
-        kind: 'ai-summary',
-        id: `turn-${ts}-ai`,
-        summary: summary.summary || '(Note saved — summary not generated.)',
-        mood: summary.mood || '',
-        medicationsNoted: summary.medications_noted ?? [],
-        urgent: !!summary.urgent,
-      };
-      setConversation((prev) => [...prev, aiTurn]);
-      fillReport(transcript, summary);
-      await persistLog(transcript, summary);
-      setEditingTranscript('');
-      setPanelOpen(true);
-      setView('voice-idle');
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not reach the AI service.');
-      // Stay on the review view so the caregiver can retry / edit / discard.
-      setView('voice-review');
+      setDockCaption(e instanceof ApiError ? e.message : 'Could not reach the AI service.');
     } finally {
       setRecordState('idle');
     }
@@ -560,15 +562,11 @@ export default function LogsPage({
           filling={recordState === 'saving'}
           onEdit={handleEditField}
         />
-
-        {error && (
-          <p className="mt-4 text-center text-[13px] text-red-600">{error}</p>
-        )}
       </div>
 
       {/* Send to family belongs to the report, not the conversation, so it
         * sits above the dock and steps aside while the sheet is up. */}
-      {view !== 'voice-review' && !panelOpen && (
+      {!panelOpen && (
         <button
           type="button"
           onClick={handleCompile}
@@ -576,15 +574,15 @@ export default function LogsPage({
           aria-label="Send to family"
           title="Send to family"
           style={{ bottom: dockHeight + 12 }}
-          className="absolute right-[20px] z-20 flex size-[48px] items-center justify-center rounded-full bg-gray-10 shadow-[0_2px_14px_rgba(10,10,10,0.14)] transition-transform active:scale-95 disabled:opacity-50"
+          className="absolute right-[20px] z-20 flex size-[48px] items-center justify-center rounded-full bg-brand-primary shadow-[0_2px_14px_rgba(94,105,246,0.40)] transition-transform active:scale-95 disabled:opacity-50"
         >
-          <IconSendMessage className="size-[22px] text-brand-primary" />
+          <IconSendMessage className="size-[22px] text-gray-10" />
         </button>
       )}
 
       {/* Conversation and the voice dock share one surface — the dock is not a
         * card sitting on a drawer, it is the drawer's own bottom edge. */}
-      {view !== 'voice-review' && (
+      {(
         <PullUpSheet
           open={panelOpen}
           onOpenChange={setPanelOpen}
@@ -596,37 +594,19 @@ export default function LogsPage({
             <VoiceDock
               mode={barMode}
               value={draft}
-              onChange={setDraft}
-              caption={recording ? liveTranscript : undefined}
+              onChange={typing ? setDraft : () => setTyping(false)}
+              caption={recording ? liveTranscript || undefined : dockCaption || undefined}
               onHoldStart={handlePressToSpeak}
               onHoldEnd={handleDone}
+              onCancel={handleCancelRecording}
               onTap={() => setTyping(true)}
               onSend={handleSendText}
-              onClose={
-                typing
-                  ? () => setTyping(false)
-                  : panelOpen
-                    ? () => setPanelOpen(false)
-                    : undefined
-              }
               disabled={recordState === 'saving'}
             />
           }
         >
           <ConversationTurns turns={conversation} onOpenReport={openReport} />
         </PullUpSheet>
-      )}
-
-      {/* Review sheet — the one moment that takes over, because the caregiver
-        * is editing what will be saved. */}
-      {view === 'voice-review' && (
-        <ReviewSheet
-          value={editingTranscript}
-          onChange={setEditingTranscript}
-          saving={recordState === 'saving'}
-          onDiscard={handleDiscardReview}
-          onSave={handleSaveReview}
-        />
       )}
 
       {compileState === 'compiling' && (
@@ -690,57 +670,6 @@ function ConversationTurns({
           return <SummaryBubble key={turn.id} turn={turn} />;
         })}
       <div ref={endRef} />
-    </div>
-  );
-}
-
-/**
- * ReviewSheet — the one step that takes the screen over, because the caregiver
- * is editing text that is about to be saved on their name.
- */
-function ReviewSheet({
-  value,
-  onChange,
-  saving,
-  onDiscard,
-  onSave,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  saving: boolean;
-  onDiscard: () => void;
-  onSave: () => void;
-}) {
-  return (
-    <div className="absolute bottom-0 left-0 right-0 z-30 rounded-t-[24px] bg-white px-[20px] pb-[24px] pt-[16px] shadow-[0_-6px_28px_rgba(0,0,0,0.16)]">
-      <div className="mx-auto mb-[14px] h-[4px] w-[38px] rounded-full bg-gray-30" />
-      <p className="text-[16px] font-bold text-gray-100">Review &amp; edit</p>
-      <textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={saving}
-        autoFocus
-        placeholder="Nothing was transcribed. Type your note here, or discard."
-        className="mt-[12px] h-[180px] w-full resize-none rounded-[16px] bg-brand-tint-1 px-[14px] py-[12px] text-[15px] leading-relaxed text-gray-100 placeholder:text-gray-60 outline-none focus:ring-2 focus:ring-brand-primary disabled:opacity-60"
-      />
-      <div className="mt-[16px] flex gap-[10px]">
-        <button
-          type="button"
-          onClick={onDiscard}
-          disabled={saving}
-          className="h-[48px] flex-1 rounded-[12px] bg-brand-tint-1 text-[14px] font-bold text-gray-100 transition-colors active:bg-brand-border disabled:opacity-50"
-        >
-          Discard
-        </button>
-        <button
-          type="button"
-          onClick={onSave}
-          disabled={saving || !value.trim()}
-          className="h-[48px] flex-1 rounded-[12px] bg-brand-primary text-[14px] font-bold text-white transition-transform active:scale-95 disabled:opacity-50"
-        >
-          {saving ? 'Saving…' : 'Save'}
-        </button>
-      </div>
     </div>
   );
 }
