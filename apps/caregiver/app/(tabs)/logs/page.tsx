@@ -77,7 +77,8 @@ export default function LogsPage({
   const [panelOpen, setPanelOpen] = useState(false);
   const [typing, setTyping] = useState(false);
   const [report, setReport] = useState<ReportDraft>(EMPTY_DRAFT);
-  // Measured so the compile button and the report can clear the dock.
+  // Height of the voice pill row — the report and the compile button clear
+  // that much, and nothing more, so the sheet's grabber floats over the report.
   const [dockHeight, setDockHeight] = useState(0);
 
   /** Fold one note's result into today's report. Existing values win, so a
@@ -548,7 +549,7 @@ export default function LogsPage({
 
       {/* Main background — today's report, filling in as notes land. */}
       <div
-        style={{ bottom: dockHeight + 68 }}
+        style={{ bottom: dockHeight + 6 }}
         className="absolute left-0 right-0 top-[122px] overflow-y-auto px-[22px] pt-[10px] pb-[16px]"
       >
         <VisitReportDraft

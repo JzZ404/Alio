@@ -34,7 +34,8 @@ export function PullUpSheet({
   children: ReactNode;
   footer: ReactNode;
   expandedHeight?: string;
-  /** Reports the collapsed height so the page can clear the dock. */
+  /** Reports the footer's height — the only part that occludes the page when
+   * the sheet is shut, so callers can size their own bottom clearance. */
   onHeightChange?: (px: number) => void;
   className?: string;
 }) {
@@ -53,7 +54,7 @@ export function PullUpSheet({
     const measure = () => {
       const h = el.getBoundingClientRect().height;
       setFooterH(h);
-      onHeightChange?.(HANDLE_H + h);
+      onHeightChange?.(h);
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -86,8 +87,10 @@ export function PullUpSheet({
   return (
     <div
       className={clsx(
-        'flex flex-col overflow-hidden rounded-t-2xl bg-brand-tint-2/90',
-        'shadow-[0_-6px_28px_rgba(10,10,10,0.10)] backdrop-blur-xl',
+        'flex flex-col overflow-hidden rounded-t-2xl transition-colors',
+        open
+          ? 'bg-brand-tint-2/90 shadow-[0_-6px_28px_rgba(10,10,10,0.10)] backdrop-blur-xl'
+          : 'bg-transparent',
         !dragging && 'transition-[height] duration-200 ease-out',
         className,
       )}

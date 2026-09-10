@@ -104,7 +104,7 @@ export function VoiceDock({
       <div
         className={clsx(
           'flex h-[52px] items-center gap-[10px] rounded-full px-[8px] transition-colors',
-          'shadow-[0_1px_10px_rgba(10,10,10,0.06)]',
+          'shadow-[0_6px_20px_rgba(10,10,10,0.12)]',
           recording ? 'bg-brand-tint-1' : 'bg-gray-10',
         )}
       >
