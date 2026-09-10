@@ -24,10 +24,6 @@ export default function CaregiverHomePage() {
   return (
     <div
       className="relative h-full overflow-y-auto pb-32"
-      style={{
-        background:
-          'linear-gradient(135deg, #E3E5F1 0%, #EAEAF2 50%, #D3D5EC 100%)',
-      }}
     >
       {/* Header — caregiver identity + actions, positioned at the consistent top-60 */}
       <header className="flex items-center gap-[14px] px-[20px] pt-[60px]">

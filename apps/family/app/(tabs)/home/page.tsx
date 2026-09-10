@@ -28,10 +28,6 @@ export default function FamilyHomePage() {
   return (
     <div
       className="h-full overflow-y-auto pb-32"
-      style={{
-        background:
-          'linear-gradient(135deg, #E3E5F1 0%, #EAEAF2 50%, #D3D5EC 100%)',
-      }}
     >
       <div className="flex flex-col gap-3 px-4 pb-6 pt-12">
         <CaregiverStatusCard

@@ -49,10 +49,6 @@ export default function ChatConversationPage({ id: propId, onBack }: { id?: stri
   return (
     <div
       className="relative h-full overflow-hidden"
-      style={{
-        background:
-          'linear-gradient(135deg, #E3E5F1 0%, #EAEAF2 50%, #D3D5EC 100%)',
-      }}
     >
       {/* Top header — pinned at top-60 to match the rest of the app */}
       <header className="absolute left-[25px] right-[25px] top-[60px] z-10 flex items-center gap-[12px]">

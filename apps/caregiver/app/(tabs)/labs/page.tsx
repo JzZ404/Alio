@@ -77,10 +77,6 @@ export default function LabReportUploadPage() {
   return (
     <div
       className="relative overflow-y-auto pb-20"
-      style={{
-        background:
-          'linear-gradient(135deg, #E3E5F1 0%, #EAEAF2 50%, #D3D5EC 100%)',
-      }}
     >
       <header className="flex items-center gap-4 px-5 pt-14">
         <button

@@ -13,10 +13,6 @@ export default function CaregiverChatPage({ onOpenThread }: { onOpenThread?: (id
   return (
     <div
       className="relative h-full overflow-hidden"
-      style={{
-        background:
-          'linear-gradient(135deg, #E3E5F1 0%, #EAEAF2 50%, #D3D5EC 100%)',
-      }}
     >
       {/* Top header — "Chat" pill + Search + chat-list icons */}
       <header className="absolute left-[25px] right-[25px] top-[60px] z-10 flex items-center justify-between">

@@ -54,7 +54,9 @@ export default function TabsLayout({ children }: { children: ReactNode }) {
 
   return (
     <MobileFrame>
-      <div className="relative h-full overflow-hidden">
+      {/* One background for the whole frame, so the tab bar floats on the
+        * same surface as the content instead of a flat band below it. */}
+      <div className="relative h-full overflow-hidden bg-app">
         <div className="absolute inset-0 bottom-[85px] overflow-y-auto">
           {subPage?.type === 'chat'   && <ChatDetail   id={subPage.id} onBack={() => setSubPage(null)} />}
           {subPage?.type === 'report' && <ReportDetail id={subPage.id} onBack={() => setSubPage(null)} />}

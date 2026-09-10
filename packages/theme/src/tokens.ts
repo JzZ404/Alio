@@ -28,6 +28,13 @@ export const colors = {
   },
 } as const;
 
+/** The app's page background. One ramp across the whole phone frame, so the
+ * tab bar floats on the same surface as the content above it rather than on a
+ * flat band. */
+export const backgroundImage = {
+  app: `linear-gradient(135deg, ${'#E3E5F1'} 0%, ${'#EAEAF2'} 50%, ${'#D3D5EC'} 100%)`,
+} as const;
+
 export const fontFamily = {
   sans: ['var(--font-century-gothic)', 'system-ui', 'sans-serif'],
 } as const;
