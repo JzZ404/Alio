@@ -9,13 +9,13 @@ import {
   AudioBubble,
   TaskCard,
   ChatBubble,
-  HoldToTalkBar,
+  VoiceDock,
   VisitReportDraft,
   PullUpSheet,
   EMPTY_DRAFT,
   type ReportDraft,
   type DraftField,
-  type BarMode,
+  type DockMode,
   IconSearch,
   IconHistory,
   IconSendMessage,
@@ -77,6 +77,8 @@ export default function LogsPage({
   const [panelOpen, setPanelOpen] = useState(false);
   const [typing, setTyping] = useState(false);
   const [report, setReport] = useState<ReportDraft>(EMPTY_DRAFT);
+  // Measured so the compile button and the report can clear the dock.
+  const [dockHeight, setDockHeight] = useState(0);
 
   /** Fold one note's result into today's report. Existing values win, so a
    * later vague note can't wipe an earlier specific one. */
@@ -243,7 +245,7 @@ export default function LogsPage({
 
   const activePatient = SAMPLE_PATIENTS.find((p) => p.id === activePatientId);
   const recording = view === 'voice-recording' && recordState === 'recording';
-  const barMode: BarMode = recording ? 'recording' : typing ? 'typing' : 'idle';
+  const barMode: DockMode = recording ? 'recording' : typing ? 'typing' : 'idle';
   // Saving on the voice screen = the /transcribe fallback; on the review
   // screen it's the summarize+persist step (label not shown there anyway).
   const busyLabel = recordState === 'saving' ? 'Transcribing…' : '';
@@ -543,8 +545,10 @@ export default function LogsPage({
       </header>
 
       {/* Main background — today's report, filling in as notes land. */}
-      {/* Bottom clearance for the collapsed sheet (148px). */}
-      <div className="absolute bottom-[156px] left-0 right-0 top-[122px] overflow-y-auto px-[22px] pt-[10px] pb-[16px]">
+      <div
+        style={{ bottom: dockHeight + 56 }}
+        className="absolute left-0 right-0 top-[122px] overflow-y-auto px-[22px] pt-[10px] pb-[16px]"
+      >
         <VisitReportDraft
           patientName={activePatient?.name ?? 'Patient'}
           dateLabel={new Date().toLocaleDateString('en-US', {
@@ -560,50 +564,52 @@ export default function LogsPage({
         {error && (
           <p className="mt-4 text-center text-[13px] text-red-600">{error}</p>
         )}
-
-        {/* Live caption while the pill is held. */}
-        {recording && liveTranscript && (
-          <p className="mt-4 rounded-[14px] bg-white/70 p-[14px] text-[15px] leading-[21px] text-gray-100">
-            {liveTranscript}
-          </p>
-        )}
       </div>
 
-      {/* Conversation + input in one surface: the sheet grows from behind the
-        * input bar, so the control the caregiver is holding never moves. */}
+      {/* Send to family belongs to the report, not the conversation, so it
+        * sits above the dock and steps aside while the sheet is up. */}
+      {view !== 'voice-review' && !panelOpen && (
+        <button
+          type="button"
+          onClick={handleCompile}
+          disabled={compileState !== 'idle' || recordState !== 'idle'}
+          style={{ bottom: dockHeight + 12 }}
+          className="absolute right-[16px] z-20 flex items-center gap-[7px] rounded-full bg-brand-primary px-[14px] py-[8px] text-sm font-bold text-gray-10 shadow-[0_2px_12px_rgba(94,105,246,0.35)] transition-transform active:scale-95 disabled:opacity-50"
+        >
+          <IconSendMessage className="size-[16px] text-gray-10" />
+          Send to family
+        </button>
+      )}
+
+      {/* Conversation and the voice dock share one surface — the dock is not a
+        * card sitting on a drawer, it is the drawer's own bottom edge. */}
       {view !== 'voice-review' && (
         <PullUpSheet
           open={panelOpen}
           onOpenChange={setPanelOpen}
-          title="Alio"
-          count={conversation.length}
+          label="conversation"
+          onHeightChange={setDockHeight}
           className="absolute bottom-0 left-0 right-0 z-10"
           expandedHeight="58vh"
           footer={
-            <>
-              {/* Finish the visit: compile the notes and hand them to the
-                * family. Labelled, because "+" reads as "add another thing". */}
-              <button
-                type="button"
-                onClick={handleCompile}
-                disabled={compileState !== 'idle' || recordState !== 'idle'}
-                className="mb-[10px] ml-auto flex items-center gap-[7px] rounded-full bg-brand-primary px-[14px] py-[8px] text-[13px] font-bold text-white shadow-[0_2px_12px_rgba(94,105,246,0.35)] transition-transform active:scale-95 disabled:opacity-50"
-              >
-                <IconSendMessage className="size-[16px] text-white" />
-                Send to family
-              </button>
-              <HoldToTalkBar
-                mode={barMode}
-                value={draft}
-                onChange={setDraft}
-                onHoldStart={handlePressToSpeak}
-                onHoldEnd={handleDone}
-                onTap={() => setTyping(true)}
-                onSend={handleSendText}
-                onExitTyping={() => setTyping(false)}
-                disabled={recordState === 'saving'}
-              />
-            </>
+            <VoiceDock
+              mode={barMode}
+              value={draft}
+              onChange={setDraft}
+              caption={recording ? liveTranscript : undefined}
+              onHoldStart={handlePressToSpeak}
+              onHoldEnd={handleDone}
+              onTap={() => setTyping(true)}
+              onSend={handleSendText}
+              onClose={
+                typing
+                  ? () => setTyping(false)
+                  : panelOpen
+                    ? () => setPanelOpen(false)
+                    : undefined
+              }
+              disabled={recordState === 'saving'}
+            />
           }
         >
           <ConversationTurns turns={conversation} onOpenReport={openReport} />

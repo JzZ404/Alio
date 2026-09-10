@@ -10,30 +10,32 @@ const SNAP_PX = 48;
 const HANDLE_H = 30;
 
 /**
- * PullUpSheet — a drawer that wraps the control it belongs to.
+ * PullUpSheet — one surface that wraps the control it belongs to.
  *
- * The `footer` (an input bar, say) is always visible and forms the sheet's
- * bottom edge. Collapsed, that footer is all you see and the surface behind it
- * is transparent, so it reads as a floating bar. Drag or tap the handle and the
- * sheet grows upward from behind the footer to reveal `children`.
+ * The `footer` (the voice dock) always shows and forms the bottom edge; the
+ * surface behind it is the same surface the dock sits on, so there is no card
+ * inside a card. Drag or tap the handle and it grows upward to reveal
+ * `children`.
  */
 export function PullUpSheet({
   open,
   onOpenChange,
-  title,
-  count,
+  label,
   children,
   footer,
   expandedHeight = '58vh',
+  onHeightChange,
   className,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  title: string;
-  count?: number;
+  /** Accessible name for the handle; never rendered. */
+  label: string;
   children: ReactNode;
   footer: ReactNode;
   expandedHeight?: string;
+  /** Reports the collapsed height so the page can clear the dock. */
+  onHeightChange?: (px: number) => void;
   className?: string;
 }) {
   const startY = useRef<number | null>(null);
@@ -48,12 +50,16 @@ export function PullUpSheet({
   useLayoutEffect(() => {
     const el = footerRef.current;
     if (!el) return;
-    const measure = () => setFooterH(el.getBoundingClientRect().height);
+    const measure = () => {
+      const h = el.getBoundingClientRect().height;
+      setFooterH(h);
+      onHeightChange?.(HANDLE_H + h);
+    };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [onHeightChange]);
   const collapsedHeight = HANDLE_H + footerH;
 
   const handlePointerDown = (e: React.PointerEvent) => {
@@ -80,10 +86,8 @@ export function PullUpSheet({
   return (
     <div
       className={clsx(
-        'flex flex-col overflow-hidden rounded-t-[22px] transition-colors',
-        open
-          ? 'bg-white/75 shadow-[0_-6px_28px_rgba(0,0,0,0.12)] backdrop-blur-xl'
-          : 'bg-transparent',
+        'flex flex-col overflow-hidden rounded-t-2xl bg-brand-tint-2/90',
+        'shadow-[0_-6px_28px_rgba(10,10,10,0.10)] backdrop-blur-xl',
         !dragging && 'transition-[height] duration-200 ease-out',
         className,
       )}
@@ -96,7 +100,7 @@ export function PullUpSheet({
       {/* Grab handle — drag to resize, tap to toggle. */}
       <button
         type="button"
-        aria-label={open ? `Collapse ${title}` : `Expand ${title}`}
+        aria-label={open ? `Collapse ${label}` : `Expand ${label}`}
         aria-expanded={open}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -107,17 +111,7 @@ export function PullUpSheet({
         style={{ height: HANDLE_H }}
         className="relative flex w-full shrink-0 touch-none select-none items-center justify-center gap-[7px]"
       >
-        <span
-          className={clsx(
-            'h-[4px] w-[38px] rounded-full transition-colors',
-            open ? 'bg-gray-30' : 'bg-gray-30/70',
-          )}
-        />
-        {!open && typeof count === 'number' && count > 0 && (
-          <span className="absolute right-[20px] rounded-full bg-white/80 px-[9px] py-[2px] text-[11px] font-bold text-brand-primary shadow-sm backdrop-blur-sm tabular-nums">
-            {title} {count}
-          </span>
-        )}
+        <span className="h-[4px] w-[38px] rounded-full bg-gray-30" />
       </button>
 
       {/* Conversation — only reachable once the sheet is up. */}

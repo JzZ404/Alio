@@ -32,7 +32,7 @@ export { AddRecordModal } from './AddRecordModal';
 export { UploadWheel, type UploadKind } from './UploadWheel';
 
 // Log screen — report-as-background plus the hold-to-talk input
-export { HoldToTalkBar, type BarMode } from './HoldToTalkBar';
+export { VoiceDock, type DockMode } from './VoiceDock';
 export {
   VisitReportDraft,
   EMPTY_DRAFT,
