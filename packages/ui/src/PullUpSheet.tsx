@@ -100,18 +100,24 @@ export function PullUpSheet({
         // second position utility would override theirs. The absolute surface
         // layer below anchors to whatever positioning they applied.
         'flex flex-col overflow-hidden rounded-t-2xl',
-        !dragging && 'transition-[height] duration-200 ease-out',
         className,
       )}
       style={{
         height: open
           ? `calc(${expandedHeight} - ${dragY}px)`
           : `${collapsedHeight - dragY}px`,
+        // On the container, not the surface layer: overflow-hidden clips a
+        // child's shadow but never the element's own. Alpha tracks the drag so
+        // it arrives with the surface.
+        boxShadow: `0 -8px 32px rgba(10, 10, 10, ${(0.22 * reveal).toFixed(3)})`,
+        // Both here: an inline transition replaces the class-based one, so
+        // listing only box-shadow silently drops the height animation.
+        transition: dragging ? undefined : 'height 200ms ease-out, box-shadow 200ms ease-out',
       }}
     >
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 z-0 rounded-t-2xl bg-brand-tint-2/90 shadow-[0_-8px_32px_rgba(10,10,10,0.22)] backdrop-blur-xl"
+        className="pointer-events-none absolute inset-0 z-0 rounded-t-2xl border-x border-t border-brand-border bg-brand-tint-2/90 backdrop-blur-xl"
         style={{
           opacity: reveal,
           transition: dragging ? undefined : 'opacity 200ms ease-out',
