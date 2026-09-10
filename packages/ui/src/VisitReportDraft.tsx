@@ -3,30 +3,12 @@
 import { useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { IconPills, IconMedicalRecord, IconHeart, IconEdit, IconClose } from './icons';
-
-export type DraftSeverity = 'none' | 'watch' | 'urgent';
+import { EMPTY_REPORT_DRAFT, type DraftSeverity, type ReportDraft } from '@alio/mock-data';
 
 /** The editable fields, so callers can switch on which one changed. */
 export type DraftField = 'summary' | 'vitals' | 'mood' | 'meds';
 
-export type ReportDraft = {
-  summary: string | null;
-  vitals: string | null;
-  mood: string | null;
-  meds: string | null;
-  /** Medication names with whether the elder actually took them. */
-  medsTaken: { name: string; taken: boolean }[];
-  severity: DraftSeverity;
-};
-
-export const EMPTY_DRAFT: ReportDraft = {
-  summary: null,
-  vitals: null,
-  mood: null,
-  meds: null,
-  medsTaken: [],
-  severity: 'none',
-};
+export const EMPTY_DRAFT = EMPTY_REPORT_DRAFT;
 
 const SEVERITY_STYLE: Record<DraftSeverity, string> = {
   none: 'bg-brand-tint-1 text-brand-primary',
@@ -89,7 +71,6 @@ export function VisitReportDraft({
           value={draft.vitals}
           hint="Blood pressure, pulse, temperature"
           filling={filling}
-          severity={draft.severity}
           onEdit={onEdit ? (v) => onEdit('vitals', v) : undefined}
         />
         <DraftCard
@@ -98,7 +79,6 @@ export function VisitReportDraft({
           value={draft.mood}
           hint="How she seemed today"
           filling={filling}
-          severity={draft.severity}
           onEdit={onEdit ? (v) => onEdit('mood', v) : undefined}
         />
         <DraftCard
@@ -107,7 +87,6 @@ export function VisitReportDraft({
           value={draft.meds}
           hint="Taken, missed, or refused"
           filling={filling}
-          severity={draft.severity}
           onEdit={onEdit ? (v) => onEdit('meds', v) : undefined}
           extra={
             draft.medsTaken.length > 0 ? (
@@ -219,7 +198,6 @@ function DraftCard({
   value,
   hint,
   filling,
-  severity,
   extra,
   onEdit,
 }: {
@@ -228,7 +206,6 @@ function DraftCard({
   value: string | null;
   hint: string;
   filling?: boolean;
-  severity: DraftSeverity;
   extra?: React.ReactNode;
   onEdit?: (v: string) => void;
 }) {
@@ -264,16 +241,6 @@ function DraftCard({
         </span>
         <span className="text-[14px] font-bold text-gray-100">{title}</span>
         <div className="ml-auto flex items-center gap-[8px]">
-          {!empty && severity !== 'none' && (
-            <span
-              className={clsx(
-                'rounded-full px-[10px] py-[3px] text-[11px] font-bold',
-                SEVERITY_STYLE[severity],
-              )}
-            >
-              {severity === 'urgent' ? 'Needs attention' : 'Watch'}
-            </span>
-          )}
           {onEdit && (
             <button
               type="button"

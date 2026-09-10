@@ -96,6 +96,47 @@ export const AI_CHAT_HISTORY: LogHistoryItem[] = [
 ];
 
 // =============================================================
+// Visit report — the document the Log screen fills in
+// =============================================================
+
+export type DraftSeverity = 'none' | 'watch' | 'urgent';
+
+export type ReportDraft = {
+  /** The line the family reads first. */
+  summary: string | null;
+  vitals: string | null;
+  mood: string | null;
+  meds: string | null;
+  medsTaken: { name: string; taken: boolean }[];
+  severity: DraftSeverity;
+};
+
+/** Start of a visit: nothing said yet. */
+export const EMPTY_REPORT_DRAFT: ReportDraft = {
+  summary: null,
+  vitals: null,
+  mood: null,
+  meds: null,
+  medsTaken: [],
+  severity: 'none',
+};
+
+/** A visit that has been talked through — every section landed. Matches
+ * INITIAL_CONVERSATION, so the Log screen reads as one coherent afternoon. */
+export const SAMPLE_REPORT_DRAFT: ReportDraft = {
+  summary:
+    'Erin had a quiet afternoon. She ate about half her lunch and asked to lie down early — a little less energy than the past few days.',
+  vitals: '116/70   72 bpm   98.4°F',
+  mood: 'Calm but tired. Napped from 2 to 3.',
+  meds: '2 medications noted',
+  medsTaken: [
+    { name: 'Metaformin', taken: true },
+    { name: 'Vitamin D', taken: false },
+  ],
+  severity: 'watch',
+};
+
+// =============================================================
 // Recording — simulated transcript text reveal
 // =============================================================
 

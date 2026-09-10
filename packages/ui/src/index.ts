@@ -33,13 +33,7 @@ export { UploadWheel, type UploadKind } from './UploadWheel';
 
 // Log screen — report-as-background plus the hold-to-talk input
 export { VoiceDock, type DockMode } from './VoiceDock';
-export {
-  VisitReportDraft,
-  EMPTY_DRAFT,
-  type ReportDraft,
-  type DraftSeverity,
-  type DraftField,
-} from './VisitReportDraft';
+export { VisitReportDraft, EMPTY_DRAFT, type DraftField } from './VisitReportDraft';
 export { PullUpSheet } from './PullUpSheet';
 
 // Caesarzkn icons — 288 generated icon components + custom

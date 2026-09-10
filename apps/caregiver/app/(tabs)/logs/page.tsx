@@ -12,8 +12,6 @@ import {
   VoiceDock,
   VisitReportDraft,
   PullUpSheet,
-  EMPTY_DRAFT,
-  type ReportDraft,
   type DraftField,
   type DockMode,
   IconSearch,
@@ -23,7 +21,9 @@ import {
 import {
   INITIAL_CONVERSATION,
   SAMPLE_PATIENTS,
+  SAMPLE_REPORT_DRAFT,
   type ConversationTurn,
+  type ReportDraft,
 } from '@alio/mock-data';
 import { api, ApiError } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
@@ -76,7 +76,9 @@ export default function LogsPage({
   // hold-to-talk pill for a text field without moving anything else.
   const [panelOpen, setPanelOpen] = useState(false);
   const [typing, setTyping] = useState(false);
-  const [report, setReport] = useState<ReportDraft>(EMPTY_DRAFT);
+  // Seeded filled to match INITIAL_CONVERSATION. Swap for EMPTY_REPORT_DRAFT
+  // to see the screen at the start of a visit.
+  const [report, setReport] = useState<ReportDraft>(SAMPLE_REPORT_DRAFT);
   // Height of the voice pill row — the report and the compile button clear
   // that much, and nothing more, so the sheet's grabber floats over the report.
   const [dockHeight, setDockHeight] = useState(0);
