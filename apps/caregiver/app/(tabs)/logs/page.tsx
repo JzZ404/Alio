@@ -551,7 +551,13 @@ export default function LogsPage({
 
       {/* Main background — today's report, filling in as notes land. */}
       <div
-        style={{ bottom: dockHeight + 6 }}
+        style={{
+          bottom: dockHeight + 6,
+          // Fade the last card out rather than clipping it mid-row: a hard
+          // scroll edge under the pill reads as the card being sliced.
+          WebkitMaskImage: 'linear-gradient(to bottom, #000 calc(100% - 44px), transparent)',
+          maskImage: 'linear-gradient(to bottom, #000 calc(100% - 44px), transparent)',
+        }}
         className="absolute left-0 right-0 top-[122px] overflow-y-auto px-[22px] pt-[10px] pb-[16px]"
       >
         <VisitReportDraft
@@ -592,7 +598,7 @@ export default function LogsPage({
           label="conversation"
           onHeightChange={setDockHeight}
           className="absolute bottom-0 left-0 right-0 z-10"
-          expandedHeight="42vh"
+          expandedHeight="68vh"
           footer={
             <VoiceDock
               mode={barMode}

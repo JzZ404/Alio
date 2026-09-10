@@ -24,7 +24,7 @@ export function PullUpSheet({
   label,
   children,
   footer,
-  expandedHeight = '42vh',
+  expandedHeight = '68vh',
   onHeightChange,
   className,
 }: {
@@ -111,7 +111,7 @@ export function PullUpSheet({
     >
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 z-0 rounded-t-2xl bg-brand-tint-2/90 shadow-[0_-6px_28px_rgba(10,10,10,0.10)] backdrop-blur-xl"
+        className="pointer-events-none absolute inset-0 z-0 rounded-t-2xl bg-brand-tint-2/90 shadow-[0_-8px_32px_rgba(10,10,10,0.22)] backdrop-blur-xl"
         style={{
           opacity: reveal,
           transition: dragging ? undefined : 'opacity 200ms ease-out',
@@ -131,7 +131,7 @@ export function PullUpSheet({
         style={{ height: HANDLE_H }}
         className="relative z-10 flex w-full shrink-0 touch-none select-none items-end justify-center pb-[6px]"
       >
-        <span className="h-[4px] w-[38px] rounded-full bg-gray-30" />
+        <span className="h-[4px] w-[38px] rounded-full bg-gray-60" />
       </button>
 
       {/* Conversation — only reachable once the sheet is up. */}
