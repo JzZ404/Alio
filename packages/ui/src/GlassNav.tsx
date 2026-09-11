@@ -7,7 +7,12 @@ import clsx from 'clsx';
 const NAV_W = 365;
 const NAV_H = 69;
 const PAD = 5;
-const SLOT_W = (NAV_W - PAD * 2) / 4;
+const BORDER = 1;
+/** Slots divide the content box, not the border box. An absolutely positioned
+ * child measures `left` from the padding box, so the border has to come out of
+ * the slot width or the indicator drifts 0.5px per slot and lands 2px short by
+ * the fourth. */
+const SLOT_W = (NAV_W - BORDER * 2 - PAD * 2) / 4;
 
 export type GlassNavTab = {
   id: string;
@@ -39,10 +44,10 @@ export function GlassNav({
    * it — position it from a wrapper, not through this prop. */
   className?: string;
 }) {
-  const isFirst = activeIdx === 0;
-  const isLast = activeIdx === tabs.length - 1;
-  const pillLeft = isFirst ? 0 : PAD + activeIdx * SLOT_W;
-  const pillWidth = isFirst || isLast ? SLOT_W + PAD : SLOT_W;
+  // Every slot is inset by PAD, the first and last included. Widening the end
+  // slots to bleed into the padding put the indicator flush against the left
+  // rim and 1px past the right one, while the top and bottom kept their gap.
+  const pillLeft = PAD + activeIdx * SLOT_W;
 
   return (
     <nav
@@ -58,7 +63,7 @@ export function GlassNav({
         <span
           aria-hidden
           className="pointer-events-none absolute rounded-full bg-glass-selected transition-[left,width] duration-200 ease-out"
-          style={{ top: PAD, bottom: PAD, left: pillLeft, width: pillWidth }}
+          style={{ top: PAD, bottom: PAD, left: pillLeft, width: SLOT_W }}
         />
       )}
 
