@@ -2,16 +2,6 @@
 
 import type { ComponentType, SVGProps } from 'react';
 import clsx from 'clsx';
-import { colors } from '@alio/theme';
-
-/** The lit rim, built from tokens rather than literals. Figma blurs three
- * bordered layers for this; a CSS `filter: blur` on a bordered box bleeds
- * inward and greys the whole bar, so inset shadows carry it instead. */
-const RIM = [
-  `inset 0 1px 0 0 ${colors.glass.edgeBright}`,
-  `inset 0 -1px 0 0 ${colors.glass.edgeSoft}`,
-  `inset 0 0 0 1px ${colors.glass.edgeDark}`,
-].join(', ');
 
 /** Geometry from Figma 411:6936 "Bar". */
 const NAV_W = 365;
@@ -28,14 +18,13 @@ export type GlassNavTab = {
 /**
  * GlassNav — the bottom tab bar.
  *
- * The glass is a stack, not one translucent fill: a white plate, a blurred and
- * slightly grey-tinted pane over it, a wide overlay ellipse that shades the
- * middle, and three hairline rims that catch and absorb light at the edge.
- * Flattening that into a single `bg-white/40` is what makes glass read as
- * milky plastic.
+ * One translucent white pane over a wide blur. Figma layers this (plate, grey
+ * tint, overlay ellipse, three blurred rims), but those layers do not compose
+ * the same way in CSS and the reproduction read heavier than the design, so the
+ * simpler pane stands.
  *
- * The selected tab is a dark scrim rather than a light chip — on glass, the
- * active slot reads as pressed into the surface.
+ * The selected tab is a dark scrim rather than a light chip — from the design,
+ * where the active slot reads as pressed into the surface.
  */
 export function GlassNav({
   tabs,
@@ -59,42 +48,11 @@ export function GlassNav({
     <nav
       style={{ width: NAV_W, height: NAV_H, padding: PAD }}
       className={clsx(
-        'relative flex items-stretch overflow-hidden rounded-full',
+        'relative flex items-stretch rounded-full',
+        'border border-gray-10/80 bg-gray-10/40 shadow-[0_2px_22px_rgba(0,0,0,0.15)] backdrop-blur-2xl',
         className,
       )}
     >
-      {/* 1 — the pane: one calibrated fill over a wide blur. Content scrolling
-        * underneath still shows through at 45%. */}
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-0 rounded-full bg-glass-plate shadow-[0_2px_22px_rgba(0,0,0,0.15)] backdrop-blur-[37px]"
-      />
-
-      {/* 3 — a very wide, very flat ellipse in overlay: shades the middle band
-        * and leaves the top and bottom edges brighter. Masked to the inner
-        * rounded rect, as in Figma, so it never reaches the outer edge. */}
-      <span
-        aria-hidden
-        className="pointer-events-none absolute overflow-hidden rounded-full"
-        style={{ inset: PAD }}
-      >
-        <span
-          className="absolute bg-glass-shade mix-blend-overlay"
-          style={{ width: 876, height: 113, left: -79, top: -22, borderRadius: '50%' }}
-        />
-      </span>
-
-      {/* 4 — the rim. Figma stacks three blurred borders; CSS `filter: blur`
-        * on a bordered box bleeds the blur inward and greys the whole bar, so
-        * these are inset shadows instead: they stay at the edge. Sampled from
-        * the design, the bar body should sit lighter than the page behind it,
-        * not darker. */}
-      <span
-        aria-hidden
-        style={{ boxShadow: RIM }}
-        className="pointer-events-none absolute inset-0 rounded-full"
-      />
-
       {/* Selected slot. */}
       {activeIdx >= 0 && (
         <span
