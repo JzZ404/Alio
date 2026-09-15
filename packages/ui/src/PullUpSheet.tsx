@@ -68,6 +68,10 @@ export function PullUpSheet({
   const collapsedHeight = HANDLE_H + footerH;
 
   const handlePointerDown = (e: React.PointerEvent) => {
+    // Capture, or the drag dies the moment the finger leaves the 26px handle —
+    // which is after about 13px of an upward pull. That was the whole reason a
+    // half-finished pull snapped shut: not the threshold, the lost pointer.
+    e.currentTarget.setPointerCapture(e.pointerId);
     startY.current = e.clientY;
     setDragY(0);
   };
@@ -145,7 +149,6 @@ export function PullUpSheet({
         onPointerMove={handlePointerMove}
         onPointerUp={() => endDrag(true)}
         onPointerCancel={() => endDrag(false)}
-        onPointerLeave={() => endDrag(false)}
         style={{ height: HANDLE_H }}
         className="relative z-10 flex w-full shrink-0 touch-none select-none items-end justify-center pb-[6px]"
       >
