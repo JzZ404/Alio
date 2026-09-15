@@ -245,10 +245,10 @@ export default function FamilyAICheckPage({
       <header className="absolute left-[25px] right-[25px] top-[60px] z-10 flex items-center justify-between gap-3">
         <ModeDropdown mode={mode} onChangeMode={handleChangeMode} />
         <div className="flex items-center gap-3">
-          <IconBox size={42} aria-label="Search" className="shadow-lift">
+          <IconBox size={42} aria-label="Search">
             <IconSearch className="size-6 text-gray-100" />
           </IconBox>
-          <IconBox size={42} aria-label="Open AI chat history" onClick={openHistory} className="shadow-lift">
+          <IconBox size={42} aria-label="Open AI chat history" onClick={openHistory}>
             <IconHistory className="size-6 text-gray-100" />
           </IconBox>
         </div>

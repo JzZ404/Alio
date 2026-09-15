@@ -15,7 +15,7 @@ export default function FamilyVisitDetailPage({ id: propId, onBack }: { id?: str
       className="relative h-full overflow-hidden"
     >
       <header className="absolute left-[25px] right-[25px] top-[60px] z-10 flex items-center gap-[16px]">
-        <IconBox size={42} aria-label="Back" onClick={handleBack} className="shadow-lift">
+        <IconBox size={42} aria-label="Back" onClick={handleBack}>
           <IconChevronLeft className="size-6 text-gray-100" />
         </IconBox>
         <span className="flex h-[42px] items-center rounded-[10px] bg-brand-tint-1 shadow-lift px-[12px] text-[16px] font-bold text-black">

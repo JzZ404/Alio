@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
+  scrollFade,
   IconBox,
   IconChevronLeft,
 } from '@alio/ui';
@@ -92,7 +93,7 @@ export default function LogReportPage({ id: propId, onBack }: { id?: string; onB
         <IconBox size={42} aria-label="Back" onClick={handleBack}>
           <IconChevronLeft className="size-6 text-gray-100" />
         </IconBox>
-        <span className="flex h-[42px] items-center rounded-[10px] bg-brand-tint-1 px-[12px] text-[16px] font-bold text-black">
+        <span className="flex h-[42px] items-center rounded-[10px] bg-brand-tint-1 shadow-lift px-[12px] text-[16px] font-bold text-black">
           Log Summary
         </span>
       </header>
@@ -149,7 +150,7 @@ function ReportBody({ row }: { row: CompiledReportRow }) {
     .join('   ') || '—';
 
   return (
-    <div className="absolute left-0 right-0 top-[122px] bottom-0 overflow-y-auto px-[22px] pt-[12px] pb-[100px]">
+    <div style={scrollFade(122)} className="absolute left-0 right-0 top-0 bottom-0 overflow-y-auto px-[22px] pt-[134px] pb-[100px]">
       <p className="font-bold text-[20px] text-black">
         Visit・{row.patient_name}
       </p>

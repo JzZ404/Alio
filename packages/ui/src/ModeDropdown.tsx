@@ -30,7 +30,7 @@ export function ModeDropdown({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex h-[42px] items-center gap-2 rounded-[10px] bg-brand-tint-1 px-3 transition-colors active:bg-brand-border"
+        className="flex h-[42px] items-center gap-2 rounded-[10px] bg-brand-tint-1 shadow-lift px-3 transition-colors active:bg-brand-border"
         aria-haspopup="menu"
         aria-expanded={open}
       >

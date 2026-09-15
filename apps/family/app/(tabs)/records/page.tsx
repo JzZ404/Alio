@@ -81,14 +81,14 @@ export default function FamilyRecordsPage({ onOpenVisit }: { onOpenVisit?: (id: 
           Records
         </span>
         <div className="flex items-center gap-[12px]">
-          <IconBox size={42} aria-label="Search records" className="shadow-lift">
+          <IconBox size={42} aria-label="Search records">
             <IconSearch className="size-[24px] text-gray-100" />
           </IconBox>
           <button
             type="button"
             aria-label="Add record"
             onClick={() => setModalOpen(true)}
-            className="flex size-[42px] items-center justify-center rounded-[12px] bg-brand-primary transition-transform active:scale-95"
+            className="flex size-[42px] items-center justify-center rounded-[12px] bg-brand-primary shadow-lift transition-transform active:scale-95"
           >
             <IconPlus className="size-[24px] text-white" />
           </button>

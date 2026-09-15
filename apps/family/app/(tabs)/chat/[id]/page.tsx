@@ -128,7 +128,6 @@ export default function FamilyChatConversationPage({ id: propId, onBack }: { id?
           shape="pill"
           aria-label="Back"
           onClick={handleBack}
-          className="shadow-lift"
         >
           <IconChevronLeft className="size-[20px] text-gray-100" />
         </IconBox>
@@ -160,7 +159,7 @@ export default function FamilyChatConversationPage({ id: propId, onBack }: { id?
           </span>
         </div>
 
-        <IconBox size={42} shape="pill" aria-label="Search this conversation" className="shadow-lift">
+        <IconBox size={42} shape="pill" aria-label="Search this conversation">
           <IconSearch className="size-[20px] text-gray-100" />
         </IconBox>
       </header>

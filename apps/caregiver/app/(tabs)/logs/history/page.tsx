@@ -20,7 +20,7 @@ export default function LogsHistoryPage({ onBack }: { onBack?: () => void } = {}
     >
       {/* Top header — back / dates / search */}
       <header className="absolute left-[25px] right-[25px] top-[60px] z-10 flex items-center justify-between">
-        <IconBox size={42} aria-label="Back" onClick={back} className="shadow-lift">
+        <IconBox size={42} aria-label="Back" onClick={back}>
           <IconArrowLeft className="size-6 text-gray-100" />
         </IconBox>
 
@@ -32,7 +32,7 @@ export default function LogsHistoryPage({ onBack }: { onBack?: () => void } = {}
           <IconChevronDown className="size-4 text-gray-100" />
         </button>
 
-        <IconBox size={42} aria-label="Search history" className="shadow-lift">
+        <IconBox size={42} aria-label="Search history">
           <IconSearch className="size-6 text-gray-100" />
         </IconBox>
       </header>

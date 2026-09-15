@@ -542,13 +542,12 @@ export default function LogsPage({
           patients={SAMPLE_PATIENTS}
           activeId={activePatientId}
           onChange={setActivePatientId}
-          className="w-fit rounded-[10px] shadow-lift"
+          className="w-fit"
         />
         <div className="flex items-center gap-3">
           <IconBox
             size={42}
             aria-label="Search"
-            className="shadow-lift"
           >
             <IconSearch className="size-6 text-gray-100" />
           </IconBox>
@@ -560,7 +559,6 @@ export default function LogsPage({
             size={42}
             aria-label="Open log history"
             onClick={openHistory}
-            className="shadow-lift"
           >
             <IconHistory className="size-6 text-gray-100" />
           </IconBox>

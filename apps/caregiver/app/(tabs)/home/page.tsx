@@ -56,7 +56,7 @@ export default function CaregiverHomePage() {
         <button
           type="button"
           aria-label="Notifications"
-          className="relative flex size-[42px] items-center justify-center rounded-lg bg-brand-tint-1 transition-colors active:bg-brand-border"
+          className="relative flex size-[42px] items-center justify-center rounded-lg bg-brand-tint-1 shadow-lift transition-colors active:bg-brand-border"
         >
           <IconNotificationFilled className="size-[22px] text-gray-100" />
           {SAMPLE_CG_USER.notifications > 0 && (

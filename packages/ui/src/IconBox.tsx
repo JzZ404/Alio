@@ -28,7 +28,10 @@ export function IconBox({
       onClick={onClick}
       aria-label={ariaLabel}
       className={clsx(
-        'flex items-center justify-center bg-brand-tint-1 transition-colors active:bg-brand-border',
+        // The lift belongs to the control, not the screen: these sit in
+        // headers that content scrolls underneath, and one shadowed while the
+        // next isn't is the kind of inconsistency you feel before you see it.
+        'flex items-center justify-center bg-brand-tint-1 shadow-lift transition-colors active:bg-brand-border',
         size === 48 ? 'size-12' : 'size-[42px]',
         shape === 'pill' ? 'rounded-full' : 'rounded-lg',
         className,

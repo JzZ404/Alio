@@ -39,7 +39,7 @@ export function PatientSwitcher({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex h-[42px] items-center gap-[8px] rounded-[10px] bg-brand-tint-1 pl-[6px] pr-[12px] transition-colors active:bg-brand-border"
+        className="flex h-[42px] items-center gap-[8px] rounded-[10px] bg-brand-tint-1 shadow-lift pl-[6px] pr-[12px] transition-colors active:bg-brand-border"
         aria-haspopup="menu"
         aria-expanded={open}
       >
