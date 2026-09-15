@@ -1,4 +1,4 @@
-import { ChatListItem, IconBox, IconSearch, IconChat } from '@alio/ui';
+import { scrollFade, ChatListItem, IconBox, IconSearch, IconChat } from '@alio/ui';
 import { SAMPLE_FM_CHAT_THREADS } from '@alio/mock-data';
 
 /**
@@ -13,21 +13,21 @@ export default function FamilyChatPage({ onOpenThread }: { onOpenThread?: (id: s
     >
       {/* Top header — "Chat" pill + Search + new-chat icons (top-60 to match other screens) */}
       <header className="absolute left-[25px] right-[25px] top-[60px] z-10 flex items-center justify-between">
-        <span className="flex h-[42px] items-center rounded-[10px] bg-brand-tint-1 px-[12px] text-[20px] font-bold text-black">
+        <span className="flex h-[42px] items-center rounded-[10px] bg-brand-tint-1 shadow-lift px-[12px] text-[20px] font-bold text-black">
           Chat
         </span>
         <div className="flex items-center gap-[12px]">
-          <IconBox size={42} shape="pill" aria-label="Search chats">
+          <IconBox size={42} shape="pill" aria-label="Search chats" className="shadow-lift">
             <IconSearch className="size-[24px] text-gray-100" />
           </IconBox>
-          <IconBox size={42} shape="pill" aria-label="New chat">
+          <IconBox size={42} shape="pill" aria-label="New chat" className="shadow-lift">
             <IconChat className="size-[24px] text-gray-100" />
           </IconBox>
         </div>
       </header>
 
       {/* Thread list */}
-      <ul className="absolute bottom-[110px] left-[22px] right-[22px] top-[129px] flex flex-col gap-[12px] overflow-y-auto">
+      <ul style={scrollFade(129)} className="absolute bottom-[110px] left-[22px] right-[22px] top-0 pt-[129px] flex flex-col gap-[12px] overflow-y-auto">
         {SAMPLE_FM_CHAT_THREADS.map((thread) => (
           <li key={thread.id}>
             <ChatListItem thread={thread} onOpen={onOpenThread} />

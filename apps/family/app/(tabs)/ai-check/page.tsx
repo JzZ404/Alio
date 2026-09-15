@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
 import {
+  scrollFade,
   IconBox,
   PressToSpeakButton,
   GradientBlob,
@@ -244,10 +245,10 @@ export default function FamilyAICheckPage({
       <header className="absolute left-[25px] right-[25px] top-[60px] z-10 flex items-center justify-between gap-3">
         <ModeDropdown mode={mode} onChangeMode={handleChangeMode} />
         <div className="flex items-center gap-3">
-          <IconBox size={42} aria-label="Search">
+          <IconBox size={42} aria-label="Search" className="shadow-lift">
             <IconSearch className="size-6 text-gray-100" />
           </IconBox>
-          <IconBox size={42} aria-label="Open AI chat history" onClick={openHistory}>
+          <IconBox size={42} aria-label="Open AI chat history" onClick={openHistory} className="shadow-lift">
             <IconHistory className="size-6 text-gray-100" />
           </IconBox>
         </div>
@@ -362,7 +363,7 @@ function MessageView({ turns, loading }: { turns: ChatMessage[]; loading: boolea
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [turns.length, loading]);
   return (
-    <div ref={scrollRef} className="absolute left-0 right-0 top-[122px] bottom-[180px] overflow-y-auto px-4 py-3">
+    <div ref={scrollRef} style={scrollFade(122)} className="absolute left-0 right-0 top-0 pt-[122px] bottom-[180px] overflow-y-auto px-4 py-3">
       <div className="flex flex-col gap-3">
         {turns.map((m) => <ChatBubble key={m.id} message={m} />)}
         {loading && (

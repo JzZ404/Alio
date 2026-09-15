@@ -1,5 +1,6 @@
 export { MobileFrame } from './MobileFrame';
 export { IconBox } from './IconBox';
+export { scrollFade } from './scrollFade';
 export { TabBar } from './TabBar';
 export { GlassNav, type GlassNavTab } from './GlassNav';
 export { PressToSpeakButton } from './PressToSpeakButton';

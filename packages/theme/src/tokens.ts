@@ -43,6 +43,13 @@ export const backgroundImage = {
   app: `linear-gradient(135deg, ${'#E3E5F1'} 0%, ${'#EAEAF2'} 50%, ${'#D3D5EC'} 100%)`,
 } as const;
 
+/** Controls that float over scrolling content — header buttons, the voice
+ * pill. A small Y offset: a large one smears onto whatever passes underneath
+ * and reads as a filled band rather than a raised control. */
+export const boxShadow = {
+  lift: '0 2px 10px rgba(10, 10, 10, 0.08)',
+} as const;
+
 export const fontFamily = {
   sans: ['var(--font-century-gothic)', 'system-ui', 'sans-serif'],
 } as const;

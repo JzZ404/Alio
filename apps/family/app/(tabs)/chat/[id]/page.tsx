@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
+  scrollFade,
   ChatBubble,
   IconBox,
   IconChevronLeft,
@@ -127,6 +128,7 @@ export default function FamilyChatConversationPage({ id: propId, onBack }: { id?
           shape="pill"
           aria-label="Back"
           onClick={handleBack}
+          className="shadow-lift"
         >
           <IconChevronLeft className="size-[20px] text-gray-100" />
         </IconBox>
@@ -158,13 +160,13 @@ export default function FamilyChatConversationPage({ id: propId, onBack }: { id?
           </span>
         </div>
 
-        <IconBox size={42} shape="pill" aria-label="Search this conversation">
+        <IconBox size={42} shape="pill" aria-label="Search this conversation" className="shadow-lift">
           <IconSearch className="size-[20px] text-gray-100" />
         </IconBox>
       </header>
 
       {/* Messages */}
-      <div className="absolute bottom-[120px] left-0 right-0 top-[129px] overflow-y-auto px-[16px] py-[12px]">
+      <div style={scrollFade(129)} className="absolute bottom-[120px] left-0 right-0 top-0 pt-[129px] overflow-y-auto px-[16px] py-[12px]">
         {messages.length === 0 ? (
           <p className="mt-12 text-center text-sm text-gray-60">
             No messages yet — say hi 👋

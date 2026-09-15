@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import {
+  scrollFade,
   IconBox,
   RecordItem,
   AddRecordModal,
@@ -80,7 +81,7 @@ export default function FamilyRecordsPage({ onOpenVisit }: { onOpenVisit?: (id: 
           Records
         </span>
         <div className="flex items-center gap-[12px]">
-          <IconBox size={42} aria-label="Search records">
+          <IconBox size={42} aria-label="Search records" className="shadow-lift">
             <IconSearch className="size-[24px] text-gray-100" />
           </IconBox>
           <button
@@ -133,7 +134,7 @@ export default function FamilyRecordsPage({ onOpenVisit }: { onOpenVisit?: (id: 
       </div>
 
       {/* Owner summary card + records list — scrollable */}
-      <div className="absolute bottom-[40px] left-0 right-0 top-[163px] overflow-y-auto px-[25px] pb-[24px]">
+      <div style={scrollFade(163)} className="absolute bottom-[40px] left-0 right-0 top-0 pt-[163px] overflow-y-auto px-[25px] pb-[24px]">
         {/* Purple summary card */}
         <div className="flex h-[70px] items-center gap-[12px] rounded-[12px] bg-brand-primary px-[12px] pr-[16px]">
           <span className="flex size-[48px] shrink-0 items-center justify-center rounded-[10px] bg-brand-tint-1">

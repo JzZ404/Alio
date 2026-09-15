@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
 import {
   IconBox,
+  scrollFade,
   PatientSwitcher,
   AudioBubble,
   TaskCard,
@@ -541,13 +542,13 @@ export default function LogsPage({
           patients={SAMPLE_PATIENTS}
           activeId={activePatientId}
           onChange={setActivePatientId}
-          className="w-fit rounded-[10px] shadow-[0_2px_10px_rgba(10,10,10,0.08)]"
+          className="w-fit rounded-[10px] shadow-lift"
         />
         <div className="flex items-center gap-3">
           <IconBox
             size={42}
             aria-label="Search"
-            className="shadow-[0_2px_10px_rgba(10,10,10,0.08)]"
+            className="shadow-lift"
           >
             <IconSearch className="size-6 text-gray-100" />
           </IconBox>
@@ -559,7 +560,7 @@ export default function LogsPage({
             size={42}
             aria-label="Open log history"
             onClick={openHistory}
-            className="shadow-[0_2px_10px_rgba(10,10,10,0.08)]"
+            className="shadow-lift"
           >
             <IconHistory className="size-6 text-gray-100" />
           </IconBox>
@@ -568,17 +569,7 @@ export default function LogsPage({
 
       {/* Main background — today's report, filling in as notes land. */}
       <div
-        style={{
-          bottom: dockHeight + 6,
-          // Fade at both ends rather than clipping: a hard scroll edge reads as
-          // the card being sliced. The scroller runs the full height and pads
-          // the header's space, so cards pass under the buttons and dissolve
-          // instead of stopping at an invisible line.
-          WebkitMaskImage:
-            'linear-gradient(to bottom, transparent 96px, #000 126px, #000 calc(100% - 44px), transparent)',
-          maskImage:
-            'linear-gradient(to bottom, transparent 96px, #000 126px, #000 calc(100% - 44px), transparent)',
-        }}
+        style={{ bottom: dockHeight + 6, ...scrollFade(126) }}
         className="absolute left-0 right-0 top-0 overflow-y-auto px-[22px] pt-[132px] pb-[16px]"
       >
         <VisitReportDraft

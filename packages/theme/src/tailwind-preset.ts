@@ -1,5 +1,5 @@
 import type { Config } from 'tailwindcss';
-import { colors, fontFamily, fontSize, borderRadius, backgroundImage } from './tokens';
+import { colors, fontFamily, fontSize, borderRadius, backgroundImage, boxShadow } from './tokens';
 
 export const tailwindPreset: Partial<Config> = {
   theme: {
@@ -30,6 +30,9 @@ export const tailwindPreset: Partial<Config> = {
       },
       backgroundImage: {
         app: backgroundImage.app,
+      },
+      boxShadow: {
+        lift: boxShadow.lift,
       },
       fontFamily: {
         sans: fontFamily.sans,
