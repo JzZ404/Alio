@@ -6,6 +6,9 @@ import clsx from 'clsx';
 /** How far you have to drag before the sheet changes state. */
 const SNAP_PX = 48;
 
+/** Under this much movement the press counts as a tap, not a drag. */
+const TAP_PX = 6;
+
 /** Height of the grab handle strip. Mostly hit area — the grabber itself
  * sits at its bottom edge so it reads as belonging to the pill below. */
 const HANDLE_H = 26;
@@ -76,11 +79,21 @@ export function PullUpSheet({
     setDragY(open ? Math.max(0, dy) : Math.min(0, dy));
   };
 
-  const endDrag = () => {
+  /** Release. `commit` is false for cancel/leave, where the gesture never
+   * really finished. Tap and drag both resolve here — the handle has no
+   * `onClick`, because a click fires after a drag too and was toggling the
+   * sheet straight back shut the moment a pull-up snapped it open. */
+  const endDrag = (commit: boolean) => {
     if (startY.current === null) return;
     const dy = dragY;
     startY.current = null;
     setDragY(0);
+    if (!commit) return;
+    // Barely moved — that was a tap, and a tap toggles.
+    if (Math.abs(dy) < TAP_PX) {
+      onOpenChange(!open);
+      return;
+    }
     // Inclusive: at exactly the threshold the surface is fully revealed, so
     // releasing there has to commit or the visual is lying.
     if (!open && dy <= -SNAP_PX) onOpenChange(true);
@@ -130,10 +143,9 @@ export function PullUpSheet({
         aria-expanded={open}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
-        onPointerLeave={endDrag}
-        onClick={() => onOpenChange(!open)}
+        onPointerUp={() => endDrag(true)}
+        onPointerCancel={() => endDrag(false)}
+        onPointerLeave={() => endDrag(false)}
         style={{ height: HANDLE_H }}
         className="relative z-10 flex w-full shrink-0 touch-none select-none items-end justify-center pb-[6px]"
       >

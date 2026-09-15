@@ -591,6 +591,21 @@ export default function LogsPage({
         />
       </div>
 
+      {/* Tapping the report behind dismisses whatever is up — the sheet, or
+        * the keyboard. Sits under the sheet (z-10) and over the report so the
+        * press lands here instead of opening a section editor by accident. */}
+      {(panelOpen || typing) && (
+        <button
+          type="button"
+          aria-label={panelOpen ? 'Close conversation' : 'Back to voice'}
+          onClick={() => {
+            if (panelOpen) setPanelOpen(false);
+            else setTyping(false);
+          }}
+          className="absolute inset-0 z-[5] cursor-default"
+        />
+      )}
+
       {/* Conversation and the voice dock share one surface — the dock is not a
         * card sitting on a drawer, it is the drawer's own bottom edge. */}
       {(
@@ -605,7 +620,7 @@ export default function LogsPage({
             <VoiceDock
               mode={barMode}
               value={draft}
-              onChange={typing ? setDraft : () => setTyping(false)}
+              onChange={setDraft}
               caption={recording ? liveTranscript || undefined : dockCaption || undefined}
               onHoldStart={handlePressToSpeak}
               onHoldEnd={handleDone}

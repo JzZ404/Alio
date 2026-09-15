@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { IconPlus, IconMicrophone, IconArrowUp, IconChevronLeft } from './icons';
+// IconMicrophone is still used by the right-hand mic and the recording state.
 
 /** Below this, a press counts as a tap (open the keyboard); above it, the press
  * is a hold and starts recording. */
@@ -113,26 +114,19 @@ export function VoiceDock({
           recording ? 'bg-brand-tint-1/85' : 'bg-gray-10/80',
         )}
       >
-        {typing ? (
-          <button
-            type="button"
-            aria-label="Back to voice"
-            onClick={() => onChange('')}
-            className="flex size-[36px] shrink-0 items-center justify-center rounded-full border border-brand-border transition-transform active:scale-95"
-          >
-            <IconMicrophone className="size-[18px] text-brand-primary" />
-          </button>
-        ) : (
-          <button
-            type="button"
-            aria-label="Attach"
-            onClick={onPlus}
-            disabled={recording}
-            className="flex size-[36px] shrink-0 items-center justify-center rounded-full border border-brand-border transition-transform active:scale-95 disabled:opacity-40"
-          >
-            <IconPlus className="size-[18px] text-brand-primary" />
-          </button>
-        )}
+        {/* Attach stays put in both modes. Typing used to swap it for a mic —
+          * but the way back to voice is tapping off the pill, and a control
+          * that changes meaning under your thumb is worse than one that
+          * doesn't move. */}
+        <button
+          type="button"
+          aria-label="Attach"
+          onClick={onPlus}
+          disabled={recording}
+          className="flex size-[36px] shrink-0 items-center justify-center rounded-full border border-brand-border transition-transform active:scale-95 disabled:opacity-40"
+        >
+          <IconPlus className="size-[18px] text-brand-primary" />
+        </button>
 
         {typing ? (
           <input
