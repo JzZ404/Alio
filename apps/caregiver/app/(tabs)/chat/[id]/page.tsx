@@ -55,7 +55,7 @@ export default function ChatConversationPage({ id: propId, onBack }: { id?: stri
       <header className="absolute left-[25px] right-[25px] top-[60px] z-10 flex items-center gap-[12px]">
         <IconBox
           size={42}
-          shape="pill"
+         
           aria-label="Back"
           onClick={handleBack}
         >
@@ -89,7 +89,7 @@ export default function ChatConversationPage({ id: propId, onBack }: { id?: stri
           </span>
         </div>
 
-        <IconBox size={42} shape="pill" aria-label="Search this conversation">
+        <IconBox size={42} aria-label="Search this conversation">
           <IconSearch className="size-[20px] text-gray-100" />
         </IconBox>
       </header>

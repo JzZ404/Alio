@@ -125,7 +125,7 @@ export default function FamilyChatConversationPage({ id: propId, onBack }: { id?
       <header className="absolute left-[25px] right-[25px] top-[60px] z-10 flex items-center gap-[12px]">
         <IconBox
           size={42}
-          shape="pill"
+         
           aria-label="Back"
           onClick={handleBack}
         >
@@ -159,7 +159,7 @@ export default function FamilyChatConversationPage({ id: propId, onBack }: { id?
           </span>
         </div>
 
-        <IconBox size={42} shape="pill" aria-label="Search this conversation">
+        <IconBox size={42} aria-label="Search this conversation">
           <IconSearch className="size-[20px] text-gray-100" />
         </IconBox>
       </header>

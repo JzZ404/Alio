@@ -20,10 +20,10 @@ export default function CaregiverChatPage({ onOpenThread }: { onOpenThread?: (id
           Chat
         </span>
         <div className="flex items-center gap-[12px]">
-          <IconBox size={42} shape="pill" aria-label="Search chats">
+          <IconBox size={42} aria-label="Search chats">
             <IconSearch className="size-[24px] text-gray-100" />
           </IconBox>
-          <IconBox size={42} shape="pill" aria-label="New chat">
+          <IconBox size={42} aria-label="New chat">
             <IconChat className="size-[24px] text-gray-100" />
           </IconBox>
         </div>
