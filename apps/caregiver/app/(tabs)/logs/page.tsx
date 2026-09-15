@@ -545,15 +545,12 @@ export default function LogsPage({
             <IconSearch className="size-6 text-gray-100" />
           </IconBox>
           {/* Past AI log sessions. Mode switching lives on the bottom-left
-           * keyboard/mic toggle, so this slot opens the history list. */}
-          <button
-            type="button"
-            aria-label="Open log history"
-            onClick={openHistory}
-            className="flex size-[42px] items-center justify-center rounded-[12px] bg-brand-primary transition-transform active:scale-95"
-          >
-            <IconHistory className="size-6 text-white" />
-          </button>
+           * keyboard/mic toggle, so this slot opens the history list. Same
+           * tint as Search — both are ways of looking things up, and the one
+           * filled button on the screen should be the sign-off. */}
+          <IconBox size={42} aria-label="Open log history" onClick={openHistory}>
+            <IconHistory className="size-6 text-gray-100" />
+          </IconBox>
         </div>
       </header>
 
@@ -579,24 +576,20 @@ export default function LogsPage({
           filling={recordState === 'saving'}
           onEdit={handleEditField}
           onEditVitals={handleEditVitals}
+          action={
+            <button
+              type="button"
+              onClick={handleCompile}
+              disabled={compileState !== 'idle' || recordState !== 'idle'}
+              aria-label="Send to family"
+              title="Send to family"
+              className="flex size-[44px] shrink-0 items-center justify-center rounded-full bg-brand-primary shadow-[0_2px_14px_rgba(94,105,246,0.40)] transition-transform active:scale-95 disabled:opacity-50"
+            >
+              <IconSendMessage className="size-[20px] text-gray-10" />
+            </button>
+          }
         />
       </div>
-
-      {/* Send to family belongs to the report, not the conversation, so it
-        * sits above the dock and steps aside while the sheet is up. */}
-      {!panelOpen && (
-        <button
-          type="button"
-          onClick={handleCompile}
-          disabled={compileState !== 'idle' || recordState !== 'idle'}
-          aria-label="Send to family"
-          title="Send to family"
-          style={{ bottom: dockHeight + 12 }}
-          className="absolute right-[20px] z-20 flex size-[48px] items-center justify-center rounded-full bg-brand-primary shadow-[0_2px_14px_rgba(94,105,246,0.40)] transition-transform active:scale-95 disabled:opacity-50"
-        >
-          <IconSendMessage className="size-[22px] text-gray-10" />
-        </button>
-      )}
 
       {/* Conversation and the voice dock share one surface — the dock is not a
         * card sitting on a drawer, it is the drawer's own bottom edge. */}

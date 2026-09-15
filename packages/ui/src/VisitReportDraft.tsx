@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import clsx from 'clsx';
 import {
   IconPills,
@@ -52,6 +52,7 @@ export function VisitReportDraft({
   filling,
   onEdit,
   onEditVitals,
+  action,
   className,
 }: {
   patientName: string;
@@ -62,6 +63,8 @@ export function VisitReportDraft({
   filling?: boolean;
   onEdit?: (field: DraftField, value: string) => void;
   onEditVitals?: (v: VitalReadings) => void;
+  /** Top-right slot of the report header — the sign-off control. */
+  action?: ReactNode;
   className?: string;
 }) {
   const anyVital = Boolean(draft.vitals.bp || draft.vitals.pulse || draft.vitals.temp);
@@ -69,16 +72,21 @@ export function VisitReportDraft({
 
   return (
     <div className={clsx('flex flex-col', className)}>
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="text-[20px] font-bold text-black">Visit・{patientName}</p>
-        <span className="shrink-0 text-[12px] font-bold text-gray-60 tabular-nums">
-          {filledCount}/3
-        </span>
+      {/* The date leads: the patient's name already sits in the switcher at the
+        * top-left, so repeating it at full size said the same thing twice. */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[20px] font-bold text-black">
+            {dateLabel}
+            {timeLabel ? `・${timeLabel}` : ''}
+          </p>
+          <p className="mt-1 text-[13px] text-gray-60">
+            Visit・{patientName}
+            <span className="ml-2 font-bold tabular-nums">{filledCount}/3</span>
+          </p>
+        </div>
+        {action}
       </div>
-      <p className="mt-1 text-[14px] text-gray-60">
-        {dateLabel}
-        {timeLabel ? `・${timeLabel}` : ''}
-      </p>
 
       <SummaryCard
         value={draft.summary}
