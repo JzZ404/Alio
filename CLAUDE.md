@@ -16,7 +16,7 @@ Three portals:
 
 ## Scope of this folder
 
-**UI-only prototype.** Translate hi-fi Figma screens into a clickable, demoable Next.js app.
+**Prototype with a live data layer.** It began as a UI-only translation of hi-fi Figma screens; Phase 2 (May 2026) wired FastAPI, Gemma and Supabase behind the caregiver and family apps. Screens still start from Figma.
 
 Build:
 - Screens at full visual fidelity to Figma
@@ -26,12 +26,10 @@ Build:
 
 **Never** build:
 - Auth, sessions, login flows (stubbed with "Continue" button)
-- Supabase, database, persistence
-- FastAPI, Gemma, real AI calls
 - Real notifications, push, SMS
 - App Store submission code
 
-Engineer wires real backend later. This folder is UI only.
+Backend and schema work is in scope when a feature spec calls for it — e.g. `docs/superpowers/specs/2026-09-15-pending-confirmations-design.md`. Schema changes go in `supabase/schema.sql`, guarded so they are safe to re-run, and are applied by hand in the Supabase SQL editor after telling the team.
 
 ## Stack
 
@@ -89,7 +87,7 @@ For demo-able prototype, fake these convincingly:
 - **Auth/onboarding** → single "Continue" button enters the app, no real form
 - **Voice recording** → fake waveform animation + hardcoded transcript reveal on a timer
 - **Live caregiver tracking (Family Home)** → static map image with a CSS-animated marker
-- **Real-time chat** → pre-seeded message threads, fake "typing..." animations, timed "new message" arrivals
+- **Real-time chat** → pre-seeded message threads, fake "typing..." animations, timed "new message" arrivals — except the Sarah ↔ Janet care thread (`caregiver-001__erin-yeung`), which is live over Supabase realtime
 - **AI chat responses (Family AI Check / Caregiver AI Log)** → hardcoded conversation flows, simulated typing delay
 - **Medication alerts** → triggered by timer or button, not real time
 - **Patient vitals** → static values pulled from `packages/mock-data`
@@ -98,7 +96,7 @@ The look and feel of "alive" matters. The data underneath doesn't.
 
 ## "Never do" rules
 
-- Never write backend code (Supabase, FastAPI, auth, real API calls)
+- Never add auth, sessions or login flows — identities stay hardcoded until auth is its own project
 - Never invent product copy without asking the user
 - Never hardcode design values — always tokens
 - Never skip the screenshot diff before committing a screen

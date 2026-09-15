@@ -116,3 +116,47 @@ create policy "family_messages anon insert" on family_messages for insert with c
 
 create policy "compiled_reports anon read"   on compiled_reports for select using (true);
 create policy "compiled_reports anon insert" on compiled_reports for insert with check (true);
+
+-- =============================================================
+-- Pending Confirmations
+-- docs/superpowers/specs/2026-09-15-pending-confirmations-design.md §6
+--
+-- No new tables. suggested_tier and final_tier stay separate on purpose: the
+-- gap between them is the adoption rate and the miss rate.
+-- Safe to re-run: every statement is guarded.
+-- =============================================================
+alter table family_messages add column if not exists sender_id text;
+alter table family_messages add column if not exists recipient_id text;
+alter table family_messages add column if not exists final_tier text
+  check (final_tier in ('action', 'fyi', 'social'));
+alter table family_messages add column if not exists tagged_by text
+  check (tagged_by in ('sender_manual', 'sender_confirmed_ai'));
+alter table family_messages add column if not exists suggested_tier text
+  check (suggested_tier in ('action', 'fyi', 'social'));
+alter table family_messages add column if not exists suggested_by text
+  check (suggested_by in ('model'));
+alter table family_messages add column if not exists acknowledged_at timestamptz;
+alter table family_messages add column if not exists acknowledged_by text;
+alter table family_messages add column if not exists followup_sent_at timestamptz;
+
+-- Every row written to the live thread before sender_id existed came from the
+-- caregiver app's "Send to family" button, so its direction is known.
+update family_messages
+  set sender_id = 'caregiver-001', recipient_id = 'janet-chen'
+  where thread_id = 'caregiver-001__erin-yeung' and sender_id is null;
+
+-- The Pending list is a view over this index, not a store (spec §1).
+create index if not exists family_messages_pending_idx
+  on family_messages (recipient_id, created_at)
+  where final_tier = 'action' and acknowledged_at is null;
+
+-- Confirm is the only update the browser may make: two columns, only on an
+-- unconfirmed "Needs response" message, and never back to unconfirmed.
+revoke update on family_messages from anon, authenticated;
+grant update (acknowledged_at, acknowledged_by) on family_messages to anon, authenticated;
+
+drop policy if exists "family_messages anon acknowledge" on family_messages;
+create policy "family_messages anon acknowledge" on family_messages
+  for update
+  using (final_tier = 'action' and acknowledged_at is null)
+  with check (acknowledged_at is not null);

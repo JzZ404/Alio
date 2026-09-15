@@ -169,10 +169,21 @@ supabase_realtime add table family_messages`).
 |---|---|---|
 | `id` | uuid | pk |
 | `thread_id` | text | derived as `${caregiver_id}__${patient_id}` for the Sarah↔Janet thread |
-| `sender` | text | "Sarah Lee" |
+| `sender` | text | display name, e.g. "Sarah Lee" |
+| `sender_id` / `recipient_id` | text \| null | `'caregiver-001'` / `'janet-chen'` for the live thread; null on rows from other writers |
+| `final_tier` | text \| null | `'action'` = the sender marked it **Needs response**. Only this drives Pending surfaces |
+| `tagged_by` | text \| null | `'sender_manual'` today; `'sender_confirmed_ai'` once suggestions ship |
+| `suggested_tier` / `suggested_by` | text \| null | model output — never drives Pending. Reserved for the suggestion plan |
+| `acknowledged_at` / `acknowledged_by` | timestamptz / text \| null | set by **Confirm**. The only columns the browser may update |
+| `followup_sent_at` | timestamptz \| null | reserved for the timeout follow-up plan |
 | `text` | text | plain-text body (Gemma-formatted for report messages) |
 | `report_id` | uuid \| null | when present, family chat renders ReportCard instead of ChatBubble |
 | `created_at` | timestamptz | default `now()` |
+
+The Pending list, the chat pinned bar and the Home bell are all the same query —
+`recipient_id = me and final_tier = 'action' and acknowledged_at is null`, oldest
+first — backed by `family_messages_pending_idx`. See
+`docs/superpowers/specs/2026-09-15-pending-confirmations-design.md`.
 
 Row-level security on all three tables is `using (true)` / `with check
 (true)` — anyone with the anon key can read and insert. Tighten before
