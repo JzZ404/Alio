@@ -535,20 +535,32 @@ export default function LogsPage({
       className="relative h-full overflow-hidden"
     >
       <header className="absolute left-[25px] right-[25px] top-[60px] z-10 flex items-center justify-between gap-3">
+        {/* The three controls float over the report — no bar behind them, just
+          * a soft lift so they stay legible as cards scroll underneath. */}
         <PatientSwitcher
           patients={SAMPLE_PATIENTS}
           activeId={activePatientId}
           onChange={setActivePatientId}
+          className="w-fit rounded-[10px] shadow-[0_2px_10px_rgba(10,10,10,0.08)]"
         />
         <div className="flex items-center gap-3">
-          <IconBox size={42} aria-label="Search">
+          <IconBox
+            size={42}
+            aria-label="Search"
+            className="shadow-[0_2px_10px_rgba(10,10,10,0.08)]"
+          >
             <IconSearch className="size-6 text-gray-100" />
           </IconBox>
           {/* Past AI log sessions. Mode switching lives on the bottom-left
            * keyboard/mic toggle, so this slot opens the history list. Same
            * tint as Search — both are ways of looking things up, and the one
            * filled button on the screen should be the sign-off. */}
-          <IconBox size={42} aria-label="Open log history" onClick={openHistory}>
+          <IconBox
+            size={42}
+            aria-label="Open log history"
+            onClick={openHistory}
+            className="shadow-[0_2px_10px_rgba(10,10,10,0.08)]"
+          >
             <IconHistory className="size-6 text-gray-100" />
           </IconBox>
         </div>
@@ -558,12 +570,16 @@ export default function LogsPage({
       <div
         style={{
           bottom: dockHeight + 6,
-          // Fade the last card out rather than clipping it mid-row: a hard
-          // scroll edge under the pill reads as the card being sliced.
-          WebkitMaskImage: 'linear-gradient(to bottom, #000 calc(100% - 44px), transparent)',
-          maskImage: 'linear-gradient(to bottom, #000 calc(100% - 44px), transparent)',
+          // Fade at both ends rather than clipping: a hard scroll edge reads as
+          // the card being sliced. The scroller runs the full height and pads
+          // the header's space, so cards pass under the buttons and dissolve
+          // instead of stopping at an invisible line.
+          WebkitMaskImage:
+            'linear-gradient(to bottom, transparent 96px, #000 126px, #000 calc(100% - 44px), transparent)',
+          maskImage:
+            'linear-gradient(to bottom, transparent 96px, #000 126px, #000 calc(100% - 44px), transparent)',
         }}
-        className="absolute left-0 right-0 top-[122px] overflow-y-auto px-[22px] pt-[10px] pb-[16px]"
+        className="absolute left-0 right-0 top-0 overflow-y-auto px-[22px] pt-[132px] pb-[16px]"
       >
         <VisitReportDraft
           patientName={activePatient?.name ?? 'Patient'}
