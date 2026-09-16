@@ -48,6 +48,9 @@ export const backgroundImage = {
  * and reads as a filled band rather than a raised control. */
 export const boxShadow = {
   lift: '0 2px 10px rgba(10, 10, 10, 0.08)',
+  /** The voice pill. Wider than a 42px button, so the same blur reads as a
+   * filled strip under it — this one is tighter and fainter. */
+  dock: '0 1px 6px rgba(10, 10, 10, 0.05)',
 } as const;
 
 export const fontFamily = {

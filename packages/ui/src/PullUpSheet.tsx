@@ -150,7 +150,7 @@ export function PullUpSheet({
         onPointerUp={() => endDrag(true)}
         onPointerCancel={() => endDrag(false)}
         style={{ height: HANDLE_H }}
-        className="relative z-10 flex w-full shrink-0 touch-none select-none items-end justify-center pb-[6px]"
+        className="relative z-10 flex w-full shrink-0 touch-none select-none items-end justify-center pb-[2px]"
       >
         <span className="h-[4px] w-[38px] rounded-full bg-gray-60" />
       </button>
@@ -171,7 +171,7 @@ export function PullUpSheet({
       </div>
 
       {/* The control the sheet wraps. Always visible; forms the bottom edge. */}
-      <div ref={footerRef} className="relative z-10 shrink-0 px-[12px] pb-[14px] pt-[4px]">
+      <div ref={footerRef} className="relative z-10 shrink-0 px-[12px] pb-[14px] pt-[2px]">
         {footer}
       </div>
     </div>

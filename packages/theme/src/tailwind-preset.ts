@@ -33,6 +33,7 @@ export const tailwindPreset: Partial<Config> = {
       },
       boxShadow: {
         lift: boxShadow.lift,
+        dock: boxShadow.dock,
       },
       fontFamily: {
         sans: fontFamily.sans,

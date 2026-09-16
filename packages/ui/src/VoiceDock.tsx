@@ -107,7 +107,7 @@ export function VoiceDock({
           'flex h-[52px] items-center gap-[10px] rounded-full px-[8px] transition-colors',
           // Lift, not a band: a large Y offset smears the shadow onto whatever
           // is behind and reads as a filled strip rather than a raised pill.
-          'shadow-[0_2px_10px_rgba(10,10,10,0.08)]',
+          'shadow-dock',
           // Frosted rather than opaque, so a report card passing underneath
           // reads as continuing behind the pill instead of being cut off.
           'backdrop-blur-xl',
