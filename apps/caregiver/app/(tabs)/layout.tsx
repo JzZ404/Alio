@@ -43,11 +43,38 @@ export default function TabsLayout({ children }: { children: ReactNode }) {
   const pathTab = segments[0] as Tab;
   const [active, setActive] = useState<Tab>(TABS.includes(pathTab) ? pathTab : 'home');
   const [subPage, setSubPage] = useState<SubPage>(null);
+  // Which way the last navigation went, so the arriving screen animates in from
+  // the side it came from. Tab switches imply no direction and simply lift.
+  const [direction, setDirection] = useState<'forward' | 'back' | 'fade'>('fade');
+
+  const open = (next: Exclude<SubPage, null>) => {
+    setDirection('forward');
+    setSubPage(next);
+  };
+  const goBack = (next: SubPage = null) => {
+    setDirection('back');
+    setSubPage(next);
+  };
+  const switchTab = (tab: Tab) => {
+    setDirection('fade');
+    setActive(tab);
+  };
 
   useEffect(() => {
     if (TABS.includes(pathTab)) setActive(pathTab);
     setSubPage(null);
   }, [pathname]);
+
+  // Changing this key restarts the animation on every navigation.
+  const screenKey = subPage
+    ? `${subPage.type}:${'id' in subPage ? subPage.id : subPage.tab}`
+    : `tab:${active}`;
+  const screenAnimation =
+    direction === 'forward'
+      ? 'animate-screen-in-right'
+      : direction === 'back'
+        ? 'animate-screen-in-left'
+        : 'animate-screen-fade';
 
   const activeIdx = tabs.findIndex(t => t.id === active);
   const isFirst = activeIdx === 0;
@@ -59,13 +86,15 @@ export default function TabsLayout({ children }: { children: ReactNode }) {
     <MobileFrame>
       <div className="relative h-full overflow-hidden">
         <div className="absolute inset-0 bottom-[85px] overflow-y-auto">
-          {subPage?.type === 'chat'    && <ChatDetail   id={subPage.id} focusMessageId={subPage.focusMessageId} onBack={() => setSubPage(subPage.from === 'pending' ? { type: 'pending', tab: 'pending' } : null)} />}
-          {subPage?.type === 'report'  && <ReportDetail id={subPage.id} onBack={() => setSubPage(null)} />}
-          {subPage?.type === 'pending' && <PendingScreen initialTab={subPage.tab} onBack={() => setSubPage(null)} onOpenMessage={(m) => { const chatId = CAREGIVER_THREAD_FOR_SUPABASE[m.threadId]; if (chatId) setSubPage({ type: 'chat', id: chatId, focusMessageId: m.id, from: 'pending' }); }} />}
-          {!subPage && active === 'home'     && <HomeTab onOpenPending={() => setSubPage({ type: 'pending', tab: 'pending' })} />}
-          {!subPage && active === 'logs'     && <LogsTab    onOpenReport={(id) => setSubPage({ type: 'report', id })} />}
-          {!subPage && active === 'chat'     && <ChatTab    onOpenThread={(id) => setSubPage({ type: 'chat',   id })} onOpenPending={(tab) => setSubPage({ type: 'pending', tab })} />}
+          <div key={screenKey} className={`h-full ${screenAnimation}`}>
+          {subPage?.type === 'chat'    && <ChatDetail   id={subPage.id} focusMessageId={subPage.focusMessageId} onBack={() => goBack(subPage.from === 'pending' ? { type: 'pending', tab: 'pending' } : null)} />}
+          {subPage?.type === 'report'  && <ReportDetail id={subPage.id} onBack={() => goBack()} />}
+          {subPage?.type === 'pending' && <PendingScreen initialTab={subPage.tab} onBack={() => goBack()} onOpenMessage={(m) => { const chatId = CAREGIVER_THREAD_FOR_SUPABASE[m.threadId]; if (chatId) open({ type: 'chat', id: chatId, focusMessageId: m.id, from: 'pending' }); }} />}
+          {!subPage && active === 'home'     && <HomeTab onOpenPending={() => open({ type: 'pending', tab: 'pending' })} />}
+          {!subPage && active === 'logs'     && <LogsTab    onOpenReport={(id) => open({ type: 'report', id })} />}
+          {!subPage && active === 'chat'     && <ChatTab    onOpenThread={(id) => open({ type: 'chat',   id })} onOpenPending={(tab) => open({ type: 'pending', tab })} />}
           {!subPage && active === 'profiles' && <ProfilesTab />}
+          </div>
         </div>
 
         {(
@@ -82,7 +111,7 @@ export default function TabsLayout({ children }: { children: ReactNode }) {
             {tabs.map((tab, idx) => {
               const isActive = idx === activeIdx;
               return (
-                <button key={tab.id} onClick={() => setActive(tab.id)}
+                <button key={tab.id} onClick={() => switchTab(tab.id)}
                   className="relative z-10 flex flex-1 flex-col items-center justify-center gap-1">
                   <tab.Icon className={`size-6 ${isActive ? 'text-brand-active' : 'text-gray-100'}`} />
                   <span className={`text-[11.5px] font-bold leading-none ${isActive ? 'text-brand-active' : 'text-gray-100'}`}>

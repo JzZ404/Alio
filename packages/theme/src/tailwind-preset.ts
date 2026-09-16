@@ -41,9 +41,27 @@ export const tailwindPreset: Partial<Config> = {
           from: { opacity: '0', transform: 'translateY(8px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
+        // Screen pushed on: arrives from the right, the way it was opened.
+        'screen-in-right': {
+          from: { opacity: '0', transform: 'translateX(24px)' },
+          to: { opacity: '1', transform: 'translateX(0)' },
+        },
+        // Screen returned to: arrives from the left, undoing the push.
+        'screen-in-left': {
+          from: { opacity: '0', transform: 'translateX(-24px)' },
+          to: { opacity: '1', transform: 'translateX(0)' },
+        },
+        // Tab switch: no direction to imply, so it simply lifts into place.
+        'screen-fade': {
+          from: { opacity: '0', transform: 'translateY(6px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
       },
       animation: {
         'tab-in': 'tab-in 260ms cubic-bezier(0.22, 1, 0.36, 1)',
+        'screen-in-right': 'screen-in-right 280ms cubic-bezier(0.22, 1, 0.36, 1)',
+        'screen-in-left': 'screen-in-left 280ms cubic-bezier(0.22, 1, 0.36, 1)',
+        'screen-fade': 'screen-fade 220ms cubic-bezier(0.22, 1, 0.36, 1)',
       },
       fontSize: fontSize as never,
       borderRadius: borderRadius as never,
