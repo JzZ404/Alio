@@ -43,6 +43,17 @@ describe('PendingCard', () => {
     fireEvent.click(screen.getByText(LONG_TEXT));
     expect(onOpen).toHaveBeenCalledWith(pending);
   });
+
+  it('exposes the card body as a button so it works without a pointer', () => {
+    const onOpen = vi.fn();
+    render(<PendingCard message={pending} now={NOW} onOpen={onOpen} onConfirm={() => {}} />);
+    const buttons = screen.getAllByRole('button');
+    expect(buttons.map((b) => b.textContent)).toContain('Confirm');
+    const body = buttons.find((b) => b.textContent?.includes(LONG_TEXT));
+    expect(body).toBeTruthy();
+    fireEvent.click(body!);
+    expect(onOpen).toHaveBeenCalledWith(pending);
+  });
 });
 
 describe('ConfirmedRow', () => {

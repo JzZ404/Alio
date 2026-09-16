@@ -32,19 +32,19 @@ export function PendingCard({
         leaving && 'translate-x-6 opacity-0',
       )}
     >
-      <div onClick={() => onOpen(message)}>
-        <div className="flex items-center justify-between">
+      <button type="button" onClick={() => onOpen(message)} className="block w-full text-left">
+        <span className="flex items-center justify-between">
           <span className="text-[15px] font-bold text-gray-100">
             {personLabel(message.senderId, message.senderName)}
           </span>
           <span className="rounded-full bg-brand-tint-1 px-[10px] py-[4px] text-[12px] font-bold text-brand-primary">
             {waitingLabel(message.createdAt, now)}
           </span>
-        </div>
-        <p className="mt-[12px] whitespace-pre-wrap text-[16px] leading-[1.45] text-gray-100">
+        </span>
+        <span className="mt-[12px] block whitespace-pre-wrap text-[16px] leading-[1.45] text-gray-100">
           {message.text}
-        </p>
-      </div>
+        </span>
+      </button>
       <button
         type="button"
         onClick={() => onConfirm(message.id)}
