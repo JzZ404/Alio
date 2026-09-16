@@ -162,6 +162,83 @@ then open http://localhost:3001/preview/pending
 
 ---
 
+## Re-plan — 2026-09-16 · `7b9d864`, `38bd474`
+
+Three caregiver screens arrived (Inbox, Pending, Confirmed). They disagreed with
+the written spec in three places, so the spec moved rather than the designs.
+
+**Purple, not amber** (`7b9d864`). The "Needs response" styling now resolves to
+brand values: pale purple surface, purple border, near-black text, purple icon.
+Confirm is `brand-active` rather than `brand-primary` — white on primary
+measures 4.35:1 and misses the accessibility floor; on active it is 5.18:1. The
+jumped-to highlight is the accent green at 3px, because that green measures only
+1.3:1 against these pale surfaces and a thin ring would vanish.
+
+**Spec revisions** (`38bd474`), each dated in the spec file:
+- The in-thread pinned bar is replaced by two cards pinned above the thread
+  list, always visible, each opening the Pending screen on its tab.
+- Waiting time always shows — minutes under an hour, then hours. The old rule
+  stayed silent under two hours, which would have rendered the design's
+  "Waiting 40m" as nothing.
+- Rows carry `name · relationship`; the Confirmed tab groups by day.
+- `inbox` came off the banned-terms list, for the chat-list header only. It was
+  banned for implying a mailbox separate from the conversation; these screens put
+  the cards above the threads in one place, so the objection does not apply.
+
+**Tasks 7-9 rewritten** to build the screens exactly, with the visual spec
+inline. The Home bell survives as a second door into the same screen.
+
+---
+
+## Tasks 7-9 — the three caregiver screens · `e026f85`, `298c651`, `11406d1`, `626e49b`, `55f0fde`, `c4326bf`
+
+**Task 7 — the data the screens need.** Waiting time now counts minutes
+(`Waiting 40m`, then `Waiting 3h`), plus `Oldest: 5h` for the section header and
+`Waiting since 9:14 AM` for the Inbox card. People gained relationships
+(`Emily · Granddaughter`), and confirmed items group by calendar day. Demo
+senders live in `apps/caregiver/lib/pending-fixtures.ts` — deliberately not in
+the shared `packages/mock-data`, which a teammate is editing on another branch.
+
+The review hand-checked the two subtle things and found both correct: grouping
+uses real calendar days rather than rolling 24-hour windows, and it survives a
+daylight-saving shift. What it did catch was the tests being too easy — every
+date used the same format, so a future mistake in date handling would have
+slipped through. One test now mixes formats where text order and time order
+disagree, and the test timezone is pinned.
+
+**Task 8 — the Pending and Confirmed screens.** Segmented tabs with a count
+badge, `WAITING ON YOU` beside `Oldest: 3h`, cards carrying the sender's
+relationship and a waiting pill above untruncated message text and a Confirm
+button, and confirmed rows grouped under `TODAY` / `YESTERDAY` / `EARLIER`
+behind check marks. Live messages and demo fixtures are merged and re-sorted
+together; a demo item can never reach the database (its id is prefixed `demo-`
+and that is checked before any write).
+
+The review caught a genuine accessibility gap: the tappable card body was a
+`div`, unreachable by keyboard, while `ChatListItem` next door already uses a
+real button. Fixed.
+
+**Task 9 — the Inbox.** The chat list header now reads `Inbox`, its second
+action is a filter, and two always-visible purple cards sit above the threads —
+each opening the Pending screen on its own tab. The Home bell opens the same
+screen. The counts on the cards read from the same merge the Pending screen
+uses, so they cannot disagree.
+
+**A styling bug found by looking, not by testing.** The Pending screen had a
+120px gap under its tabs. The cause was not spacing: `apps/caregiver/tailwind.config.ts`
+never scanned its own `components/` folder — the family app's config already
+did — so every class used only in `PendingScreen.tsx` was missing from the
+compiled stylesheet. The scroll container lost its position and fell down the
+page. Measured before: 288px. After (`c4326bf`): 178px, as written. Tests,
+typecheck and builds all passed the whole time; only opening the page in a
+browser found it.
+
+**Note for anyone running the app:** do not run `pnpm build` while `pnpm dev` is
+running for the same app. They share `.next/`, and the production build leaves
+the dev server serving broken chunks until you delete that folder and restart.
+
+---
+
 ## Outstanding — needs a human
 
 **Run the new SQL on Supabase.** Nothing else is blocked on it until the app is

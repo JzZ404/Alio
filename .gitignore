@@ -89,3 +89,4 @@ __pycache__/
 report_*.json
 med_log_*.txt
 chat_history.json
+.gstack/
