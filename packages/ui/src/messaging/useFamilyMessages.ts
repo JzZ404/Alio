@@ -9,8 +9,11 @@ export type MessageScope =
 
 /**
  * Live `family_messages` for one scope: an initial select, then realtime INSERT
- * and UPDATE merged by id. The channel opens before the select so nothing that
- * lands in between is lost; mergeMessage makes the overlap harmless.
+ * and UPDATE merged by id. The initial load runs only once the channel reports
+ * SUBSCRIBED, so no write can land in the gap between the snapshot and the
+ * subscription going live; if the socket drops and rejoins, SUBSCRIBED fires
+ * again and the reload heals whatever was missed while it was away, which is
+ * safe because mergeMessage merges by id.
  *
  * `patch` is for optimistic updates — a Confirm tap should not wait on the
  * network. `upsert` takes the row a write returned.
@@ -35,21 +38,7 @@ export function useFamilyMessages(client: SupabaseClient, scope: MessageScope | 
       if (!cancelled) setMessages((prev) => mergeMessage(prev, fromRow(row)));
     };
 
-    const channel = client
-      .channel(`family_messages:${filter}:${Math.random().toString(36).slice(2)}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'family_messages', filter },
-        (payload) => apply(payload.new as FamilyMessageRow),
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'family_messages', filter },
-        (payload) => apply(payload.new as FamilyMessageRow),
-      )
-      .subscribe();
-
-    (async () => {
+    const load = async () => {
       const base = client.from('family_messages').select('*');
       const query =
         scope.by === 'thread'
@@ -64,7 +53,24 @@ export function useFamilyMessages(client: SupabaseClient, scope: MessageScope | 
         return;
       }
       for (const row of (data ?? []) as FamilyMessageRow[]) apply(row);
-    })();
+    };
+
+    const channel = client
+      .channel(`family_messages:${filter}:${Math.random().toString(36).slice(2)}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'family_messages', filter },
+        (payload) => apply(payload.new as FamilyMessageRow),
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'family_messages', filter },
+        (payload) => apply(payload.new as FamilyMessageRow),
+      )
+      .subscribe((status) => {
+        if (status !== 'SUBSCRIBED') return;
+        void load();
+      });
 
     return () => {
       cancelled = true;
