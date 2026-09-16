@@ -25,7 +25,7 @@ export function NeedsResponseToggle({
       className={clsx(
         'flex size-[44px] shrink-0 items-center justify-center rounded-full transition-colors',
         pressed
-          ? 'bg-attention-surface text-attention-text ring-1 ring-attention-border'
+          ? 'bg-attention-surface text-brand-primary ring-1 ring-attention-border'
           : 'bg-white/70 text-gray-100 active:bg-white',
       )}
     >

@@ -42,12 +42,14 @@ export function MessageBubble({
             : isMine
               ? 'bg-brand-primary text-white'
               : 'bg-white text-gray-100',
-          highlighted && 'ring-2 ring-brand-primary ring-offset-2',
+          // Jumped-to from the Pending list: brand accent, thick enough to
+          // register — the accent green is only 1.3:1 against these surfaces.
+          highlighted && 'ring-[3px] ring-brand-accent ring-offset-2',
         )}
       >
         {needsResponse && (
           <p className="mb-[6px] flex items-center gap-[6px] text-[12px] font-bold">
-            <IconAttention aria-hidden className="size-[16px]" />
+            <IconAttention aria-hidden className="size-[16px] text-brand-primary" />
             Needs response
           </p>
         )}
@@ -56,7 +58,9 @@ export function MessageBubble({
           <button
             type="button"
             onClick={() => onConfirm?.(message.id)}
-            className="mt-[10px] h-[38px] w-full rounded-lg bg-gray-10 text-[14px] font-bold text-gray-100 transition-colors active:bg-gray-30"
+            // brand-active, not brand-primary: white on primary is 4.35:1 and
+            // misses AA; on active it is 5.18:1.
+            className="mt-[10px] h-[38px] w-full rounded-lg bg-brand-active text-[14px] font-bold text-white transition-colors active:bg-brand-primary"
           >
             Confirm
           </button>

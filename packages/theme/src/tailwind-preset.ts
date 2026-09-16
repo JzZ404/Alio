@@ -1,5 +1,5 @@
 import type { Config } from 'tailwindcss';
-import { colors, fontFamily, fontSize, borderRadius } from './tokens';
+import { attention, colors, fontFamily, fontSize, borderRadius } from './tokens';
 
 export const tailwindPreset: Partial<Config> = {
   theme: {
@@ -25,9 +25,9 @@ export const tailwindPreset: Partial<Config> = {
         alert: colors.alert.red,
         info: colors.info.blue,
         attention: {
-          surface: colors.attention.surface,
-          border: colors.attention.border,
-          text: colors.attention.text,
+          surface: attention.surface,
+          border: attention.border,
+          text: attention.text,
         },
       },
       fontFamily: {
