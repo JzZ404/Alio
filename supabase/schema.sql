@@ -184,6 +184,7 @@ grant update (final_tier, tagged_by, acknowledged_at, acknowledged_by, suggested
 
 drop policy if exists "family_messages anon acknowledge" on family_messages;
 drop policy if exists "family_messages anon mark pending" on family_messages;
+drop policy if exists "family_messages anon update" on family_messages;
 
 create policy "family_messages anon update" on family_messages
   for update using (true) with check (true);
