@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   ChatBubble,
+  FAMILY_MEMBER_ID,
   IconBox,
   IconChevronLeft,
   IconSearch,
@@ -12,24 +13,24 @@ import {
   IconReminder,
   IconRefresh,
   IconProfile,
+  MessageBubble,
+  NeedsResponseToggle,
+  SUPABASE_THREAD_FOR_FAMILY,
+  sendMessage,
+  useFamilyMessages,
 } from '@alio/ui';
 import {
   SAMPLE_FM_CHAT_THREADS,
   SAMPLE_FM_CONVERSATIONS,
   type ChatMessage,
 } from '@alio/mock-data';
-import { supabase, type FamilyMessageRow } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { ReportCard } from '@/components/ReportCard';
 
-// Map a family-side chat thread ID to the Supabase thread_id that the
-// caregiver app writes to. Add entries as more caregivers/patients come online.
-const SUPABASE_THREAD_FOR: Record<string, string | undefined> = {
-  'sarah-caregiver': 'caregiver-001__erin-yeung',
-};
-
 /**
- * Family Chat conversation — same layout as Caregiver Chat conversation,
- * just sourcing from the family fixture (`SAMPLE_FM_*`).
+ * Family Chat conversation — same layout as Caregiver Chat conversation.
+ * Threads with a Supabase mapping show mock history, then the live thread;
+ * sends are written to Supabase and can be marked Needs response.
  */
 export default function FamilyChatConversationPage({ id: propId, onBack }: { id?: string; onBack?: () => void } = {}) {
   const router = useRouter();
@@ -38,82 +39,41 @@ export default function FamilyChatConversationPage({ id: propId, onBack }: { id?
   const handleBack = onBack ?? (() => router.back());
 
   const thread = SAMPLE_FM_CHAT_THREADS.find((t) => t.id === id);
-  const initial = SAMPLE_FM_CONVERSATIONS[id] ?? [];
-  const supabaseThreadId = SUPABASE_THREAD_FOR[id];
+  const supabaseThreadId = SUPABASE_THREAD_FOR_FAMILY[id];
 
-  const [messages, setMessages] = useState<ChatMessage[]>(initial);
-  // messageId -> compiled_reports.id, for messages that should render as a
-  // structured ReportCard instead of a plain chat bubble.
-  const [reportIdByMessage, setReportIdByMessage] = useState<Record<string, string>>({});
+  const [mockMessages, setMockMessages] = useState<ChatMessage[]>(SAMPLE_FM_CONVERSATIONS[id] ?? []);
+  const { messages: live, upsert } = useFamilyMessages(
+    supabase,
+    supabaseThreadId ? { by: 'thread', threadId: supabaseThreadId } : null,
+  );
   const [draft, setDraft] = useState('');
+  const [needsResponse, setNeedsResponse] = useState(false);
+  const [sendError, setSendError] = useState('');
 
-  // Subscribe to live messages from the caregiver app via Supabase realtime.
-  // Initial fetch loads any messages we missed before the subscription opened.
-  useEffect(() => {
-    if (!supabaseThreadId) return;
-
-    let cancelled = false;
-    const seen = new Set<string>();
-
-    const toChatMessage = (row: FamilyMessageRow): ChatMessage => ({
-      id: row.id,
-      sender: 'them',
-      text: row.text,
-    });
-
-    (async () => {
-      const { data } = await supabase
-        .from('family_messages')
-        .select('*')
-        .eq('thread_id', supabaseThreadId)
-        .order('created_at');
-      if (cancelled || !data) return;
-      const fresh = (data as FamilyMessageRow[]).filter((r) => !seen.has(r.id));
-      fresh.forEach((r) => seen.add(r.id));
-      setMessages((prev) => [...prev, ...fresh.map(toChatMessage)]);
-      setReportIdByMessage((prev) => {
-        const next = { ...prev };
-        for (const r of fresh) if (r.report_id) next[r.id] = r.report_id;
-        return next;
-      });
-    })();
-
-    const channel = supabase
-      .channel(`family_messages:${supabaseThreadId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'family_messages',
-          filter: `thread_id=eq.${supabaseThreadId}`,
-        },
-        (payload) => {
-          const row = payload.new as FamilyMessageRow;
-          if (seen.has(row.id)) return;
-          seen.add(row.id);
-          setMessages((prev) => [...prev, toChatMessage(row)]);
-          if (row.report_id) {
-            setReportIdByMessage((prev) => ({ ...prev, [row.id]: row.report_id! }));
-          }
-        },
-      )
-      .subscribe();
-
-    return () => {
-      cancelled = true;
-      supabase.removeChannel(channel);
-    };
-  }, [supabaseThreadId]);
-
-  const handleSend = () => {
+  const handleSend = async () => {
     const text = draft.trim();
     if (!text) return;
-    setMessages((prev) => [
-      ...prev,
-      { id: `m-${Date.now()}`, sender: 'me', text },
-    ]);
     setDraft('');
+    if (!supabaseThreadId) {
+      setMockMessages((prev) => [...prev, { id: `m-${Date.now()}`, sender: 'me', text }]);
+      return;
+    }
+    try {
+      upsert(
+        await sendMessage(supabase, {
+          threadId: supabaseThreadId,
+          senderId: FAMILY_MEMBER_ID,
+          text,
+          needsResponse,
+        }),
+      );
+      setNeedsResponse(false);
+      setSendError('');
+    } catch (e) {
+      console.error(e);
+      setDraft(text);
+      setSendError("Message didn't send. Check your connection and try again.");
+    }
   };
 
   return (
@@ -169,23 +129,24 @@ export default function FamilyChatConversationPage({ id: propId, onBack }: { id?
 
       {/* Messages */}
       <div className="absolute bottom-[120px] left-0 right-0 top-[129px] overflow-y-auto px-[16px] py-[12px]">
-        {messages.length === 0 ? (
+        {mockMessages.length === 0 && live.length === 0 ? (
           <p className="mt-12 text-center text-sm text-gray-60">
             No messages yet — say hi 👋
           </p>
         ) : (
           <div className="flex flex-col gap-[12px]">
-            {messages.map((m) => {
-              const reportId = reportIdByMessage[m.id];
-              if (reportId) {
-                return (
-                  <div key={m.id} className="flex">
-                    <ReportCard reportId={reportId} />
-                  </div>
-                );
-              }
-              return <ChatBubble key={m.id} message={m} />;
-            })}
+            {mockMessages.map((m) => (
+              <ChatBubble key={m.id} message={m} />
+            ))}
+            {live.map((m) =>
+              m.reportId ? (
+                <div key={m.id} className="flex" data-message-id={m.id}>
+                  <ReportCard reportId={m.reportId} />
+                </div>
+              ) : (
+                <MessageBubble key={m.id} message={m} viewerId={FAMILY_MEMBER_ID} />
+              ),
+            )}
           </div>
         )}
       </div>
@@ -198,43 +159,58 @@ export default function FamilyChatConversationPage({ id: propId, onBack }: { id?
       </div>
 
       {/* Input row */}
-      <div className="absolute bottom-[16px] left-0 right-0 flex items-center gap-[10px] px-[16px]">
-        <button
-          type="button"
-          aria-label="Record voice message"
-          className="flex size-[44px] items-center justify-center rounded-full bg-white/70 transition-colors active:bg-white"
-        >
-          <IconMicrophone className="size-[22px] text-gray-100" />
-        </button>
-
-        <div className="flex h-[44px] flex-1 items-center gap-2 rounded-full bg-white/70 px-[14px]">
-          <input
-            type="text"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleSend();
-            }}
-            placeholder=""
-            className="flex-1 bg-transparent text-[14px] text-gray-100 placeholder:text-gray-60 outline-none"
-          />
+      <div className="absolute bottom-[16px] left-0 right-0 flex flex-col gap-[6px] px-[16px]">
+        {sendError && (
+          <p role="alert" className="text-center text-[12px] font-bold text-alert">
+            {sendError}
+          </p>
+        )}
+        <div className="flex items-center gap-[10px]">
           <button
             type="button"
-            aria-label="Insert emoji"
-            className="flex size-[24px] items-center justify-center text-gray-60"
+            aria-label="Record voice message"
+            className="flex size-[44px] items-center justify-center rounded-full bg-white/70 transition-colors active:bg-white"
           >
-            <span className="text-[18px]">☺</span>
+            <IconMicrophone className="size-[22px] text-gray-100" />
+          </button>
+
+          {supabaseThreadId && (
+            <NeedsResponseToggle
+              pressed={needsResponse}
+              onToggle={() => setNeedsResponse((v) => !v)}
+            />
+          )}
+
+          <div className="flex h-[44px] flex-1 items-center gap-2 rounded-full bg-white/70 px-[14px]">
+            <input
+              type="text"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                // isComposing: Enter that commits an IME candidate must not send.
+                if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleSend();
+              }}
+              placeholder=""
+              className="flex-1 bg-transparent text-[14px] text-gray-100 placeholder:text-gray-60 outline-none"
+            />
+            <button
+              type="button"
+              aria-label="Insert emoji"
+              className="flex size-[24px] items-center justify-center text-gray-60"
+            >
+              <span className="text-[18px]">☺</span>
+            </button>
+          </div>
+
+          <button
+            type="button"
+            aria-label="More actions"
+            onClick={handleSend}
+            className="flex size-[44px] items-center justify-center rounded-[12px] bg-white/70 transition-colors active:bg-white"
+          >
+            <IconPlus className="size-[22px] text-gray-100" />
           </button>
         </div>
-
-        <button
-          type="button"
-          aria-label="More actions"
-          onClick={handleSend}
-          className="flex size-[44px] items-center justify-center rounded-[12px] bg-white/70 transition-colors active:bg-white"
-        >
-          <IconPlus className="size-[22px] text-gray-100" />
-        </button>
       </div>
     </div>
   );

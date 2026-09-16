@@ -17,11 +17,3 @@ export interface CaregiverLogRow {
   urgent: boolean;
   created_at: string;
 }
-
-export interface FamilyMessageRow {
-  id: string;
-  thread_id: string;
-  sender: string;
-  text: string;
-  created_at: string;
-}

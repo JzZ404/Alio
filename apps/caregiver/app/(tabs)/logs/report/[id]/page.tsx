@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
+  CAREGIVER_ID,
+  FAMILY_MEMBER_ID,
   IconBox,
   IconChevronLeft,
 } from '@alio/ui';
@@ -68,6 +70,8 @@ export default function LogReportPage({ id: propId, onBack }: { id?: string; onB
       const { error: insertError } = await supabase.from('family_messages').insert({
         thread_id: threadIdFor(row.caregiver_id, row.patient_id),
         sender: CAREGIVER_NAME,
+        sender_id: CAREGIVER_ID,
+        recipient_id: FAMILY_MEMBER_ID,
         text,
         report_id: row.id,
       });
