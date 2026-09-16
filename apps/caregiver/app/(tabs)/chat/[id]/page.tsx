@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
+  CAREGIVER_ID,
   ChatBubble,
   IconBox,
   IconChevronLeft,
@@ -12,44 +13,112 @@ import {
   IconReminder,
   IconRefresh,
   IconProfile,
+  MessageBubble,
+  SUPABASE_THREAD_FOR_CAREGIVER,
+  acknowledgeMessage,
+  sendMessage,
+  useFamilyMessages,
 } from '@alio/ui';
 import {
   SAMPLE_CHAT_THREADS,
   SAMPLE_CONVERSATIONS,
   type ChatMessage,
 } from '@alio/mock-data';
+import { supabase } from '@/lib/supabase';
+
+const HIGHLIGHT_MS = 1600;
 
 /**
  * Caregiver Chat conversation — Figma: `GC - Chat - conversation` (388:3940).
  * Header with back + avatar + name + online + search, message bubbles
- * (right=me, left=them), quick actions row, input bar.
+ * (right=me, left=them), quick actions row, input bar. Threads with a Supabase
+ * mapping show mock history, then the live thread, where Needs response
+ * messages carry Confirm in the bubble.
  */
 export default function ChatConversationPage({
   id: propId,
   onBack,
-  // Accepted so the Pending screen can jump here; highlighting the target
-  // message is a later screen's job, not this one's.
-  focusMessageId: _focusMessageId,
-}: { id?: string; onBack?: () => void; focusMessageId?: string } = {}) {
+  focusMessageId,
+}: {
+  id?: string;
+  onBack?: () => void;
+  focusMessageId?: string;
+} = {}) {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const id = propId ?? params?.id ?? '';
   const handleBack = onBack ?? (() => router.back());
 
   const thread = SAMPLE_CHAT_THREADS.find((t) => t.id === id);
-  const initial = SAMPLE_CONVERSATIONS[id] ?? [];
+  const supabaseThreadId = SUPABASE_THREAD_FOR_CAREGIVER[id];
 
-  const [messages, setMessages] = useState<ChatMessage[]>(initial);
+  const [mockMessages, setMockMessages] = useState<ChatMessage[]>(SAMPLE_CONVERSATIONS[id] ?? []);
+  const { messages: live, patch, upsert } = useFamilyMessages(
+    supabase,
+    supabaseThreadId ? { by: 'thread', threadId: supabaseThreadId } : null,
+  );
   const [draft, setDraft] = useState('');
+  const [sendError, setSendError] = useState('');
 
-  const handleSend = () => {
+  // Jump-to-message from the Pending list: scroll the target bubble into
+  // view once it exists, then highlight it briefly. `live` is a dependency
+  // only so this retries once the realtime load populates the DOM node;
+  // `focusedRef` guards it so the scroll+highlight itself only ever fires
+  // once per target id, not on every subsequent message update.
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const focusedRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!focusMessageId || focusedRef.current === focusMessageId) return;
+    const el = document.querySelector(`[data-message-id="${focusMessageId}"]`);
+    if (!el) return;
+    focusedRef.current = focusMessageId;
+    el.scrollIntoView({ block: 'center' });
+    setHighlightedId(focusMessageId);
+  }, [focusMessageId, live]);
+
+  // Clears the highlight on its own clock, independent of the effect above,
+  // so a realtime message arriving mid-highlight can't cancel the fade-out.
+  useEffect(() => {
+    if (!highlightedId) return;
+    const timer = setTimeout(() => setHighlightedId(null), HIGHLIGHT_MS);
+    return () => clearTimeout(timer);
+  }, [highlightedId]);
+
+  const handleSend = async () => {
     const text = draft.trim();
     if (!text) return;
-    setMessages((prev) => [
-      ...prev,
-      { id: `m-${Date.now()}`, sender: 'me', text },
-    ]);
     setDraft('');
+    if (!supabaseThreadId) {
+      setMockMessages((prev) => [...prev, { id: `m-${Date.now()}`, sender: 'me', text }]);
+      return;
+    }
+    try {
+      upsert(
+        await sendMessage(supabase, {
+          threadId: supabaseThreadId,
+          senderId: CAREGIVER_ID,
+          text,
+          needsResponse: false,
+        }),
+      );
+      setSendError('');
+    } catch (e) {
+      console.error(e);
+      setDraft(text);
+      setSendError("Message didn't send. Check your connection and try again.");
+    }
+  };
+
+  const handleConfirm = async (messageId: string) => {
+    const at = new Date();
+    patch(messageId, { acknowledgedAt: at.toISOString() });
+    try {
+      await acknowledgeMessage(supabase, { messageId, userId: CAREGIVER_ID, at });
+    } catch (e) {
+      console.error(e);
+      patch(messageId, { acknowledgedAt: null });
+      setSendError("Couldn't confirm. Check your connection and tap Confirm again.");
+    }
   };
 
   return (
@@ -105,14 +174,23 @@ export default function ChatConversationPage({
 
       {/* Messages — start below header (60+42+27=129), end above quick actions */}
       <div className="absolute bottom-[120px] left-0 right-0 top-[129px] overflow-y-auto px-[16px] py-[12px]">
-        {messages.length === 0 ? (
+        {mockMessages.length === 0 && live.length === 0 ? (
           <p className="mt-12 text-center text-sm text-gray-60">
             No messages yet — say hi 👋
           </p>
         ) : (
           <div className="flex flex-col gap-[12px]">
-            {messages.map((m) => (
+            {mockMessages.map((m) => (
               <ChatBubble key={m.id} message={m} />
+            ))}
+            {live.map((m) => (
+              <MessageBubble
+                key={m.id}
+                message={m}
+                viewerId={CAREGIVER_ID}
+                onConfirm={handleConfirm}
+                highlighted={m.id === highlightedId}
+              />
             ))}
           </div>
         )}
@@ -124,6 +202,15 @@ export default function ChatConversationPage({
         <QuickAction icon={IconRefresh} label="Status Update" />
         <QuickAction icon={IconProfile} label="Contact" />
       </div>
+
+      {sendError && (
+        <p
+          role="alert"
+          className="absolute bottom-[112px] left-0 right-0 px-[16px] text-center text-[12px] font-bold text-alert"
+        >
+          {sendError}
+        </p>
+      )}
 
       {/* Input row — anchored above tab bar */}
       <div className="absolute bottom-[16px] left-0 right-0 flex items-center gap-[10px] px-[16px]">
@@ -141,7 +228,7 @@ export default function ChatConversationPage({
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') handleSend();
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleSend();
             }}
             placeholder=""
             className="flex-1 bg-transparent text-[14px] text-gray-100 placeholder:text-gray-60 outline-none"
