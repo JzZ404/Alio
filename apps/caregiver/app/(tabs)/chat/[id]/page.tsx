@@ -24,7 +24,13 @@ import {
  * Header with back + avatar + name + online + search, message bubbles
  * (right=me, left=them), quick actions row, input bar.
  */
-export default function ChatConversationPage({ id: propId, onBack }: { id?: string; onBack?: () => void } = {}) {
+export default function ChatConversationPage({
+  id: propId,
+  onBack,
+  // Accepted so the Pending screen can jump here; highlighting the target
+  // message is a later screen's job, not this one's.
+  focusMessageId: _focusMessageId,
+}: { id?: string; onBack?: () => void; focusMessageId?: string } = {}) {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const id = propId ?? params?.id ?? '';

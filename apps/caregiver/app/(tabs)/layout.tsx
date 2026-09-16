@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, type ReactNode } from 'react';
-import { MobileFrame } from '@alio/ui';
+import { MobileFrame, CAREGIVER_THREAD_FOR_SUPABASE } from '@alio/ui';
 import { usePathname } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { IconHome, IconMicrophone, IconChat, IconProfile } from '@alio/ui';
@@ -12,10 +12,18 @@ const ChatTab      = dynamic(() => import('./chat/page'),             { ssr: fal
 const ProfilesTab  = dynamic(() => import('./profiles/page'),         { ssr: false });
 const ChatDetail   = dynamic(() => import('./chat/[id]/page'),        { ssr: false });
 const ReportDetail = dynamic(() => import('./logs/report/[id]/page'), { ssr: false });
+const PendingScreen = dynamic(
+  () => import('@/components/PendingScreen').then((m) => m.PendingScreen),
+  { ssr: false },
+);
 
 const TABS = ['home', 'logs', 'chat', 'profiles'] as const;
 type Tab = typeof TABS[number];
-type SubPage = { type: 'chat'; id: string } | { type: 'report'; id: string } | null;
+type SubPage =
+  | { type: 'chat'; id: string; focusMessageId?: string; from?: 'pending' }
+  | { type: 'report'; id: string }
+  | { type: 'pending'; tab: 'pending' | 'confirmed' }
+  | null;
 
 const NAV_W = 365;
 const NAV_H = 69;
@@ -51,8 +59,9 @@ export default function TabsLayout({ children }: { children: ReactNode }) {
     <MobileFrame>
       <div className="relative h-full overflow-hidden">
         <div className="absolute inset-0 bottom-[85px] overflow-y-auto">
-          {subPage?.type === 'chat'   && <ChatDetail   id={subPage.id} onBack={() => setSubPage(null)} />}
-          {subPage?.type === 'report' && <ReportDetail id={subPage.id} onBack={() => setSubPage(null)} />}
+          {subPage?.type === 'chat'    && <ChatDetail   id={subPage.id} focusMessageId={subPage.focusMessageId} onBack={() => setSubPage(subPage.from === 'pending' ? { type: 'pending', tab: 'pending' } : null)} />}
+          {subPage?.type === 'report'  && <ReportDetail id={subPage.id} onBack={() => setSubPage(null)} />}
+          {subPage?.type === 'pending' && <PendingScreen initialTab={subPage.tab} onBack={() => setSubPage(null)} onOpenMessage={(m) => { const chatId = CAREGIVER_THREAD_FOR_SUPABASE[m.threadId]; if (chatId) setSubPage({ type: 'chat', id: chatId, focusMessageId: m.id, from: 'pending' }); }} />}
           {!subPage && active === 'home'     && <HomeTab />}
           {!subPage && active === 'logs'     && <LogsTab    onOpenReport={(id) => setSubPage({ type: 'report', id })} />}
           {!subPage && active === 'chat'     && <ChatTab    onOpenThread={(id) => setSubPage({ type: 'chat',   id })} />}

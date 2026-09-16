@@ -21,6 +21,9 @@ export { ChatListItem } from './ChatListItem';
 export { ChatBubble } from './ChatBubble';
 export { MessageBubble } from './MessageBubble';
 export { NeedsResponseToggle } from './NeedsResponseToggle';
+export { SegmentedTabs } from './SegmentedTabs';
+export { PendingCard } from './PendingCard';
+export { ConfirmedRow } from './ConfirmedRow';
 
 // Patient (caregiver Home + patient switcher)
 export { PatientCard } from './PatientCard';
