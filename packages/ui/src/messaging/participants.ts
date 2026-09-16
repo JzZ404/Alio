@@ -8,10 +8,28 @@ export const FAMILY_MEMBER_ID = 'janet-chen';
 
 export const CARE_THREAD_ID = 'caregiver-001__erin-yeung';
 
-export const DISPLAY_NAME: Record<string, string> = {
-  [CAREGIVER_ID]: 'Sarah Lee',
-  [FAMILY_MEMBER_ID]: 'Janet Chen',
+/**
+ * Prototype directory. Relationship is what the caregiver screens show beside a
+ * name ("Emily · Granddaughter"); it has no home in the database yet, so it
+ * lives here until a people table exists.
+ */
+export const PEOPLE: Record<string, { name: string; relationship: string }> = {
+  [CAREGIVER_ID]: { name: 'Sarah Lee', relationship: 'Caregiver' },
+  [FAMILY_MEMBER_ID]: { name: 'Janet Chen', relationship: 'Daughter' },
+  'emily-chen': { name: 'Emily', relationship: 'Granddaughter' },
+  'charles-chen': { name: 'Charles', relationship: 'Son' },
+  'miranda-chen': { name: 'Miranda', relationship: 'Daughter' },
 };
+
+export const DISPLAY_NAME: Record<string, string> = Object.fromEntries(
+  Object.entries(PEOPLE).map(([id, person]) => [id, person.name]),
+);
+
+/** "Emily · Granddaughter" for a known sender, the plain name otherwise. */
+export function personLabel(senderId: string | null, fallbackName: string): string {
+  const person = senderId === null ? undefined : PEOPLE[senderId];
+  return person ? `${person.name} · ${person.relationship}` : fallbackName;
+}
 
 /** Caregiver app chat-list thread id → Supabase thread_id. */
 export const SUPABASE_THREAD_FOR_CAREGIVER: Record<string, string | undefined> = {

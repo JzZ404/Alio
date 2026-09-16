@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ThreadMessage } from './types';
-import { CAREGIVER_ID, FAMILY_MEMBER_ID, otherParticipant } from './participants';
+import { CAREGIVER_ID, FAMILY_MEMBER_ID, otherParticipant, personLabel } from './participants';
 import {
   formatBadge,
   formatMessageTime,
@@ -10,6 +10,10 @@ import {
   selectPending,
   selectRecentlyConfirmed,
   waitingLabel,
+  oldestWaitingLabel,
+  waitingSinceLabel,
+  confirmedRecencyLabel,
+  groupConfirmedByDay,
 } from './pending';
 
 const NOW = new Date('2026-09-15T12:00:00Z');
@@ -87,10 +91,15 @@ describe('formatBadge', () => {
 });
 
 describe('waitingLabel', () => {
-  it('appears only once two hours have passed', () => {
-    expect(waitingLabel('2026-09-15T10:01:00Z', NOW)).toBeNull();
-    expect(waitingLabel('2026-09-15T10:00:00Z', NOW)).toBe('Waiting 2 hours');
-    expect(waitingLabel('2026-09-15T06:30:00Z', NOW)).toBe('Waiting 5 hours');
+  it('counts minutes below an hour and hours above it', () => {
+    expect(waitingLabel('2026-09-15T11:20:00Z', NOW)).toBe('Waiting 40m');
+    expect(waitingLabel('2026-09-15T11:01:00Z', NOW)).toBe('Waiting 59m');
+    expect(waitingLabel('2026-09-15T11:00:00Z', NOW)).toBe('Waiting 1h');
+    expect(waitingLabel('2026-09-15T09:00:00Z', NOW)).toBe('Waiting 3h');
+  });
+
+  it('never shows less than a minute', () => {
+    expect(waitingLabel('2026-09-15T11:59:50Z', NOW)).toBe('Waiting 1m');
   });
 });
 
@@ -130,5 +139,60 @@ describe('mergeMessage', () => {
     expect(mergeMessage([confirmed], staleInsertEcho)[0].acknowledgedAt).toBe(
       '2026-09-15T10:00:00Z',
     );
+  });
+});
+
+describe('personLabel', () => {
+  it('adds the relationship when the person is known', () => {
+    expect(personLabel('janet-chen', 'Janet Chen')).toBe('Janet Chen · Daughter');
+  });
+
+  it('falls back to the name alone for an unknown sender', () => {
+    expect(personLabel('someone-else', 'Pat')).toBe('Pat');
+    expect(personLabel(null, 'Pat')).toBe('Pat');
+  });
+});
+
+describe('oldestWaitingLabel', () => {
+  it('reports the longest wait, or nothing when nothing is pending', () => {
+    const older = msg({ id: 'o', createdAt: '2026-09-15T07:00:00Z' });
+    const newer = msg({ id: 'n', createdAt: '2026-09-15T11:30:00Z' });
+    expect(oldestWaitingLabel(selectPending([newer, older], CAREGIVER_ID), NOW)).toBe('Oldest: 5h');
+    expect(oldestWaitingLabel([], NOW)).toBeNull();
+  });
+});
+
+describe('waitingSinceLabel', () => {
+  it('reports the clock time the oldest item arrived', () => {
+    const older = msg({ id: 'o', createdAt: '2026-09-15T09:14:00Z' });
+    expect(waitingSinceLabel([older], 'UTC')).toBe('Waiting since 9:14 AM');
+    expect(waitingSinceLabel([], 'UTC')).toBeNull();
+  });
+});
+
+describe('confirmedRecencyLabel', () => {
+  it('summarises how recent the newest confirmation is', () => {
+    const today = msg({ acknowledgedAt: '2026-09-15T09:00:00Z' });
+    const yesterday = msg({ acknowledgedAt: '2026-09-14T09:00:00Z' });
+    const older = msg({ acknowledgedAt: '2026-09-11T09:00:00Z' });
+    expect(confirmedRecencyLabel([today], NOW)).toBe('Today');
+    expect(confirmedRecencyLabel([yesterday], NOW)).toBe('Yesterday');
+    expect(confirmedRecencyLabel([older], NOW)).toBe('Earlier');
+    expect(confirmedRecencyLabel([], NOW)).toBeNull();
+  });
+});
+
+describe('groupConfirmedByDay', () => {
+  it('splits into TODAY, YESTERDAY and EARLIER, newest first, dropping empty groups', () => {
+    const today = msg({ id: 't', acknowledgedAt: '2026-09-15T09:00:00Z' });
+    const yesterdayEarly = msg({ id: 'y1', acknowledgedAt: '2026-09-14T08:00:00Z' });
+    const yesterdayLate = msg({ id: 'y2', acknowledgedAt: '2026-09-14T16:41:00Z' });
+    const older = msg({ id: 'e', acknowledgedAt: '2026-09-11T11:20:00Z' });
+    const groups = groupConfirmedByDay([yesterdayEarly, older, today, yesterdayLate], NOW);
+    expect(groups.map((g) => g.label)).toEqual(['TODAY', 'YESTERDAY', 'EARLIER']);
+    expect(groups[0].items.map((m) => m.id)).toEqual(['t']);
+    expect(groups[1].items.map((m) => m.id)).toEqual(['y2', 'y1']);
+    expect(groups[2].items.map((m) => m.id)).toEqual(['e']);
+    expect(groupConfirmedByDay([today], NOW).map((g) => g.label)).toEqual(['TODAY']);
   });
 });
