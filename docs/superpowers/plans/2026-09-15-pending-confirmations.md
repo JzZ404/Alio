@@ -2444,6 +2444,368 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ---
 
 
+---
+
+### Task 10: Long-press to Mark as Pending
+
+Built from the family design supplied 2026-09-16. Replaces the composer toggle
+that shipped in Task 5.
+
+**Files:**
+- Modify: `supabase/schema.sql` (append a second migration block)
+- Create: `packages/ui/src/MessageActionSheet.tsx`
+- Test: `packages/ui/src/MessageActionSheet.test.tsx`
+- Modify: `packages/ui/src/messaging/client.ts` (add `markPending`)
+- Test: `packages/ui/src/messaging/client.test.ts` (add its cases)
+- Modify: `packages/ui/src/MessageBubble.tsx` (header copy, long-press handling)
+- Modify: `packages/ui/src/index.ts`
+- Modify: `apps/family/app/(tabs)/chat/[id]/page.tsx` (remove the toggle, hold the sheet's state)
+- Delete: `packages/ui/src/NeedsResponseToggle.tsx` and its cases in `MessageBubble.test.tsx`
+
+**Interfaces:**
+- Produces:
+  - `markPending(client: SupabaseClient, params: { messageId: string; taggedBy: 'sender_manual' | 'sender_confirmed_ai' }): Promise<void>`
+  - `MessageActionSheet({ message, onMarkPending, onCopy, onClose })` — renders nothing when `message` is null
+  - `MessageBubble` gains `onLongPress?: (message: ThreadMessage) => void`
+
+- [ ] **Step 1: Append the second migration to `supabase/schema.sql`**
+
+```sql
+
+-- =============================================================
+-- Pending Confirmations, part 2: marking a message after it is sent
+-- docs/superpowers/specs/2026-09-15-pending-confirmations-design.md §2.4
+--
+-- The first migration let the browser write only the confirmation columns.
+-- The family screens now mark a message by long-pressing it after sending, so
+-- the sender must be able to set the tag on a message that already exists.
+--
+-- Kept narrow on purpose: the tag may be set once, only while the message is
+-- untagged and unconfirmed, and it can never be removed or changed afterwards.
+-- Message text stays unwritable, as before.
+-- =============================================================
+grant update (final_tier, tagged_by) on family_messages to anon, authenticated;
+
+drop policy if exists "family_messages anon mark pending" on family_messages;
+create policy "family_messages anon mark pending" on family_messages
+  for update
+  using (final_tier is null and acknowledged_at is null)
+  with check (final_tier = 'action' and tagged_by in ('sender_manual', 'sender_confirmed_ai'));
+```
+
+Do not apply it. The user runs it; a later step tells them how.
+
+- [ ] **Step 2: Write the failing tests**
+
+Append to `packages/ui/src/messaging/client.test.ts`:
+
+```ts
+describe('markPending', () => {
+  it('tags an existing message as a human tag, only while untagged', async () => {
+    const { client, calls } = fakeClient({});
+    await markPending(client, { messageId: 'row-9', taggedBy: 'sender_manual' });
+    expect(argsOf(calls, 'update')).toEqual([
+      { final_tier: 'action', tagged_by: 'sender_manual' },
+    ]);
+    expect(argsOf(calls, 'eq')).toEqual(['id', 'row-9']);
+    expect(argsOf(calls, 'is')).toEqual(['final_tier', null]);
+  });
+
+  it('records an accepted suggestion as its own kind of tag', async () => {
+    const { client, calls } = fakeClient({});
+    await markPending(client, { messageId: 'row-9', taggedBy: 'sender_confirmed_ai' });
+    expect(argsOf(calls, 'update')).toEqual([
+      { final_tier: 'action', tagged_by: 'sender_confirmed_ai' },
+    ]);
+  });
+
+  it('throws when Supabase rejects the write', async () => {
+    const { client } = fakeClient({ error: { message: 'denied' } });
+    await expect(
+      markPending(client, { messageId: 'row-9', taggedBy: 'sender_manual' }),
+    ).rejects.toThrow('markPending: denied');
+  });
+});
+```
+
+Create `packages/ui/src/MessageActionSheet.test.tsx`:
+
+```tsx
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { MessageActionSheet } from './MessageActionSheet';
+import type { ThreadMessage } from './messaging/types';
+
+afterEach(cleanup);
+
+const mine: ThreadMessage = {
+  id: 'm1',
+  threadId: 'caregiver-001__erin-yeung',
+  senderId: 'janet-chen',
+  recipientId: 'caregiver-001',
+  senderName: 'Janet Chen',
+  text: 'Please pick up her prescription on your way today — order 4471.',
+  reportId: null,
+  finalTier: null,
+  acknowledgedAt: null,
+  createdAt: '2026-09-16T09:00:00Z',
+};
+
+describe('MessageActionSheet', () => {
+  it('renders nothing when no message is held', () => {
+    const { container } = render(
+      <MessageActionSheet message={null} onMarkPending={() => {}} onCopy={() => {}} onClose={() => {}} />,
+    );
+    expect(container.firstChild).toBeNull();
+  });
+
+  it('offers the three actions, with the message and the reassurance', () => {
+    render(
+      <MessageActionSheet message={mine} onMarkPending={() => {}} onCopy={() => {}} onClose={() => {}} />,
+    );
+    expect(screen.getByText(mine.text)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Mark as Pending' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Reply' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Copy text' })).toBeTruthy();
+    expect(screen.getByText('Sarah Confirms it when she sees it')).toBeTruthy();
+  });
+
+  it('reports the action taken and closes on the backdrop', () => {
+    const onMarkPending = vi.fn();
+    const onCopy = vi.fn();
+    const onClose = vi.fn();
+    render(
+      <MessageActionSheet message={mine} onMarkPending={onMarkPending} onCopy={onCopy} onClose={onClose} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Mark as Pending' }));
+    expect(onMarkPending).toHaveBeenCalledWith(mine);
+    fireEvent.click(screen.getByRole('button', { name: 'Copy text' }));
+    expect(onCopy).toHaveBeenCalledWith(mine);
+    fireEvent.click(screen.getByLabelText('Close'));
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('hides Mark as Pending once the message is already marked', () => {
+    render(
+      <MessageActionSheet
+        message={{ ...mine, finalTier: 'action' }}
+        onMarkPending={() => {}}
+        onCopy={() => {}}
+        onClose={() => {}}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: 'Mark as Pending' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Copy text' })).toBeTruthy();
+  });
+});
+```
+
+- [ ] **Step 3: Run them and watch them fail**
+
+Run: `pnpm --filter @alio/ui test` → FAIL: `markPending` and `MessageActionSheet` do not exist.
+
+- [ ] **Step 4: Implement `markPending`**
+
+In `packages/ui/src/messaging/client.ts`:
+
+```ts
+/**
+ * Mark an already-sent message Pending (spec §2.4). Filtered on final_tier is
+ * null so a tag is set once and never rewritten — matching the database policy,
+ * which allows the update only while the message is untagged and unconfirmed.
+ */
+export async function markPending(
+  client: SupabaseClient,
+  params: { messageId: string; taggedBy: 'sender_manual' | 'sender_confirmed_ai' },
+): Promise<void> {
+  const { error } = await client
+    .from('family_messages')
+    .update({ final_tier: 'action', tagged_by: params.taggedBy })
+    .eq('id', params.messageId)
+    .is('final_tier', null);
+  if (error) throw new Error(`markPending: ${error.message}`);
+}
+```
+
+- [ ] **Step 5: Build the action sheet**
+
+Create `packages/ui/src/MessageActionSheet.tsx`. Visual spec, from the design:
+
+- A fixed overlay covering the frame: `fixed inset-0 z-50 flex flex-col items-center justify-center gap-[12px] bg-gray-100/20 px-[24px] backdrop-blur-md`. The backdrop is a `<button aria-label="Close" className="absolute inset-0 cursor-default">` so tapping anywhere outside dismisses it, with the content above it in the stacking order.
+- The pressed message renders above the menu, unblurred, in the same bubble treatment it has in the thread: right-aligned, `max-w-[75%] rounded-[20px] rounded-tr-[6px] bg-brand-primary px-[14px] py-[12px] text-[14px] leading-snug text-white`.
+- The menu is a white card: `w-full max-w-[260px] overflow-hidden rounded-[16px] bg-white`.
+  - `Mark as Pending` is the first row and the only accented one: `flex w-full items-center gap-[10px] bg-brand-accent px-[16px] py-[14px] text-left text-[16px] font-bold text-gray-100`, with `IconPinFilled` at `size-[18px]`. Omit this row entirely when `message.finalTier` is already set.
+  - `Reply` and `Copy text` follow: `flex w-full items-center px-[16px] py-[14px] text-left text-[16px] text-gray-100`, separated by `border-t border-gray-30`.
+  - `Reply` is deliberately inert — it calls nothing. Add a comment saying threaded replies are unspecified and this is a placeholder the user asked to keep visible.
+- Under the card: `text-[12px] text-gray-60` reading `Sarah Confirms it when she sees it`.
+- Escape closes it: a `useEffect` binding `keydown`.
+
+- [ ] **Step 6: Long-press on the bubble, and the copy change**
+
+In `packages/ui/src/MessageBubble.tsx`:
+- Change the header string from `Needs response` to `Pending` (spec §0, revised).
+- Add `onLongPress?: (message: ThreadMessage) => void`. Implement it with a pointer timer: on `onPointerDown` start a 450ms `setTimeout` that fires `onLongPress(message)`; clear it on `onPointerUp`, `onPointerLeave` and `onPointerCancel`. Also fire on `onContextMenu` with `preventDefault()`, so a desktop right-click works for testing.
+- Nothing else about the bubble changes, and a bubble without `onLongPress` behaves exactly as it does today.
+
+Update `MessageBubble.test.tsx`: the three assertions on the old header string become `Pending`, and the `NeedsResponseToggle` describe block is deleted along with its import.
+
+- [ ] **Step 7: Wire the family thread, and remove the toggle**
+
+In `apps/family/app/(tabs)/chat/[id]/page.tsx`:
+- Delete the `NeedsResponseToggle` import, its `needsResponse` state, the toggle from the composer row, and the `needsResponse` argument to `sendMessage` (send it as `false` — every message now starts untagged).
+- Hold `const [sheetFor, setSheetFor] = useState<ThreadMessage | null>(null)`.
+- Pass `onLongPress={setSheetFor}` to every live `MessageBubble` the family member sent themselves (`m.senderId === FAMILY_MEMBER_ID`); leave the caregiver's own messages without it.
+- Render `<MessageActionSheet message={sheetFor} … />` at the end of the screen.
+- `onMarkPending`: optimistically `patch(message.id, { finalTier: 'action' })`, close the sheet, then `await markPending(supabase, { messageId: message.id, taggedBy: 'sender_manual' })`; on failure roll the patch back to `null` and show the existing error line with `Couldn't mark that as Pending. Check your connection and try again.`
+- `onCopy`: `navigator.clipboard.writeText(message.text)` inside a try/catch, then close.
+
+Delete `packages/ui/src/NeedsResponseToggle.tsx` and its export.
+
+- [ ] **Step 8: Verify**
+
+`pnpm --filter @alio/ui test` (report the count), `pnpm --filter @alio/ui typecheck`, `pnpm --filter @alio/family typecheck`.
+
+Live check against the running family app: long-press one of your own messages, confirm the background blurs and the menu appears, tap `Mark as Pending`, and confirm the bubble becomes the Pending card. **This write will fail until the user applies the Step 1 migration** — if it does, report exactly that error rather than working around it.
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add supabase/schema.sql packages/ui apps/family
+git commit -m "feat(family): mark a message Pending by long-pressing it
+
+Tagging moves out of the composer and onto the message itself, per the family
+designs: long-press blurs the thread, lifts the message, and offers Mark as
+Pending above Reply and Copy text.
+
+That means tagging now happens after a message exists, which the first
+migration did not allow — the browser could write only the confirmation
+columns. The second block appended to schema.sql grants exactly one more
+transition: an untagged, unconfirmed message may be tagged once, and never
+untagged.
+
+Reply is deliberately inert; threaded replies are unspecified.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+```
+
+---
+
+### Task 11: The ALIO SUGGESTS card
+
+Built from the family design supplied 2026-09-16. The card is real; the
+suggestion behind it is a stub until the classifier plan runs.
+
+**Files:**
+- Create: `packages/ui/src/SuggestionCard.tsx`
+- Test: `packages/ui/src/SuggestionCard.test.tsx`
+- Create: `apps/family/lib/suggest-pending.ts`
+- Test: `apps/family/lib/suggest-pending.test.ts` — **only if** the family app has a test runner; if it does not, put the pure function in `packages/ui/src/messaging/suggest.ts` with its test beside the others instead, and say so in your report
+- Modify: `packages/ui/src/index.ts`
+- Modify: `apps/family/app/(tabs)/chat/[id]/page.tsx`
+
+**Interfaces:**
+- Produces:
+  - `suggestsPending(text: string): boolean` — the stub
+  - `SuggestionCard({ onMark, onDismiss })`
+
+- [ ] **Step 1: Write the failing tests**
+
+```ts
+describe('suggestsPending', () => {
+  it('flags a request aimed at the caregiver', () => {
+    expect(suggestsPending('Could you pick up her prescription today?')).toBe(true);
+    expect(suggestsPending('Please remind her to take the blue pill')).toBe(true);
+    expect(suggestsPending('Can you take her to the appointment on Thursday')).toBe(true);
+  });
+
+  it('leaves conversation alone', () => {
+    expect(suggestsPending('Thanks Sarah, that is a relief')).toBe(false);
+    expect(suggestsPending('She sounded happy on the phone')).toBe(false);
+    expect(suggestsPending('')).toBe(false);
+  });
+});
+```
+
+And for the card:
+
+```tsx
+describe('SuggestionCard', () => {
+  it('explains itself and offers both answers', () => {
+    render(<SuggestionCard onMark={() => {}} onDismiss={() => {}} />);
+    expect(screen.getByText('ALIO SUGGESTS')).toBeTruthy();
+    expect(screen.getByText('This one sounds like it needs Sarah. Mark it as Pending so she Confirms it?')).toBeTruthy();
+    expect(screen.getByText('Only you can see this')).toBeTruthy();
+  });
+
+  it('reports which answer was given', () => {
+    const onMark = vi.fn();
+    const onDismiss = vi.fn();
+    render(<SuggestionCard onMark={onMark} onDismiss={onDismiss} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Mark it' }));
+    expect(onMark).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'No need' }));
+    expect(onDismiss).toHaveBeenCalled();
+  });
+});
+```
+
+- [ ] **Step 2: Run them, watch them fail**
+
+- [ ] **Step 3: Implement the stub**
+
+```ts
+/**
+ * Stand-in for the classifier in spec §4, so the suggestion card can be seen and
+ * tuned before a model exists. Deliberately crude: a request aimed at someone
+ * else usually asks, and asks about an errand.
+ *
+ * Replace this with the model call; keep the signature. Its mistakes are not
+ * evidence about the model's accuracy.
+ */
+const ASKS = /\b(can|could|would|will) you\b|\bplease\b|\?/i;
+const ERRAND = /\b(prescription|pharmacy|pill|pills|medication|appointment|doctor|refill|pick up|drop off|bring|remind)\b/i;
+
+export function suggestsPending(text: string): boolean {
+  return ASKS.test(text) && ERRAND.test(text);
+}
+```
+
+- [ ] **Step 4: Build the card**
+
+Visual spec, from the design:
+- Container: `mt-[8px] w-full max-w-[75%] self-end rounded-[16px] bg-white/70 px-[16px] py-[14px]`.
+- Header row: `flex items-center gap-[6px] text-[12px] font-bold uppercase tracking-[0.08em] text-gray-60`, with `IconRiVoiceAiFill` at `size-[14px]`, reading `ALIO SUGGESTS`.
+- Sentence: `mt-[8px] text-[15px] leading-snug text-gray-100` — `This one sounds like it needs Sarah. Mark it as Pending so she Confirms it?`
+- Buttons row: `mt-[12px] flex gap-[10px]`.
+  - `Mark it`: `flex-1 rounded-[12px] bg-brand-accent px-[16px] py-[10px] text-[15px] font-bold text-gray-100`
+  - `No need`: `flex-1 rounded-[12px] bg-gray-30 px-[16px] py-[10px] text-[15px] font-bold text-gray-100`
+- Under the card, outside it: `mt-[6px] text-right text-[12px] text-gray-60` reading `Only you can see this`.
+
+- [ ] **Step 5: Wire it into the family thread**
+
+- After a successful send, if `suggestsPending(text)` and the message was not already tagged, remember that message id in `const [suggestedFor, setSuggestedFor] = useState<string | null>(null)`.
+- Render the card directly under that message, only for the family member's own messages, and only while the message is untagged.
+- `Mark it` → `markPending(supabase, { messageId, taggedBy: 'sender_confirmed_ai' })` with the same optimistic patch and rollback as the long-press path, then clear `suggestedFor`.
+- `No need` → clear `suggestedFor`. Nothing is written; the spec's `suggested_tier` column stays for the real model.
+- The card never appears on the caregiver's side, and never on a message already marked.
+
+- [ ] **Step 6: Verify and commit**
+
+`pnpm --filter @alio/ui test`, both typechecks, and a live check: send `Could you pick up her prescription today?` in the family app and confirm the card appears under it; tap `Mark it` and confirm the bubble becomes Pending.
+
+```bash
+git add packages/ui apps/family
+git commit -m "feat(family): add the ALIO SUGGESTS card, on a stubbed suggester
+
+The card from the family designs, wired to a deliberately crude heuristic so
+the interaction can be seen and tuned before the classifier exists. Accepting a
+suggestion records tagged_by = sender_confirmed_ai rather than sender_manual,
+which is what makes the adoption rate measurable once the model is real.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+```
+
+
 ## After this plan
 
 - **Open a pull request** from `feat/pending-confirmations` into `main` for review, rather than pushing to `main`.

@@ -14,7 +14,7 @@ Use these terms and no others, in code, copy, and design files.
 
 | Concept | UI string | Code identifier |
 |---|---|---|
-| A message the sender marked as needing a response | Needs response | `tier = 'action'` |
+| A message the sender marked as needing a response | Pending | `tier = 'action'` |
 | The unconfirmed state | Pending | `acknowledged_at IS NULL` |
 | The confirm action / button | Confirm | `acknowledge` |
 | The confirmed state | Confirmed | `acknowledged_at` |
@@ -29,6 +29,12 @@ Use these terms and no others, in code, copy, and design files.
   reply in the thread like a person.
 - **notification hub** — these aren't notifications. They're messages.
 - **task** — already used by the routine/anchor system. Collision.
+
+**Revised 2026-09-16: the tag's UI string is `Pending`, not `Needs response`.**
+The family screens label the action "Mark as Pending", and a marked message is
+exactly what the caregiver's Pending list holds, so one word now covers the
+mark, the state and the list. The user has flagged the wording as provisional —
+expect a language pass before ship.
 
 **Un-banned 2026-09-16: `inbox`.** It was banned for implying a mailbox separate
 from the conversation. The caregiver screens label the chat list itself `Inbox`,
@@ -96,6 +102,33 @@ conditional on a count.
 
 The bubble is the primary surface. The list exists for messages that have
 already scrolled away.
+
+### 2.4 Marking a message — long-press, after sending
+
+**Revised 2026-09-16**, replacing the composer toggle that shipped first.
+
+The sender long-presses their own sent message. The background blurs, the
+pressed bubble stays sharp, and a menu rises beneath it, iMessage-style:
+
+- `Mark as Pending` — the accent-green primary item, with a tag icon
+- `Reply`
+- `Copy text`
+
+Under the menu, quiet grey: `Sarah Confirms it when she sees it`.
+
+Tagging therefore happens **after** the message exists, which the first
+migration did not allow: the browser could update only the confirmation
+columns. A second migration lets a message be tagged once, while untagged, and
+never untagged again.
+
+### 2.5 The suggestion card
+
+The model's suggestion renders under the sender's own message, visible only to
+them: a header `ALIO SUGGESTS`, one sentence of reasoning, then `Mark it`
+(accent green) and `No need`. Under it, quiet grey: `Only you can see this`.
+
+Accepting records `tagged_by = 'sender_confirmed_ai'` rather than
+`'sender_manual'`, which is what makes the adoption rate in §4.5 computable.
 
 ---
 

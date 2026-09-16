@@ -239,26 +239,74 @@ the dev server serving broken chunks until you delete that folder and restart.
 
 ---
 
+## Tasks 5, 6 and 10 — the loop closes · `360db5f`, `d874758`, `495e800`, `fad439b`
+
+**The migration went in.** The user applied the first SQL block; the app's queries
+against the new columns started succeeding immediately.
+
+**Task 5 — the family app really sends.** Its Send button had never written
+anything. Now it does, and a message can be marked as needing a response. Proven
+against the live database, not fixtures: a helper sent a tagged message from the
+family app and the row came back with `sender_id=janet-chen`,
+`recipient_id=caregiver-001`, `final_tier=action`, `tagged_by=sender_manual`.
+
+**Task 6 — the caregiver thread goes live, with Confirm in the bubble.** The
+loop now closes end to end: Janet's real message appeared in the caregiver's
+Pending list, Confirm flipped it, it survived a reload, and the Inbox count
+dropped from 3 to 2.
+
+The implementer caught its own bug before committing: the highlight-clear timer
+shared an effect with the scroll, so a live message arriving mid-highlight would
+cancel the fade and leave a message ringed forever. Splitting the effects fixed
+it, and the reviewer re-traced the dependency arrays rather than taking the claim
+on trust.
+
+Review also found a stale error banner — a failed Confirm kept telling you to
+retry after the retry had worked, because the error field is shared with the send
+path and only that path cleared it. Fixed in `fad439b`, along with deleting the
+temporary preview route.
+
+**Task 10 — tagging moves to a long-press.** New family designs arrived
+mid-build: instead of a toggle in the composer, you long-press your own sent
+message, the thread blurs, the message lifts, and a menu offers **Mark as
+Pending** above Reply and Copy text. The composer toggle from Task 5 is gone, and
+the bubble's header changed from "Needs response" to **Pending** (the user's
+wording, flagged as provisional).
+
+That change has a consequence in the database: tagging now happens *after* a
+message exists, which the first migration deliberately did not allow — the
+browser could write only the confirmation columns. A second block in
+`supabase/schema.sql` grants exactly one more transition: an untagged,
+unconfirmed message may be marked once, and never un-marked. Message text stays
+unwritable.
+
+Until that block is applied, the long-press correctly fails with
+`permission denied for table family_messages` and the UI rolls back — which is
+how it was verified.
+
+---
+
 ## Outstanding — needs a human
 
-**Run the new SQL on Supabase.** Nothing else is blocked on it until the app is
-tested in a browser, but the app starts writing to those columns in Task 5.
+**Run the second SQL block** — the one that lets a message be marked after it is
+sent. Without it the long-press menu appears but the mark is refused.
 
-1. Tell the team first — it is the shared project (`trnjqdafpnxkhacuzcuh`).
-2. `cd ~/Documents/aliomodel/Alio && sed -n '120,162p' supabase/schema.sql | pbcopy`
-   (copies only the new block; the older statements in that file would error on
-   re-run).
-3. Paste into Supabase Dashboard → SQL Editor → Run. Expect
-   `Success. No rows returned`.
-4. Verify:
-   `select column_name from information_schema.columns where table_name = 'family_messages';`
-   → 15 rows, the last 9 being the new ones.
-5. Verify the safety rule — this one should **fail** with `permission denied`:
+1. `cd ~/Documents/aliomodel/Alio && sed -n '/part 2: marking a message after it is sent/,$p' supabase/schema.sql | pbcopy`
+2. Paste into Supabase Dashboard → SQL Editor → Run. Expect `Success. No rows returned`.
+3. Confirm it stayed narrow — this should still fail with `permission denied`:
    ```sql
    begin; set local role anon;
    update family_messages set text = 'tampered' where thread_id = '__verify__';
    rollback;
    ```
 
-Access is per-organization in Supabase, so whoever owns the project can add
-others as **Administrator** once, instead of running SQL on their behalf forever.
+The first block is already applied and working.
+
+**Two open decisions:**
+- Pending list order: oldest at the top (built, per the spec) or newest at the
+  top (as the original mockup drew it).
+- The wording pass the user flagged: `Pending` is doing the work of both the
+  mark and the state.
+
+**Test rows:** a few `ALIO-TEST` messages were written into the live thread while
+proving the write path. They can be deleted whenever.
