@@ -195,4 +195,21 @@ describe('groupConfirmedByDay', () => {
     expect(groups[2].items.map((m) => m.id)).toEqual(['e']);
     expect(groupConfirmedByDay([today], NOW).map((g) => g.label)).toEqual(['TODAY']);
   });
+
+  it('orders by instant, not by string, when offsets are written differently', () => {
+    // 2026-09-14T20:00:00+12:00 is 2026-09-14T08:00:00Z (08:00 UTC, earlier)
+    // 2026-09-14T09:00:00-11:00 is 2026-09-14T20:00:00Z (20:00 UTC, later)
+    // Lexicographically '20' > '09' so the first sorts later as a string,
+    // but chronologically it is 12 hours earlier. A naive string compare would
+    // get this backwards.
+    const early = msg({ id: 'early', acknowledgedAt: '2026-09-14T20:00:00+12:00' });
+    const late = msg({ id: 'late', acknowledgedAt: '2026-09-14T09:00:00-11:00' });
+    const groups = groupConfirmedByDay([early, late], NOW);
+    expect(groups.map((g) => g.label)).toEqual(['YESTERDAY']);
+    expect(groups[0].items.map((m) => m.id)).toEqual(['late', 'early']);
+  });
+
+  it('returns nothing when there is nothing confirmed', () => {
+    expect(groupConfirmedByDay([], NOW)).toEqual([]);
+  });
 });
