@@ -24,6 +24,7 @@ export { NeedsResponseToggle } from './NeedsResponseToggle';
 export { SegmentedTabs } from './SegmentedTabs';
 export { PendingCard } from './PendingCard';
 export { ConfirmedRow } from './ConfirmedRow';
+export { InboxSummaryCard } from './InboxSummaryCard';
 
 // Patient (caregiver Home + patient switcher)
 export { PatientCard } from './PatientCard';

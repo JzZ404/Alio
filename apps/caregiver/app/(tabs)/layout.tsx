@@ -62,9 +62,9 @@ export default function TabsLayout({ children }: { children: ReactNode }) {
           {subPage?.type === 'chat'    && <ChatDetail   id={subPage.id} focusMessageId={subPage.focusMessageId} onBack={() => setSubPage(subPage.from === 'pending' ? { type: 'pending', tab: 'pending' } : null)} />}
           {subPage?.type === 'report'  && <ReportDetail id={subPage.id} onBack={() => setSubPage(null)} />}
           {subPage?.type === 'pending' && <PendingScreen initialTab={subPage.tab} onBack={() => setSubPage(null)} onOpenMessage={(m) => { const chatId = CAREGIVER_THREAD_FOR_SUPABASE[m.threadId]; if (chatId) setSubPage({ type: 'chat', id: chatId, focusMessageId: m.id, from: 'pending' }); }} />}
-          {!subPage && active === 'home'     && <HomeTab />}
+          {!subPage && active === 'home'     && <HomeTab onOpenPending={() => setSubPage({ type: 'pending', tab: 'pending' })} />}
           {!subPage && active === 'logs'     && <LogsTab    onOpenReport={(id) => setSubPage({ type: 'report', id })} />}
-          {!subPage && active === 'chat'     && <ChatTab    onOpenThread={(id) => setSubPage({ type: 'chat',   id })} />}
+          {!subPage && active === 'chat'     && <ChatTab    onOpenThread={(id) => setSubPage({ type: 'chat',   id })} onOpenPending={(tab) => setSubPage({ type: 'pending', tab })} />}
           {!subPage && active === 'profiles' && <ProfilesTab />}
         </div>
 

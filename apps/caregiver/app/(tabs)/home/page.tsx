@@ -18,7 +18,7 @@ import { SAMPLE_PATIENTS, SAMPLE_CG_USER } from '@alio/mock-data';
  *   2. "Upcoming Schedule" title + add button
  *   3. List of patient cards (first is expanded by default)
  */
-export default function CaregiverHomePage() {
+export default function CaregiverHomePage({ onOpenPending }: { onOpenPending?: () => void } = {}) {
   const router = useRouter();
 
   return (
@@ -60,6 +60,7 @@ export default function CaregiverHomePage() {
         <button
           type="button"
           aria-label="Notifications"
+          onClick={onOpenPending}
           className="relative flex size-[42px] items-center justify-center rounded-lg bg-brand-tint-1 transition-colors active:bg-brand-border"
         >
           <IconNotificationFilled className="size-[22px] text-gray-100" />
