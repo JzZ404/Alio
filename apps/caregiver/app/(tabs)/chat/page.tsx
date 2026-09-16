@@ -87,7 +87,7 @@ export default function CaregiverChatPage({
       </header>
 
       {/* Pending / Confirmed summary cards — always visible, including at zero */}
-      <div className="absolute left-[25px] right-[25px] top-[114px] flex gap-[12px]">
+      <div className="absolute left-[25px] right-[25px] top-[140px] flex gap-[12px]">
         <InboxSummaryCard
           count={pending.length}
           label="Pending"
@@ -103,7 +103,7 @@ export default function CaregiverChatPage({
       </div>
 
       {/* Thread list — unchanged appearance, just starts lower to clear the cards */}
-      <ul className="absolute bottom-[110px] left-[22px] right-[22px] top-[216px] flex flex-col gap-[12px] overflow-y-auto">
+      <ul className="absolute bottom-[16px] left-[22px] right-[22px] top-[248px] flex flex-col gap-[12px] overflow-y-auto">
         {SAMPLE_CHAT_THREADS.map((thread) => (
           <li key={thread.id}>
             <ChatListItem thread={thread} onOpen={onOpenThread} />

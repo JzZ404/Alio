@@ -129,14 +129,14 @@ export function PendingScreen({
         background: 'linear-gradient(135deg, #E3E5F1 0%, #EAEAF2 50%, #D3D5EC 100%)',
       }}
     >
-      <header className="absolute left-[25px] right-[25px] top-[60px] z-10 flex items-center justify-between">
+      <header className="absolute left-[25px] right-[25px] top-[60px] z-10 flex items-center gap-[12px]">
         <IconBox size={42} shape="pill" aria-label="Back" onClick={onBack}>
           <IconChevronLeft className="size-[20px] text-gray-100" />
         </IconBox>
         <span className="flex h-[42px] items-center rounded-[10px] bg-brand-tint-1 px-[12px] text-[20px] font-bold text-black">
           Inbox
         </span>
-        <div className="flex items-center gap-[12px]">
+        <div className="ml-auto flex items-center gap-[12px]">
           <IconBox size={42} shape="pill" aria-label="Search">
             <IconSearch className="size-[24px] text-gray-100" />
           </IconBox>
@@ -146,7 +146,7 @@ export function PendingScreen({
         </div>
       </header>
 
-      <div className="absolute left-[25px] right-[25px] top-[114px]">
+      <div className="absolute left-[25px] right-[25px] top-[140px]">
         <SegmentedTabs
           tabs={[
             { value: 'pending', label: 'Pending', badge: pending.length },
@@ -157,7 +157,8 @@ export function PendingScreen({
         />
       </div>
 
-      <div className="absolute bottom-[110px] left-[25px] right-[25px] top-[178px] overflow-y-auto">
+      <div className="absolute bottom-[16px] left-[25px] right-[25px] top-[204px] overflow-y-auto">
+        <div key={tab} className="animate-tab-in">
         {tab === 'pending' ? (
           <>
             {pending.length > 0 && (
@@ -201,6 +202,7 @@ export function PendingScreen({
             </div>
           ))
         )}
+        </div>
       </div>
     </div>
   );

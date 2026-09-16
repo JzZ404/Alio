@@ -35,6 +35,16 @@ export const tailwindPreset: Partial<Config> = {
         // FontFamily type wants a mutable string[].
         sans: [...fontFamily.sans],
       },
+      keyframes: {
+        // Tab content entering after a segmented-control switch.
+        'tab-in': {
+          from: { opacity: '0', transform: 'translateY(8px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+      },
+      animation: {
+        'tab-in': 'tab-in 260ms cubic-bezier(0.22, 1, 0.36, 1)',
+      },
       fontSize: fontSize as never,
       borderRadius: borderRadius as never,
     },
