@@ -35,6 +35,8 @@ export { UploadWheel, type UploadKind } from './UploadWheel';
 export * from './messaging/types';
 export * from './messaging/participants';
 export * from './messaging/pending';
+export * from './messaging/client';
+export * from './messaging/useFamilyMessages';
 
 // Caesarzkn icons — 288 generated icon components + custom
 export * from './icons';

@@ -151,6 +151,9 @@ importers:
       '@alio/theme':
         specifier: workspace:*
         version: link:../theme
+      '@supabase/supabase-js':
+        specifier: ^2.105.4
+        version: 2.105.4
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
