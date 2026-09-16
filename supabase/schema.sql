@@ -160,3 +160,23 @@ create policy "family_messages anon acknowledge" on family_messages
   for update
   using (final_tier = 'action' and acknowledged_at is null)
   with check (acknowledged_at is not null);
+
+-- =============================================================
+-- Pending Confirmations, part 2: marking a message after it is sent
+-- docs/superpowers/specs/2026-09-15-pending-confirmations-design.md §2.4
+--
+-- The first migration let the browser write only the confirmation columns.
+-- The family screens now mark a message by long-pressing it after sending, so
+-- the sender must be able to set the tag on a message that already exists.
+--
+-- Kept narrow on purpose: the tag may be set once, only while the message is
+-- untagged and unconfirmed, and it can never be removed or changed afterwards.
+-- Message text stays unwritable, as before.
+-- =============================================================
+grant update (final_tier, tagged_by) on family_messages to anon, authenticated;
+
+drop policy if exists "family_messages anon mark pending" on family_messages;
+create policy "family_messages anon mark pending" on family_messages
+  for update
+  using (final_tier is null and acknowledged_at is null)
+  with check (final_tier = 'action' and tagged_by in ('sender_manual', 'sender_confirmed_ai'));

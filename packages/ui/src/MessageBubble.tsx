@@ -1,25 +1,35 @@
+import { useRef } from 'react';
 import clsx from 'clsx';
 import { IconAttention } from './icons';
 import type { ThreadMessage } from './messaging/types';
 
+/** How long a press must hold before it counts as a long-press (spec §2.4). */
+const LONG_PRESS_MS = 450;
+
 /**
  * A live chat message. The primary Pending surface (spec §2.3): a
- * "Needs response" message carries its Confirm button in the bubble, and both
+ * "Pending" message carries its Confirm button in the bubble, and both
  * sides see the state — the recipient gets Confirm, the sender sees Pending,
  * everyone sees Confirmed.
  *
  * Confirm renders only when `onConfirm` is passed, so a screen that cannot
  * confirm never shows a dead button.
+ *
+ * `onLongPress` opens the action sheet (spec §2.4): a 450ms pointer hold, or
+ * a desktop right-click so the interaction is testable without a touch
+ * device. A bubble without `onLongPress` behaves exactly as it does today.
  */
 export function MessageBubble({
   message,
   viewerId,
   onConfirm,
+  onLongPress,
   highlighted = false,
 }: {
   message: ThreadMessage;
   viewerId: string;
   onConfirm?: (messageId: string) => void;
+  onLongPress?: (message: ThreadMessage) => void;
   highlighted?: boolean;
 }) {
   const isMine = message.senderId === viewerId;
@@ -28,12 +38,36 @@ export function MessageBubble({
   const canConfirm =
     onConfirm !== undefined && needsResponse && !confirmed && message.recipientId === viewerId;
 
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearPressTimer = () => {
+    if (pressTimer.current !== null) {
+      clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
+  };
+
+  const startPressTimer = () => {
+    if (!onLongPress) return;
+    clearPressTimer();
+    pressTimer.current = setTimeout(() => onLongPress(message), LONG_PRESS_MS);
+  };
+
   return (
     <div
       data-message-id={message.id}
       className={clsx('flex', isMine ? 'justify-end' : 'justify-start')}
     >
       <div
+        onPointerDown={startPressTimer}
+        onPointerUp={clearPressTimer}
+        onPointerLeave={clearPressTimer}
+        onPointerCancel={clearPressTimer}
+        onContextMenu={(e) => {
+          if (!onLongPress) return;
+          e.preventDefault();
+          onLongPress(message);
+        }}
         className={clsx(
           'max-w-[75%] rounded-[20px] px-[14px] py-[12px] transition-shadow duration-300',
           isMine ? 'rounded-tr-[6px]' : 'rounded-tl-[6px]',
@@ -50,7 +84,7 @@ export function MessageBubble({
         {needsResponse && (
           <p className="mb-[6px] flex items-center gap-[6px] text-[12px] font-bold">
             <IconAttention aria-hidden className="size-[16px] text-brand-primary" />
-            Needs response
+            Pending
           </p>
         )}
         <p className="whitespace-pre-wrap text-[14px] leading-snug">{message.text}</p>
@@ -65,8 +99,13 @@ export function MessageBubble({
             Confirm
           </button>
         )}
-        {needsResponse && !canConfirm && (
-          <p className="mt-[8px] text-[12px] font-bold">{confirmed ? 'Confirmed' : 'Pending'}</p>
+        {/*
+         * The header above already reads "Pending" for the whole time a
+         * message is untagged-but-open, on both sides. This line only needs
+         * to add the one thing the header can't say: that it's done.
+         */}
+        {needsResponse && !canConfirm && confirmed && (
+          <p className="mt-[8px] text-[12px] font-bold">Confirmed</p>
         )}
       </div>
     </div>

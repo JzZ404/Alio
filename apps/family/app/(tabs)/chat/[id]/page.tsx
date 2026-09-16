@@ -13,11 +13,13 @@ import {
   IconReminder,
   IconRefresh,
   IconProfile,
+  MessageActionSheet,
   MessageBubble,
-  NeedsResponseToggle,
   SUPABASE_THREAD_FOR_FAMILY,
+  markPending,
   sendMessage,
   useFamilyMessages,
+  type ThreadMessage,
 } from '@alio/ui';
 import {
   SAMPLE_FM_CHAT_THREADS,
@@ -30,7 +32,8 @@ import { ReportCard } from '@/components/ReportCard';
 /**
  * Family Chat conversation — same layout as Caregiver Chat conversation.
  * Threads with a Supabase mapping show mock history, then the live thread;
- * sends are written to Supabase and can be marked Needs response.
+ * sends are written to Supabase, and a message you sent can be marked
+ * Pending afterwards by long-pressing it (or right-clicking, on desktop).
  */
 export default function FamilyChatConversationPage({ id: propId, onBack }: { id?: string; onBack?: () => void } = {}) {
   const router = useRouter();
@@ -42,18 +45,22 @@ export default function FamilyChatConversationPage({ id: propId, onBack }: { id?
   const supabaseThreadId = SUPABASE_THREAD_FOR_FAMILY[id];
 
   const [mockMessages, setMockMessages] = useState<ChatMessage[]>(SAMPLE_FM_CONVERSATIONS[id] ?? []);
-  const { messages: live, upsert } = useFamilyMessages(
+  const { messages: live, patch, upsert } = useFamilyMessages(
     supabase,
     supabaseThreadId ? { by: 'thread', threadId: supabaseThreadId } : null,
   );
   const [draft, setDraft] = useState('');
-  const [needsResponse, setNeedsResponse] = useState(false);
+  const [sheetFor, setSheetFor] = useState<ThreadMessage | null>(null);
+  // Shared banner for both the send path and the Mark-as-Pending path below.
+  // Every attempt clears it up front, so a retry never shows a stale message
+  // left over from a different, now-resolved failure.
   const [sendError, setSendError] = useState('');
 
   const handleSend = async () => {
     const text = draft.trim();
     if (!text) return;
     setDraft('');
+    setSendError('');
     if (!supabaseThreadId) {
       setMockMessages((prev) => [...prev, { id: `m-${Date.now()}`, sender: 'me', text }]);
       return;
@@ -64,16 +71,39 @@ export default function FamilyChatConversationPage({ id: propId, onBack }: { id?
           threadId: supabaseThreadId,
           senderId: FAMILY_MEMBER_ID,
           text,
-          needsResponse,
+          needsResponse: false,
         }),
       );
-      setNeedsResponse(false);
       setSendError('');
     } catch (e) {
       console.error(e);
       setDraft(text);
       setSendError("Message didn't send. Check your connection and try again.");
     }
+  };
+
+  const handleMarkPending = async (message: ThreadMessage) => {
+    setSendError('');
+    patch(message.id, { finalTier: 'action' });
+    setSheetFor(null);
+    try {
+      await markPending(supabase, { messageId: message.id, taggedBy: 'sender_manual' });
+      setSendError('');
+    } catch (e) {
+      console.error(e);
+      patch(message.id, { finalTier: null });
+      setSendError("Couldn't mark that as Pending. Check your connection and try again.");
+    }
+  };
+
+  const handleCopy = async (message: ThreadMessage) => {
+    setSendError('');
+    try {
+      await navigator.clipboard.writeText(message.text);
+    } catch (e) {
+      console.error(e);
+    }
+    setSheetFor(null);
   };
 
   return (
@@ -144,7 +174,12 @@ export default function FamilyChatConversationPage({ id: propId, onBack }: { id?
                   <ReportCard reportId={m.reportId} />
                 </div>
               ) : (
-                <MessageBubble key={m.id} message={m} viewerId={FAMILY_MEMBER_ID} />
+                <MessageBubble
+                  key={m.id}
+                  message={m}
+                  viewerId={FAMILY_MEMBER_ID}
+                  onLongPress={m.senderId === FAMILY_MEMBER_ID ? setSheetFor : undefined}
+                />
               ),
             )}
           </div>
@@ -173,13 +208,6 @@ export default function FamilyChatConversationPage({ id: propId, onBack }: { id?
           >
             <IconMicrophone className="size-[22px] text-gray-100" />
           </button>
-
-          {supabaseThreadId && (
-            <NeedsResponseToggle
-              pressed={needsResponse}
-              onToggle={() => setNeedsResponse((v) => !v)}
-            />
-          )}
 
           <div className="flex h-[44px] flex-1 items-center gap-2 rounded-full bg-white/70 px-[14px]">
             <input
@@ -212,6 +240,13 @@ export default function FamilyChatConversationPage({ id: propId, onBack }: { id?
           </button>
         </div>
       </div>
+
+      <MessageActionSheet
+        message={sheetFor}
+        onMarkPending={handleMarkPending}
+        onCopy={handleCopy}
+        onClose={() => setSheetFor(null)}
+      />
     </div>
   );
 }

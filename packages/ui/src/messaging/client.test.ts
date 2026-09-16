@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { acknowledgeMessage, sendMessage } from './client';
+import { acknowledgeMessage, markPending, sendMessage } from './client';
 
 /**
  * Records every builder call and resolves the chain with `result`, mirroring
@@ -100,5 +100,32 @@ describe('acknowledgeMessage', () => {
     await expect(
       acknowledgeMessage(client, { messageId: 'row-2', userId: 'caregiver-001' }),
     ).rejects.toThrow('acknowledgeMessage: denied');
+  });
+});
+
+describe('markPending', () => {
+  it('tags an existing message as a human tag, only while untagged', async () => {
+    const { client, calls } = fakeClient({});
+    await markPending(client, { messageId: 'row-9', taggedBy: 'sender_manual' });
+    expect(argsOf(calls, 'update')).toEqual([
+      { final_tier: 'action', tagged_by: 'sender_manual' },
+    ]);
+    expect(argsOf(calls, 'eq')).toEqual(['id', 'row-9']);
+    expect(argsOf(calls, 'is')).toEqual(['final_tier', null]);
+  });
+
+  it('records an accepted suggestion as its own kind of tag', async () => {
+    const { client, calls } = fakeClient({});
+    await markPending(client, { messageId: 'row-9', taggedBy: 'sender_confirmed_ai' });
+    expect(argsOf(calls, 'update')).toEqual([
+      { final_tier: 'action', tagged_by: 'sender_confirmed_ai' },
+    ]);
+  });
+
+  it('throws when Supabase rejects the write', async () => {
+    const { client } = fakeClient({ error: { message: 'denied' } });
+    await expect(
+      markPending(client, { messageId: 'row-9', taggedBy: 'sender_manual' }),
+    ).rejects.toThrow('markPending: denied');
   });
 });

@@ -42,3 +42,20 @@ export async function acknowledgeMessage(
     .is('acknowledged_at', null);
   if (error) throw new Error(`acknowledgeMessage: ${error.message}`);
 }
+
+/**
+ * Mark an already-sent message Pending (spec §2.4). Filtered on final_tier is
+ * null so a tag is set once and never rewritten — matching the database policy,
+ * which allows the update only while the message is untagged and unconfirmed.
+ */
+export async function markPending(
+  client: SupabaseClient,
+  params: { messageId: string; taggedBy: 'sender_manual' | 'sender_confirmed_ai' },
+): Promise<void> {
+  const { error } = await client
+    .from('family_messages')
+    .update({ final_tier: 'action', tagged_by: params.taggedBy })
+    .eq('id', params.messageId)
+    .is('final_tier', null);
+  if (error) throw new Error(`markPending: ${error.message}`);
+}

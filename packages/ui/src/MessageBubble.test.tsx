@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MessageBubble } from './MessageBubble';
-import { NeedsResponseToggle } from './NeedsResponseToggle';
 import type { ThreadMessage } from './messaging/types';
 
 afterEach(cleanup);
@@ -23,7 +22,7 @@ describe('MessageBubble', () => {
   it('gives the recipient a Confirm button that reports the message id', () => {
     const onConfirm = vi.fn();
     render(<MessageBubble message={tagged} viewerId="caregiver-001" onConfirm={onConfirm} />);
-    expect(screen.getByText('Needs response')).toBeTruthy();
+    expect(screen.getByText('Pending')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
     expect(onConfirm).toHaveBeenCalledWith('m1');
   });
@@ -47,23 +46,11 @@ describe('MessageBubble', () => {
   it('renders an untagged message as a plain bubble', () => {
     render(<MessageBubble message={{ ...tagged, finalTier: null }} viewerId="caregiver-001" />);
     expect(screen.getByText('Pick up prescription, order 4471')).toBeTruthy();
-    expect(screen.queryByText('Needs response')).toBeNull();
     expect(screen.queryByText('Pending')).toBeNull();
   });
 
   it('marks its root with the message id for jump-to-message', () => {
     const { container } = render(<MessageBubble message={tagged} viewerId="caregiver-001" />);
     expect(container.querySelector('[data-message-id="m1"]')).not.toBeNull();
-  });
-});
-
-describe('NeedsResponseToggle', () => {
-  it('exposes its state and reports taps', () => {
-    const onToggle = vi.fn();
-    render(<NeedsResponseToggle pressed onToggle={onToggle} />);
-    const toggle = screen.getByRole('button', { name: 'Needs response' });
-    expect(toggle.getAttribute('aria-pressed')).toBe('true');
-    fireEvent.click(toggle);
-    expect(onToggle).toHaveBeenCalledOnce();
   });
 });
