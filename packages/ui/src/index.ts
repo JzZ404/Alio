@@ -19,6 +19,8 @@ export { FloatingAddButton } from './FloatingAddButton';
 // Chat
 export { ChatListItem } from './ChatListItem';
 export { ChatBubble } from './ChatBubble';
+export { MessageBubble } from './MessageBubble';
+export { NeedsResponseToggle } from './NeedsResponseToggle';
 
 // Patient (caregiver Home + patient switcher)
 export { PatientCard } from './PatientCard';

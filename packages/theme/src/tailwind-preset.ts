@@ -24,6 +24,11 @@ export const tailwindPreset: Partial<Config> = {
         },
         alert: colors.alert.red,
         info: colors.info.blue,
+        attention: {
+          surface: colors.attention.surface,
+          border: colors.attention.border,
+          text: colors.attention.text,
+        },
       },
       fontFamily: {
         // Spread: tokens.ts declares fontFamily `as const`, and Tailwind's

@@ -26,6 +26,14 @@ export const colors = {
   info: {
     blue: '#1C4EAB',
   },
+  // PROVISIONAL — matched by eye to the Pending Confirmations mockup
+  // (docs/superpowers/specs/2026-09-15-pending-confirmations-design.md),
+  // not yet in Figma. When design finalizes, change the values here only.
+  attention: {
+    surface: '#F5DEAB',
+    border: '#E3A73A',
+    text: '#6B4A12',
+  },
 } as const;
 
 export const fontFamily = {
