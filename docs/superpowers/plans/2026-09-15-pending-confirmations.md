@@ -1718,28 +1718,420 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 ---
 
-### Task 7: The Pending list
+### Task 7: People, waiting time and day grouping
 
-Completes spec build-order step 2.
+Revised 2026-09-16 against the caregiver screens. Pure data and logic — no
+screens. Everything here is consumed by Tasks 8 and 9.
 
 **Files:**
-- Create: `packages/ui/src/PendingCard.tsx`
-- Test: `packages/ui/src/PendingCard.test.tsx`
-- Create: `apps/caregiver/components/PendingScreen.tsx`
-- Modify: `apps/caregiver/app/(tabs)/layout.tsx` (lines 13–18, 54, 56)
-- Modify: `apps/caregiver/app/(tabs)/home/page.tsx` (signature, bell `onClick`)
-- Modify: `apps/caregiver/app/(tabs)/chat/[id]/page.tsx` (focus + highlight)
-- Modify: `packages/ui/src/index.ts`
+- Modify: `packages/ui/src/messaging/participants.ts`
+- Modify: `packages/ui/src/messaging/pending.ts`
+- Modify: `packages/ui/src/messaging/pending.test.ts`
+- Create: `apps/caregiver/lib/pending-fixtures.ts`
 
 **Interfaces:**
-- Consumes: `selectPending`, `selectRecentlyConfirmed`, `waitingLabel`, `formatMessageTime`, `useFamilyMessages`, `acknowledgeMessage`, `CAREGIVER_ID`, `CAREGIVER_THREAD_FOR_SUPABASE`, `ThreadMessage`
+- Consumes: `ThreadMessage`, `selectPending`, `selectRecentlyConfirmed` (Task 2)
 - Produces:
-  - `PendingCard({ message: ThreadMessage; now: Date; onOpen: (message: ThreadMessage) => void; onConfirm?: (messageId: string) => void; leaving?: boolean })`
-  - `PendingScreen({ onBack: () => void; onOpenMessage: (message: ThreadMessage) => void })`
-  - Layout `SubPage` gains `{ type: 'pending' }`; the chat variant gains `focusMessageId?: string; from?: 'pending'`
-  - `CaregiverHomePage` accepts `{ onOpenPending?: () => void }` and its bell calls it
+  - `PEOPLE: Record<string, { name: string; relationship: string }>`
+  - `personLabel(senderId: string | null, fallbackName: string): string` → `"Emily · Granddaughter"`, or just the name when the id is unknown
+  - `waitingLabel(createdAt: string, now: Date): string` — **signature changes: never returns null**
+  - `oldestWaitingLabel(pending: ThreadMessage[], now: Date): string | null` → `"Oldest: 5h"`
+  - `waitingSinceLabel(pending: ThreadMessage[], timeZone?: string): string | null` → `"Waiting since 9:14 AM"`
+  - `confirmedRecencyLabel(confirmed: ThreadMessage[], now: Date): string | null` → `"Today"` / `"Yesterday"` / `"Earlier"`
+  - `groupConfirmedByDay(confirmed: ThreadMessage[], now: Date): { label: 'TODAY' | 'YESTERDAY' | 'EARLIER'; items: ThreadMessage[] }[]`
+  - `DEMO_PENDING(now: Date): ThreadMessage[]` and `DEMO_CONFIRMED(now: Date): ThreadMessage[]` from the fixtures file
 
 - [ ] **Step 1: Write the failing tests**
+
+Replace the whole `describe('waitingLabel', …)` block in
+`packages/ui/src/messaging/pending.test.ts` with:
+
+```ts
+describe('waitingLabel', () => {
+  it('counts minutes below an hour and hours above it', () => {
+    expect(waitingLabel('2026-09-15T11:20:00Z', NOW)).toBe('Waiting 40m');
+    expect(waitingLabel('2026-09-15T11:01:00Z', NOW)).toBe('Waiting 59m');
+    expect(waitingLabel('2026-09-15T11:00:00Z', NOW)).toBe('Waiting 1h');
+    expect(waitingLabel('2026-09-15T09:00:00Z', NOW)).toBe('Waiting 3h');
+  });
+
+  it('never shows less than a minute', () => {
+    expect(waitingLabel('2026-09-15T11:59:50Z', NOW)).toBe('Waiting 1m');
+  });
+});
+```
+
+Append these blocks to the same file:
+
+```ts
+describe('personLabel', () => {
+  it('adds the relationship when the person is known', () => {
+    expect(personLabel('janet-chen', 'Janet Chen')).toBe('Janet Chen · Daughter');
+  });
+
+  it('falls back to the name alone for an unknown sender', () => {
+    expect(personLabel('someone-else', 'Pat')).toBe('Pat');
+    expect(personLabel(null, 'Pat')).toBe('Pat');
+  });
+});
+
+describe('oldestWaitingLabel', () => {
+  it('reports the longest wait, or nothing when nothing is pending', () => {
+    const older = msg({ id: 'o', createdAt: '2026-09-15T07:00:00Z' });
+    const newer = msg({ id: 'n', createdAt: '2026-09-15T11:30:00Z' });
+    expect(oldestWaitingLabel(selectPending([newer, older], CAREGIVER_ID), NOW)).toBe('Oldest: 5h');
+    expect(oldestWaitingLabel([], NOW)).toBeNull();
+  });
+});
+
+describe('waitingSinceLabel', () => {
+  it('reports the clock time the oldest item arrived', () => {
+    const older = msg({ id: 'o', createdAt: '2026-09-15T09:14:00Z' });
+    expect(waitingSinceLabel([older], 'UTC')).toBe('Waiting since 9:14 AM');
+    expect(waitingSinceLabel([], 'UTC')).toBeNull();
+  });
+});
+
+describe('confirmedRecencyLabel', () => {
+  it('summarises how recent the newest confirmation is', () => {
+    const today = msg({ acknowledgedAt: '2026-09-15T09:00:00Z' });
+    const yesterday = msg({ acknowledgedAt: '2026-09-14T09:00:00Z' });
+    const older = msg({ acknowledgedAt: '2026-09-11T09:00:00Z' });
+    expect(confirmedRecencyLabel([today], NOW)).toBe('Today');
+    expect(confirmedRecencyLabel([yesterday], NOW)).toBe('Yesterday');
+    expect(confirmedRecencyLabel([older], NOW)).toBe('Earlier');
+    expect(confirmedRecencyLabel([], NOW)).toBeNull();
+  });
+});
+
+describe('groupConfirmedByDay', () => {
+  it('splits into TODAY, YESTERDAY and EARLIER, newest first, dropping empty groups', () => {
+    const today = msg({ id: 't', acknowledgedAt: '2026-09-15T09:00:00Z' });
+    const yesterdayEarly = msg({ id: 'y1', acknowledgedAt: '2026-09-14T08:00:00Z' });
+    const yesterdayLate = msg({ id: 'y2', acknowledgedAt: '2026-09-14T16:41:00Z' });
+    const older = msg({ id: 'e', acknowledgedAt: '2026-09-11T11:20:00Z' });
+    const groups = groupConfirmedByDay([yesterdayEarly, older, today, yesterdayLate], NOW);
+    expect(groups.map((g) => g.label)).toEqual(['TODAY', 'YESTERDAY', 'EARLIER']);
+    expect(groups[0].items.map((m) => m.id)).toEqual(['t']);
+    expect(groups[1].items.map((m) => m.id)).toEqual(['y2', 'y1']);
+    expect(groups[2].items.map((m) => m.id)).toEqual(['e']);
+    expect(groupConfirmedByDay([today], NOW).map((g) => g.label)).toEqual(['TODAY']);
+  });
+});
+```
+
+Add the new names to the existing import from `./pending`, and `personLabel`
+to the existing import from `./participants`.
+
+- [ ] **Step 2: Run the tests to verify they fail**
+
+Run: `pnpm --filter @alio/ui test`
+Expected: FAIL — `waitingLabel` returns `null` where a string is expected, and
+the new names are not exported.
+
+- [ ] **Step 3: Add people to `participants.ts`**
+
+Replace the `DISPLAY_NAME` block with:
+
+```ts
+/**
+ * Prototype directory. Relationship is what the caregiver screens show beside a
+ * name ("Emily · Granddaughter"); it has no home in the database yet, so it
+ * lives here until a people table exists.
+ */
+export const PEOPLE: Record<string, { name: string; relationship: string }> = {
+  [CAREGIVER_ID]: { name: 'Sarah Lee', relationship: 'Caregiver' },
+  [FAMILY_MEMBER_ID]: { name: 'Janet Chen', relationship: 'Daughter' },
+  'emily-chen': { name: 'Emily', relationship: 'Granddaughter' },
+  'charles-chen': { name: 'Charles', relationship: 'Son' },
+  'miranda-chen': { name: 'Miranda', relationship: 'Daughter' },
+};
+
+export const DISPLAY_NAME: Record<string, string> = Object.fromEntries(
+  Object.entries(PEOPLE).map(([id, person]) => [id, person.name]),
+);
+
+/** "Emily · Granddaughter" for a known sender, the plain name otherwise. */
+export function personLabel(senderId: string | null, fallbackName: string): string {
+  const person = senderId === null ? undefined : PEOPLE[senderId];
+  return person ? `${person.name} · ${person.relationship}` : fallbackName;
+}
+```
+
+- [ ] **Step 4: Rewrite the time helpers in `pending.ts`**
+
+Replace `waitingLabel` with:
+
+```ts
+const MINUTE_MS = 60 * 1000;
+
+/**
+ * "Waiting 40m" below an hour, "Waiting 3h" above it (spec §3, revised
+ * 2026-09-16 — it used to stay silent under two hours, which the screens
+ * contradict). Never below a minute: a fresh item still reads as waiting.
+ */
+export function waitingLabel(createdAt: string, now: Date): string {
+  const elapsed = Math.max(now.getTime() - instant(createdAt), MINUTE_MS);
+  const minutes = Math.floor(elapsed / MINUTE_MS);
+  return minutes < 60 ? `Waiting ${minutes}m` : `Waiting ${Math.floor(minutes / 60)}h`;
+}
+```
+
+Append:
+
+```ts
+/** "Oldest: 5h" for the section header. Null when nothing is pending. */
+export function oldestWaitingLabel(pending: ThreadMessage[], now: Date): string | null {
+  const oldest = pending[0];
+  if (!oldest) return null;
+  return `Oldest: ${waitingLabel(oldest.createdAt, now).replace('Waiting ', '')}`;
+}
+
+/** "Waiting since 9:14 AM" for the Inbox card. Null when nothing is pending. */
+export function waitingSinceLabel(pending: ThreadMessage[], timeZone?: string): string | null {
+  const oldest = pending[0];
+  if (!oldest) return null;
+  return `Waiting since ${formatMessageTime(oldest.createdAt, timeZone)}`;
+}
+
+const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+
+/** How recent the newest confirmation is, for the Inbox card. */
+export function confirmedRecencyLabel(confirmed: ThreadMessage[], now: Date): string | null {
+  const newest = confirmed[0];
+  if (!newest?.acknowledgedAt) return null;
+  const days = Math.round((startOfDay(now) - startOfDay(new Date(newest.acknowledgedAt))) / DAY_MS);
+  if (days <= 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  return 'Earlier';
+}
+
+export type ConfirmedGroup = { label: 'TODAY' | 'YESTERDAY' | 'EARLIER'; items: ThreadMessage[] };
+
+/** Confirmed rows grouped by calendar day, newest first, empty groups dropped. */
+export function groupConfirmedByDay(confirmed: ThreadMessage[], now: Date): ConfirmedGroup[] {
+  const buckets: ConfirmedGroup[] = [
+    { label: 'TODAY', items: [] },
+    { label: 'YESTERDAY', items: [] },
+    { label: 'EARLIER', items: [] },
+  ];
+  const sorted = [...confirmed].sort(
+    (a, b) => instant(b.acknowledgedAt ?? b.createdAt) - instant(a.acknowledgedAt ?? a.createdAt),
+  );
+  for (const m of sorted) {
+    const days = Math.round((startOfDay(now) - startOfDay(new Date(m.acknowledgedAt ?? m.createdAt))) / DAY_MS);
+    const bucket = days <= 0 ? buckets[0] : days === 1 ? buckets[1] : buckets[2];
+    bucket.items.push(m);
+  }
+  return buckets.filter((b) => b.items.length > 0);
+}
+```
+
+- [ ] **Step 5: Run the tests to verify they pass**
+
+Run: `pnpm --filter @alio/ui test`
+Expected: PASS. The `selectPending`/`PendingCard` callers still compile because
+`waitingLabel` only became non-nullable.
+
+- [ ] **Step 6: Export and add the demo fixtures**
+
+Add `personLabel` and the four new pending helpers to the existing export
+blocks in `packages/ui/src/index.ts` (they are covered by the existing
+`export *` lines — verify, and add nothing if so).
+
+Create `apps/caregiver/lib/pending-fixtures.ts`:
+
+```ts
+import type { ThreadMessage } from '@alio/ui';
+import { CAREGIVER_ID, CARE_THREAD_ID, PEOPLE } from '@alio/ui';
+
+/**
+ * Demo people for the caregiver screens. The live thread has exactly one family
+ * member (Janet); these fixtures let the Pending and Confirmed screens show the
+ * range of senders the design calls for. They follow the codebase's existing
+ * pattern of mock history alongside live rows (see the chat pages), and they
+ * are display-only — confirming one updates local state, never the database.
+ */
+const ago = (now: Date, minutes: number) => new Date(now.getTime() - minutes * 60_000).toISOString();
+
+function demo(
+  id: string,
+  senderId: string,
+  text: string,
+  createdAt: string,
+  acknowledgedAt: string | null,
+): ThreadMessage {
+  return {
+    id,
+    threadId: CARE_THREAD_ID,
+    senderId,
+    recipientId: CAREGIVER_ID,
+    senderName: PEOPLE[senderId].name,
+    text,
+    reportId: null,
+    finalTier: 'action',
+    acknowledgedAt,
+    createdAt,
+  };
+}
+
+export function DEMO_PENDING(now: Date): ThreadMessage[] {
+  return [
+    demo(
+      'demo-pending-emily',
+      'emily-chen',
+      "Could you check whether she still has enough of the blue blood pressure pills? I'll order more tonight if she's low.",
+      ago(now, 40),
+      null,
+    ),
+    demo(
+      'demo-pending-charles',
+      'charles-chen',
+      "Mom's cardiology appointment moved to Thursday at 2:15. Can you take her then instead of Friday?",
+      ago(now, 180),
+      null,
+    ),
+  ];
+}
+
+export function DEMO_CONFIRMED(now: Date): ThreadMessage[] {
+  const day = 24 * 60;
+  return [
+    demo(
+      'demo-confirmed-walker',
+      'miranda-chen',
+      'Can you bring the walker in from the porch before you leave?',
+      ago(now, 300),
+      ago(now, 240),
+    ),
+    demo(
+      'demo-confirmed-grocery',
+      'emily-chen',
+      'Grocery list is on the fridge — she wants the oat milk this time.',
+      ago(now, day + 400),
+      ago(now, day + 300),
+    ),
+    demo(
+      'demo-confirmed-water',
+      'charles-chen',
+      'Remind her to drink a full glass of water with lunch.',
+      ago(now, day + 600),
+      ago(now, day + 500),
+    ),
+    demo(
+      'demo-confirmed-mail',
+      'miranda-chen',
+      'Bring the mail up on Tuesday, please.',
+      ago(now, 4 * day),
+      ago(now, 4 * day - 60),
+    ),
+  ];
+}
+```
+
+- [ ] **Step 7: Typecheck and commit**
+
+Run: `pnpm --filter @alio/ui test && pnpm --filter @alio/ui typecheck && pnpm --filter @alio/caregiver build`
+Expected: tests pass, typecheck clean, build completes.
+
+```bash
+git add packages/ui apps/caregiver/lib/pending-fixtures.ts
+git commit -m "feat(ui): show waiting time in minutes, add people and day grouping
+
+The caregiver screens show 'Waiting 40m' and group confirmed items by day, so
+the waiting label no longer stays silent under two hours and rows now carry
+'name · relationship'. Relationship has no database home yet and lives in the
+prototype directory next to the other hardcoded identities.
+
+Demo senders let the screens show the range the design calls for while the live
+thread still has one real family member.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+```
+
+---
+
+### Task 8: The Pending screen — screens 2 and 3
+
+Revised 2026-09-16. Builds `GC - Chat - pending` and `GC - Chat - confirmed`
+exactly: one screen, two tabs.
+
+**Files:**
+- Create: `packages/ui/src/SegmentedTabs.tsx`
+- Create: `packages/ui/src/PendingCard.tsx`
+- Create: `packages/ui/src/ConfirmedRow.tsx`
+- Test: `packages/ui/src/PendingCard.test.tsx` (covers all three)
+- Modify: `packages/ui/src/icons/custom.tsx` (add `IconCheck`)
+- Modify: `packages/ui/src/index.ts`
+- Create: `apps/caregiver/components/PendingScreen.tsx`
+- Modify: `apps/caregiver/app/(tabs)/layout.tsx`
+
+**Interfaces:**
+- Consumes: Task 7's helpers and fixtures; `useFamilyMessages`, `acknowledgeMessage`, `CAREGIVER_ID` (Task 3)
+- Produces:
+  - `SegmentedTabs<T extends string>({ tabs, value, onChange })` where `tabs: { value: T; label: string; badge?: number }[]`
+  - `PendingCard({ message, now, onConfirm, onOpen, leaving })`
+  - `ConfirmedRow({ message })`
+  - `PendingScreen({ initialTab, onBack, onOpenMessage })`, `initialTab: 'pending' | 'confirmed'`
+  - Layout `SubPage` gains `{ type: 'pending'; tab: 'pending' | 'confirmed' }`
+
+**Visual spec — follow exactly.** Colors come from tokens only.
+
+Screen chrome (both tabs):
+- Page background: the app gradient, `linear-gradient(135deg, #E3E5F1 0%, #EAEAF2 50%, #D3D5EC 100%)` inline, as every other screen does.
+- Header at `top-[60px] left-[25px] right-[25px]`, `flex items-center justify-between`: back `IconBox size={42} shape="pill"` with `IconChevronLeft`, then a `Inbox` pill (`h-[42px] rounded-[10px] bg-brand-tint-1 px-[12px] text-[20px] font-bold text-black`), then on the right a `gap-[12px]` pair of `IconBox size={42} shape="pill"`: `IconSearch` (aria-label "Search") and `IconFilter` (aria-label "Filter").
+- Segmented control below the header: full width, `h-[52px] rounded-full bg-white/50 p-[5px] flex`. Each segment `flex-1 rounded-full flex items-center justify-center gap-[8px] text-[16px] font-bold`; selected: `bg-white text-gray-100 shadow-[0_2px_10px_rgba(0,0,0,0.08)]`; unselected: `text-gray-60`. A badge renders when `badge` is set and above zero: `flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-brand-primary px-[6px] text-[12px] font-bold text-white`.
+- Scrollable content below.
+
+Pending tab:
+- Section header row: `WAITING ON YOU` (`text-[12px] font-bold uppercase tracking-[0.08em] text-gray-60`) on the left, `Oldest: 5h` (`text-[12px] font-bold text-brand-primary`) on the right, hidden when nothing is pending.
+- `PendingCard`: `rounded-[16px] bg-white px-[16px] py-[16px]`.
+  - Top row: `personLabel(...)` as `text-[15px] font-bold text-gray-100`, and on the right the waiting pill: `rounded-full bg-brand-tint-1 px-[10px] py-[4px] text-[12px] font-bold text-brand-primary`.
+  - Message: `mt-[12px] whitespace-pre-wrap text-[16px] leading-[1.45] text-gray-100`. Never truncated.
+  - Confirm: `mt-[16px] h-[48px] w-full rounded-[12px] bg-brand-active text-[16px] font-bold text-white transition-colors active:bg-brand-primary`. (`brand-active`, not `brand-primary`: white on primary is 4.35:1 and misses AA; on active it is 5.18:1.)
+  - Tapping the card body — not the button — calls `onOpen(message)`.
+  - `leaving` adds `translate-x-6 opacity-0` for the 300ms exit.
+- Cards `gap-[12px]`, oldest first.
+- Empty: `Nothing pending`, `text-[14px] text-gray-60`, centred with `py-[24px]`.
+
+Confirmed tab:
+- For each group: label (`TODAY`/`YESTERDAY`/`EARLIER`) as `mt-[20px] mb-[8px] text-[12px] font-bold uppercase tracking-[0.08em] text-gray-60`.
+- `ConfirmedRow`: `flex gap-[10px] rounded-[16px] bg-white px-[16px] py-[14px]`; `IconCheck` `mt-[2px] size-[18px] shrink-0 text-brand-primary` with `aria-hidden`; then a column: message `text-[15px] leading-snug text-gray-100`, then `mt-[4px] text-[12px] text-gray-60` reading `personLabel(...) · formatMessageTime(acknowledgedAt)`.
+- Rows `gap-[10px]`.
+- Empty: `Nothing confirmed yet`, same styling as the pending empty state.
+
+- [ ] **Step 1: Add the check icon**
+
+Append to `packages/ui/src/icons/custom.tsx`:
+
+```tsx
+/**
+ * IconCheck — plain check mark for confirmed rows. The generated Caesarzkn set
+ * only has circled/boxed checklist variants; the screens use a bare tick.
+ */
+export function IconCheck(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      width={24}
+      height={24}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+    >
+      <path
+        d="M4 12.5L9.5 18L20 7"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+```
+
+- [ ] **Step 2: Write the failing tests**
 
 Create `packages/ui/src/PendingCard.test.tsx`:
 
@@ -1747,46 +2139,36 @@ Create `packages/ui/src/PendingCard.test.tsx`:
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { PendingCard } from './PendingCard';
+import { ConfirmedRow } from './ConfirmedRow';
+import { SegmentedTabs } from './SegmentedTabs';
 import type { ThreadMessage } from './messaging/types';
 
 afterEach(cleanup);
 
 const NOW = new Date('2026-09-15T12:00:00Z');
 const LONG_TEXT =
-  'Please pick up her prescription on the way back, order 4471 at the Walgreens on 45th — ' +
-  'they close at six, and ask the pharmacist whether the new dose replaces the old bottle.';
+  'Could you check whether she still has enough of the blue blood pressure pills? ' +
+  "I'll order more tonight if she's low, and I can drop them off on Thursday.";
 
 const pending: ThreadMessage = {
   id: 'm1',
   threadId: 'caregiver-001__erin-yeung',
-  senderId: 'janet-chen',
+  senderId: 'emily-chen',
   recipientId: 'caregiver-001',
-  senderName: 'Janet Chen',
+  senderName: 'Emily',
   text: LONG_TEXT,
   reportId: null,
   finalTier: 'action',
   acknowledgedAt: null,
-  createdAt: '2026-09-15T07:00:00Z',
+  createdAt: '2026-09-15T11:20:00Z',
 };
 
 describe('PendingCard', () => {
-  it('shows sender, the full untruncated text and how long it has waited', () => {
+  it('shows sender with relationship, the waiting pill and the full text', () => {
     render(<PendingCard message={pending} now={NOW} onOpen={() => {}} onConfirm={() => {}} />);
-    expect(screen.getByText('Janet Chen')).toBeTruthy();
+    expect(screen.getByText('Emily · Granddaughter')).toBeTruthy();
+    expect(screen.getByText('Waiting 40m')).toBeTruthy();
     expect(screen.getByText(LONG_TEXT)).toBeTruthy();
-    expect(screen.getByText('Waiting 5 hours')).toBeTruthy();
-  });
-
-  it('hides the waiting label before two hours', () => {
-    render(
-      <PendingCard
-        message={{ ...pending, createdAt: '2026-09-15T11:00:00Z' }}
-        now={NOW}
-        onOpen={() => {}}
-        onConfirm={() => {}}
-      />,
-    );
-    expect(screen.queryByText(/Waiting/)).toBeNull();
   });
 
   it('confirms from the button and opens the thread from the body', () => {
@@ -1799,263 +2181,103 @@ describe('PendingCard', () => {
     fireEvent.click(screen.getByText(LONG_TEXT));
     expect(onOpen).toHaveBeenCalledWith(pending);
   });
+});
 
-  it('shows Confirmed and no button once acknowledged', () => {
+describe('ConfirmedRow', () => {
+  it('reads as one line: message, then who and when', () => {
     render(
-      <PendingCard
-        message={{ ...pending, acknowledgedAt: '2026-09-15T11:00:00Z' }}
-        now={NOW}
-        onOpen={() => {}}
+      <ConfirmedRow
+        message={{ ...pending, acknowledgedAt: '2026-09-15T09:14:00Z' }}
       />,
     );
-    expect(screen.getByText('Confirmed')).toBeTruthy();
+    expect(screen.getByText(LONG_TEXT)).toBeTruthy();
+    expect(screen.getByText(/Emily · Granddaughter ·/)).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Confirm' })).toBeNull();
-    expect(screen.queryByText(/Waiting/)).toBeNull();
+  });
+});
+
+describe('SegmentedTabs', () => {
+  it('marks the selected tab, shows a badge and reports a change', () => {
+    const onChange = vi.fn();
+    render(
+      <SegmentedTabs
+        tabs={[
+          { value: 'pending', label: 'Pending', badge: 3 },
+          { value: 'confirmed', label: 'Confirmed' },
+        ]}
+        value="pending"
+        onChange={onChange}
+      />,
+    );
+    expect(screen.getByRole('tab', { name: /Pending/ }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByText('3')).toBeTruthy();
+    fireEvent.click(screen.getByRole('tab', { name: 'Confirmed' }));
+    expect(onChange).toHaveBeenCalledWith('confirmed');
+  });
+
+  it('hides a zero badge', () => {
+    render(
+      <SegmentedTabs
+        tabs={[
+          { value: 'pending', label: 'Pending', badge: 0 },
+          { value: 'confirmed', label: 'Confirmed' },
+        ]}
+        value="confirmed"
+        onChange={() => {}}
+      />,
+    );
+    expect(screen.queryByText('0')).toBeNull();
   });
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [ ] **Step 3: Run the tests to verify they fail**
 
 Run: `pnpm --filter @alio/ui test`
-Expected: FAIL — `Failed to resolve import "./PendingCard"`.
+Expected: FAIL — the three components do not exist.
 
-- [ ] **Step 3: Implement `PendingCard`**
+- [ ] **Step 4: Build the three components**
 
-Create `packages/ui/src/PendingCard.tsx`:
+Write `SegmentedTabs.tsx`, `PendingCard.tsx` and `ConfirmedRow.tsx` to the
+visual spec above. `SegmentedTabs` uses `role="tablist"` on the container and
+`role="tab"` with `aria-selected` on each segment. `PendingCard` composes
+`personLabel(message.senderId, message.senderName)` and
+`waitingLabel(message.createdAt, now)`; `ConfirmedRow` composes
+`personLabel(...)` and `formatMessageTime(message.acknowledgedAt ?? message.createdAt)`.
+Keep each file to its one component.
 
-```tsx
-import clsx from 'clsx';
-import { formatMessageTime, waitingLabel } from './messaging/pending';
-import type { ThreadMessage } from './messaging/types';
-
-/**
- * One item in the Pending list (spec §3). The text is never truncated — the
- * caregiver must be able to act without leaving the screen. The body opens the
- * message in its thread; only the button confirms.
- */
-export function PendingCard({
-  message,
-  now,
-  onOpen,
-  onConfirm,
-  leaving = false,
-}: {
-  message: ThreadMessage;
-  now: Date;
-  onOpen: (message: ThreadMessage) => void;
-  onConfirm?: (messageId: string) => void;
-  leaving?: boolean;
-}) {
-  const confirmed = message.acknowledgedAt !== null;
-  const waiting = confirmed ? null : waitingLabel(message.createdAt, now);
-
-  return (
-    <article
-      className={clsx(
-        'rounded-2xl bg-white px-[16px] py-[14px] transition-all duration-300 ease-out',
-        leaving && 'translate-x-6 opacity-0',
-        confirmed && 'opacity-70',
-      )}
-    >
-      <button type="button" onClick={() => onOpen(message)} className="block w-full text-left">
-        <span className="flex items-baseline justify-between gap-[8px]">
-          <span className="text-[14px] font-bold text-gray-100">{message.senderName}</span>
-          <time dateTime={message.createdAt} className="shrink-0 text-[12px] text-gray-60">
-            {formatMessageTime(message.createdAt)}
-          </time>
-        </span>
-        {waiting && (
-          <span className="mt-[2px] block text-[12px] font-bold text-attention-text">{waiting}</span>
-        )}
-        <span className="mt-[8px] block whitespace-pre-wrap text-[14px] leading-snug text-gray-100">
-          {message.text}
-        </span>
-      </button>
-
-      {confirmed ? (
-        <p className="mt-[10px] text-[12px] font-bold text-gray-60">Confirmed</p>
-      ) : (
-        onConfirm && (
-          <button
-            type="button"
-            onClick={() => onConfirm?.(message.id)}
-            className="mt-[12px] h-[42px] w-full rounded-lg bg-brand-primary text-[14px] font-bold text-white transition-colors active:bg-brand-active"
-          >
-            Confirm
-          </button>
-        )
-      )}
-    </article>
-  );
-}
-```
-
-- [ ] **Step 4: Run the tests to verify they pass**
+- [ ] **Step 5: Run the tests to verify they pass**
 
 Run: `pnpm --filter @alio/ui test`
-Expected: PASS, 27 tests.
+Expected: PASS.
 
-In `packages/ui/src/index.ts`, after the `NeedsResponseToggle` export, add:
+Export all three from `packages/ui/src/index.ts`, next to `MessageBubble`.
 
-```ts
-export { PendingCard } from './PendingCard';
-```
+- [ ] **Step 6: Build the screen**
 
-- [ ] **Step 5: Build the screen**
+Create `apps/caregiver/components/PendingScreen.tsx`, a `'use client'`
+component (not a route) with `{ initialTab, onBack, onOpenMessage }`:
 
-Create `apps/caregiver/components/PendingScreen.tsx`:
+- `useFamilyMessages(supabase, { by: 'recipient', recipientId: CAREGIVER_ID, since })`
+  with `since` memoised to 7 days ago, exactly as before.
+- A `useNow(60_000)` hook local to the file keeps the waiting labels current.
+- Live items come from `selectPending(messages, CAREGIVER_ID)` and
+  `selectRecentlyConfirmed(messages, CAREGIVER_ID, now)`.
+- Demo items come from `DEMO_PENDING(now)` / `DEMO_CONFIRMED(now)`, held in
+  component state so confirming one moves it to the Confirmed tab locally. Merge
+  live and demo with live first, then re-sort with the same helpers so ordering
+  stays oldest-first (pending) and newest-first (confirmed).
+- Confirming a live item calls `acknowledgeMessage` with the optimistic
+  patch/rollback and 300ms exit animation from the previous version of this
+  screen. Confirming a demo item only updates local state — never call Supabase
+  with a `demo-` id.
+- Tab state starts at `initialTab` and is switchable.
+- Tapping a card body calls `onOpenMessage(message)`; for a demo item, do
+  nothing (there is no real thread position to jump to).
 
-```tsx
-'use client';
+- [ ] **Step 7: Wire it into the layout**
 
-import { useEffect, useMemo, useState } from 'react';
-import clsx from 'clsx';
-import {
-  CAREGIVER_ID,
-  IconBox,
-  IconChevronDown,
-  IconChevronLeft,
-  PendingCard,
-  acknowledgeMessage,
-  selectPending,
-  selectRecentlyConfirmed,
-  useFamilyMessages,
-  type ThreadMessage,
-} from '@alio/ui';
-import { supabase } from '@/lib/supabase';
-
-const CONFIRMED_DAYS = 7;
-const LEAVE_MS = 300;
-
-/** Re-renders every `intervalMs` so "Waiting N hours" stays current. */
-function useNow(intervalMs: number): Date {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), intervalMs);
-    return () => window.clearInterval(timer);
-  }, [intervalMs]);
-  return now;
-}
-
-/**
- * The Pending list (spec §3) — a view over family_messages, not a store.
- * Oldest first; confirming animates the card out into the collapsed Confirmed
- * section, which stays open when nothing is pending so the screen never dead-ends.
- */
-export function PendingScreen({
-  onBack,
-  onOpenMessage,
-}: {
-  onBack: () => void;
-  onOpenMessage: (message: ThreadMessage) => void;
-}) {
-  const since = useMemo(() => new Date(Date.now() - CONFIRMED_DAYS * 24 * 60 * 60 * 1000), []);
-  const { messages, patch } = useFamilyMessages(supabase, {
-    by: 'recipient',
-    recipientId: CAREGIVER_ID,
-    since,
-  });
-  const now = useNow(60_000);
-  const [leaving, setLeaving] = useState<ReadonlySet<string>>(new Set());
-  const [showConfirmed, setShowConfirmed] = useState(false);
-  const [error, setError] = useState('');
-
-  const pending = selectPending(messages, CAREGIVER_ID);
-  const confirmed = selectRecentlyConfirmed(messages, CAREGIVER_ID, now, CONFIRMED_DAYS);
-  const confirmedOpen = showConfirmed || pending.length === 0;
-
-  async function handleConfirm(messageId: string) {
-    const at = new Date();
-    setError('');
-    setLeaving((prev) => new Set(prev).add(messageId));
-    const outcome = acknowledgeMessage(supabase, { messageId, userId: CAREGIVER_ID, at }).then(
-      () => null,
-      (e: unknown) => e,
-    );
-    await new Promise((resolve) => window.setTimeout(resolve, LEAVE_MS));
-    patch(messageId, { acknowledgedAt: at.toISOString() });
-    setLeaving((prev) => {
-      const next = new Set(prev);
-      next.delete(messageId);
-      return next;
-    });
-    const failure = await outcome;
-    if (failure) {
-      console.error(failure);
-      patch(messageId, { acknowledgedAt: null });
-      setError("Couldn't confirm. Check your connection and tap Confirm again.");
-    }
-  }
-
-  return (
-    <div
-      className="relative min-h-full pb-32"
-      style={{
-        background: 'linear-gradient(135deg, #E3E5F1 0%, #EAEAF2 50%, #D3D5EC 100%)',
-      }}
-    >
-      <header className="flex items-center gap-[12px] px-[25px] pt-[60px]">
-        <IconBox size={42} shape="pill" aria-label="Back" onClick={onBack}>
-          <IconChevronLeft className="size-[20px] text-gray-100" />
-        </IconBox>
-        <h1 className="text-[20px] font-bold text-gray-100">Pending</h1>
-      </header>
-
-      {error && (
-        <p role="alert" className="mt-[12px] px-[25px] text-[12px] font-bold text-alert">
-          {error}
-        </p>
-      )}
-
-      <section className="mt-[20px] flex flex-col gap-[10px] px-[16px]">
-        {pending.length === 0 ? (
-          <p className="py-[24px] text-center text-[14px] text-gray-60">Nothing pending</p>
-        ) : (
-          pending.map((m) => (
-            <PendingCard
-              key={m.id}
-              message={m}
-              now={now}
-              leaving={leaving.has(m.id)}
-              onConfirm={handleConfirm}
-              onOpen={onOpenMessage}
-            />
-          ))
-        )}
-      </section>
-
-      {confirmed.length > 0 && (
-        <section className="mt-[24px] px-[16px]">
-          <button
-            type="button"
-            aria-expanded={confirmedOpen}
-            onClick={() => setShowConfirmed((v) => !v)}
-            className="flex w-full items-center justify-between px-[4px] py-[8px] text-[14px] font-bold text-gray-60"
-          >
-            Confirmed
-            <IconChevronDown
-              aria-hidden
-              className={clsx('size-[18px] transition-transform', confirmedOpen && 'rotate-180')}
-            />
-          </button>
-          {confirmedOpen && (
-            <div className="mt-[8px] flex flex-col gap-[10px]">
-              {confirmed.map((m) => (
-                <PendingCard key={m.id} message={m} now={now} onOpen={onOpenMessage} />
-              ))}
-            </div>
-          )}
-        </section>
-      )}
-    </div>
-  );
-}
-```
-
-- [ ] **Step 6: Wire it into the layout**
-
-In `apps/caregiver/app/(tabs)/layout.tsx`, add after the `ReportDetail` dynamic import (line 14):
+In `apps/caregiver/app/(tabs)/layout.tsx`:
 
 ```tsx
 const PendingScreen = dynamic(
@@ -2064,389 +2286,163 @@ const PendingScreen = dynamic(
 );
 ```
 
-Add to the imports at the top:
-
-```tsx
-import { CAREGIVER_THREAD_FOR_SUPABASE } from '@alio/ui';
-```
-
-Replace the `SubPage` type (line 18) with:
+`SubPage` becomes:
 
 ```tsx
 type SubPage =
   | { type: 'chat'; id: string; focusMessageId?: string; from?: 'pending' }
   | { type: 'report'; id: string }
-  | { type: 'pending' }
+  | { type: 'pending'; tab: 'pending' | 'confirmed' }
   | null;
 ```
 
-Replace the `ChatDetail` line (line 54) with these two lines:
+Render it, and give the chat sub-page a back route home:
 
 ```tsx
-          {subPage?.type === 'chat'    && <ChatDetail   id={subPage.id} focusMessageId={subPage.focusMessageId} onBack={() => setSubPage(subPage.from === 'pending' ? { type: 'pending' } : null)} onOpenPending={() => setSubPage({ type: 'pending' })} />}
-          {subPage?.type === 'pending' && <PendingScreen onBack={() => setSubPage(null)} onOpenMessage={(m) => { const chatId = CAREGIVER_THREAD_FOR_SUPABASE[m.threadId]; if (chatId) setSubPage({ type: 'chat', id: chatId, focusMessageId: m.id, from: 'pending' }); }} />}
+          {subPage?.type === 'chat'    && <ChatDetail   id={subPage.id} focusMessageId={subPage.focusMessageId} onBack={() => setSubPage(subPage.from === 'pending' ? { type: 'pending', tab: 'pending' } : null)} />}
+          {subPage?.type === 'pending' && <PendingScreen initialTab={subPage.tab} onBack={() => setSubPage(null)} onOpenMessage={(m) => { const chatId = CAREGIVER_THREAD_FOR_SUPABASE[m.threadId]; if (chatId) setSubPage({ type: 'chat', id: chatId, focusMessageId: m.id, from: 'pending' }); }} />}
 ```
 
-Replace the `HomeTab` line (line 56) with:
+Import `CAREGIVER_THREAD_FOR_SUPABASE` from `@alio/ui`.
 
-```tsx
-          {!subPage && active === 'home'     && <HomeTab onOpenPending={() => setSubPage({ type: 'pending' })} />}
-```
+- [ ] **Step 8: Verify and commit**
 
-In `apps/caregiver/app/(tabs)/home/page.tsx`, change the component signature from:
-
-```tsx
-export default function CaregiverHomePage() {
-```
-
-to:
-
-```tsx
-export default function CaregiverHomePage({ onOpenPending }: { onOpenPending?: () => void } = {}) {
-```
-
-and add `onClick={onOpenPending}` to the `aria-label="Notifications"` button, directly after `type="button"`. The badge still shows mock data until Task 9.
-
-- [ ] **Step 7: Scroll to and highlight the focused message**
-
-In `apps/caregiver/app/(tabs)/chat/[id]/page.tsx`, change the React import to:
-
-```tsx
-import { useEffect, useRef, useState } from 'react';
-```
-
-After `handleConfirm`, add:
-
-```tsx
-  // Arriving from the Pending list: once the message has rendered, scroll it
-  // into view and highlight it briefly (spec §3). Runs once per visit.
-  const [highlightedId, setHighlightedId] = useState<string | null>(null);
-  const focused = useRef(false);
-  useEffect(() => {
-    if (!focusMessageId || focused.current) return;
-    const el = document.querySelector(`[data-message-id="${focusMessageId}"]`);
-    if (!el) return; // not loaded yet; runs again when `live` changes
-    focused.current = true;
-    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    setHighlightedId(focusMessageId);
-    const timer = window.setTimeout(() => setHighlightedId(null), 1600);
-    return () => window.clearTimeout(timer);
-  }, [focusMessageId, live]);
-```
-
-In the live messages map, add the prop to `MessageBubble`:
-
-```tsx
-                highlighted={highlightedId === m.id}
-```
-
-- [ ] **Step 8: Typecheck and test**
-
-Run: `pnpm --filter @alio/ui test && pnpm --filter @alio/ui typecheck && pnpm --filter @alio/caregiver typecheck`
-Expected: 27 tests pass; `@alio/ui` clean; caregiver shows the three pre-existing `PageProps` errors plus **one new one for `home/page.ts`**, from the `onOpenPending` prop. It is the same pattern as the other seven across both apps (see `docs/restructure-2026-09-02.md` → Deliberately not done), and `ignoreBuildErrors: true` keeps builds green. `components/PendingScreen.tsx` is not a route, so it adds none.
-
-- [ ] **Step 9: Verify in the browser**
-
-1. From the family app, send three tagged messages a few seconds apart: `First`, `Second`, `Third`.
-2. Caregiver Home → tap the bell. The Pending screen lists them **First, Second, Third** — oldest on top — each with sender, time, full text and **Confirm**.
-3. Tap **Confirm** on `Second`. It slides out, and **Confirmed** appears below with `Second` in it.
-4. Tap the body of `First`. The Janet thread opens, scrolls to `First` and rings it for about a second and a half. Tap Back: you return to Pending, not Home.
-5. Confirm the remaining two. **Nothing pending** shows, with the Confirmed section open beneath it.
-6. In Supabase, set one confirmed row's `created_at` to eight hours ago and its `acknowledged_at` to null. It returns to Pending showing **Waiting 8 hours**.
-
-- [ ] **Step 10: Commit**
+Run: `pnpm --filter @alio/ui test && pnpm --filter @alio/ui typecheck && pnpm --filter @alio/caregiver build`
+Expected: tests pass, typecheck shows only the known `PageProps` errors, build completes.
 
 ```bash
 git add packages/ui apps/caregiver
-git commit -m "feat(caregiver): add the Pending list
+git commit -m "feat(caregiver): build the Pending and Confirmed screens
 
-Spec build step 2. A view over family_messages: oldest first, full text,
-Waiting N hours after two hours, Confirm animates into a 7-day Confirmed
-section, and tapping a card opens the message in its thread, highlighted.
+Two tabs on one screen, per the caregiver designs: pending cards carry the
+sender's relationship, a waiting pill and Confirm; confirmed rows group by day
+behind a check mark. Demo senders sit alongside the live thread so the screens
+show the range the design calls for.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ```
 
 ---
 
-### Task 8: Pinned bar in the chat thread
+### Task 9: The Inbox screen, the bell, and final verification
 
-Completes spec build-order step 3.
+Revised 2026-09-16. Builds `GC - Chat - initial page` and finishes the feature.
 
 **Files:**
-- Create: `packages/ui/src/PendingPinnedBar.tsx`
-- Test: `packages/ui/src/PendingPinnedBar.test.tsx`
-- Modify: `apps/caregiver/app/(tabs)/chat/[id]/page.tsx`
+- Modify: `apps/caregiver/app/(tabs)/chat/page.tsx`
+- Modify: `apps/caregiver/app/(tabs)/home/page.tsx`
+- Modify: `apps/caregiver/app/(tabs)/layout.tsx`
+- Create: `packages/ui/src/InboxSummaryCard.tsx`
+- Test: `packages/ui/src/InboxSummaryCard.test.tsx`
 - Modify: `packages/ui/src/index.ts`
 
 **Interfaces:**
-- Consumes: `pinnedBarLabel` (Task 2), `onOpenPending` prop (Task 6), layout wiring (Task 7)
-- Produces: `PendingPinnedBar({ label: string | null; onOpen: () => void })` — renders nothing when `label` is null
+- Consumes: Task 7's `waitingSinceLabel`, `confirmedRecencyLabel`; Task 8's `PendingScreen` sub-page
+- Produces: `InboxSummaryCard({ count, label, detail, onOpen })`; `CaregiverChatPage` accepts `{ onOpenThread?, onOpenPending? }`; `CaregiverHomePage` accepts `{ onOpenPending? }`
 
-- [ ] **Step 1: Write the failing tests**
+**Visual spec:**
+- Header pill text changes from `Chat` to `Inbox`. The second header button changes from `IconChat` to `IconFilter`, `aria-label="Filter chats"`. Search stays.
+- Two cards directly under the header, above the thread list: a `flex gap-[12px]` row, each card `flex-1`, `rounded-[14px] bg-brand-primary px-[14px] py-[12px] text-left text-white transition-colors active:bg-brand-active`.
+  - Count: `text-[28px] font-bold leading-none`.
+  - Label: `mt-[6px] text-[14px] font-bold leading-none` — `Pending` / `Confirmed`.
+  - Detail: `mt-[6px] text-[12px] leading-none text-white/80` — `waitingSinceLabel(...)` or `confirmedRecencyLabel(...)`; render an empty string when null so the cards keep equal height.
+- The cards are always visible, including at zero (spec §2.2, revised).
+- The thread list starts below the cards.
 
-Create `packages/ui/src/PendingPinnedBar.test.tsx`:
+- [ ] **Step 1: Write the failing test**
+
+Create `packages/ui/src/InboxSummaryCard.test.tsx`:
 
 ```tsx
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { PendingPinnedBar } from './PendingPinnedBar';
+import { InboxSummaryCard } from './InboxSummaryCard';
 
 afterEach(cleanup);
 
-describe('PendingPinnedBar', () => {
-  it('renders nothing when nothing is pending', () => {
-    const { container } = render(<PendingPinnedBar label={null} onOpen={() => {}} />);
-    expect(container.firstChild).toBeNull();
-  });
-
-  it('shows the label and opens the Pending list on tap', () => {
+describe('InboxSummaryCard', () => {
+  it('shows the count, label and detail, and reports taps', () => {
     const onOpen = vi.fn();
     render(
-      <PendingPinnedBar label="1 pending · Pick up prescription, order 4471" onOpen={onOpen} />,
+      <InboxSummaryCard count={2} label="Pending" detail="Waiting since 9:14 AM" onOpen={onOpen} />,
     );
-    fireEvent.click(screen.getByRole('button', { name: /1 pending/ }));
+    expect(screen.getByText('2')).toBeTruthy();
+    expect(screen.getByText('Pending')).toBeTruthy();
+    expect(screen.getByText('Waiting since 9:14 AM')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Pending/ }));
     expect(onOpen).toHaveBeenCalledOnce();
+  });
+
+  it('still renders at zero', () => {
+    render(<InboxSummaryCard count={0} label="Pending" detail={null} onOpen={() => {}} />);
+    expect(screen.getByText('0')).toBeTruthy();
   });
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [ ] **Step 2: Run it and see it fail**
 
-Run: `pnpm --filter @alio/ui test`
-Expected: FAIL — `Failed to resolve import "./PendingPinnedBar"`.
+Run: `pnpm --filter @alio/ui test` → FAIL, component missing.
 
-- [ ] **Step 3: Implement it**
+- [ ] **Step 3: Build the card, export it, see the test pass**
 
-Create `packages/ui/src/PendingPinnedBar.tsx`:
+Write `packages/ui/src/InboxSummaryCard.tsx` to the visual spec, export it from
+the barrel, and run the suite again — PASS.
 
-```tsx
-import { IconPinFilled } from './icons';
+- [ ] **Step 4: Rebuild the Inbox screen**
 
-/**
- * Thread pinned bar (spec §2.2): count plus the longest-waiting item. Exists
- * only while something is pending — never a permanent fixture. Truncating the
- * preview is fine here; the list it opens shows full text.
- */
-export function PendingPinnedBar({
-  label,
-  onOpen,
-}: {
-  label: string | null;
-  onOpen: () => void;
-}) {
-  if (label === null) return null;
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="flex w-full items-center gap-[10px] rounded-2xl border border-attention-border bg-attention-surface px-[14px] py-[10px] text-left text-attention-text"
-    >
-      <IconPinFilled aria-hidden className="size-[18px] shrink-0" />
-      <span className="truncate text-[14px] font-bold">{label}</span>
-    </button>
-  );
-}
-```
+In `apps/caregiver/app/(tabs)/chat/page.tsx`: add `'use client'`, take
+`{ onOpenThread, onOpenPending }`, swap the pill copy and the icon, read the
+counts from `useFamilyMessages` + `selectPending`/`selectRecentlyConfirmed`
+merged with `DEMO_PENDING`/`DEMO_CONFIRMED` exactly as `PendingScreen` does, and
+render the two cards above the list. Keep the list's existing appearance.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [ ] **Step 5: Point the bell at the Pending screen**
 
-Run: `pnpm --filter @alio/ui test`
-Expected: PASS, 29 tests.
-
-In `packages/ui/src/index.ts`, after the `PendingCard` export, add:
-
-```ts
-export { PendingPinnedBar } from './PendingPinnedBar';
-```
-
-- [ ] **Step 5: Put it in the thread**
-
-In `apps/caregiver/app/(tabs)/chat/[id]/page.tsx`, add `PendingPinnedBar` and `pinnedBarLabel` to the `@alio/ui` import list. After the `highlightedId` effect, add:
+In `home/page.tsx`, keep the badge work from before and make the bell call
+`onOpenPending`. In `layout.tsx`:
 
 ```tsx
-  const pinnedLabel = pinnedBarLabel(live, CAREGIVER_ID);
+          {!subPage && active === 'home'     && <HomeTab onOpenPending={() => setSubPage({ type: 'pending', tab: 'pending' })} />}
+          {!subPage && active === 'chat'     && <ChatTab    onOpenThread={(id) => setSubPage({ type: 'chat',   id })} onOpenPending={(tab) => setSubPage({ type: 'pending', tab })} />}
 ```
 
-Directly after the closing `</header>`, add:
-
-```tsx
-      {onOpenPending && pinnedLabel && (
-        <div className="absolute left-[16px] right-[16px] top-[114px] z-10">
-          <PendingPinnedBar label={pinnedLabel} onOpen={onOpenPending} />
-        </div>
-      )}
-```
-
-Change the messages container's opening tag from:
-
-```tsx
-      <div className="absolute bottom-[120px] left-0 right-0 top-[129px] overflow-y-auto px-[16px] py-[12px]">
-```
-
-to:
-
-```tsx
-      <div
-        className={`absolute bottom-[120px] left-0 right-0 overflow-y-auto px-[16px] py-[12px] ${
-          onOpenPending && pinnedLabel ? 'top-[172px]' : 'top-[129px]'
-        }`}
-      >
-```
-
-- [ ] **Step 6: Verify**
-
-Run: `pnpm --filter @alio/caregiver typecheck`
-Expected: only the four `PageProps` errors present after Task 7 (`chat/[id]/page.ts`, `chat/page.ts`, `logs/page.ts`, `home/page.ts`).
-
-In the browser:
-1. With nothing pending, open the Janet thread. No bar.
-2. From the family app, tag and send `Pick up prescription, order 4471`. The bar appears live: `1 pending · Pick up prescription, order 4471`.
-3. Tag and send `Call me after lunch`. The bar reads `2 pending · Pick up prescription, order 4471` — still the oldest.
-4. Tap the bar. The Pending list opens.
-5. Confirm both, go back to the thread. The bar is gone.
-
-- [ ] **Step 7: Commit**
-
-```bash
-git add packages/ui "apps/caregiver/app/(tabs)/chat/[id]/page.tsx"
-git commit -m "feat(caregiver): pin the longest-waiting item to the top of the thread
-
-Spec build step 3. Shows only while something is pending and opens the
-Pending list.
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
-```
-
----
-
-### Task 9: Home bell badge, and final verification
-
-Completes spec build-order step 4.
-
-**Files:**
-- Modify: `apps/caregiver/app/(tabs)/home/page.tsx` (top of file through `const router = useRouter();`, and the bell button)
-
-**Interfaces:**
-- Consumes: `useFamilyMessages`, `selectPending`, `formatBadge`, `CAREGIVER_ID`; `onOpenPending` prop and layout wiring (Task 7)
-
-- [ ] **Step 1: Read the pending count on Home**
-
-In `apps/caregiver/app/(tabs)/home/page.tsx`, replace everything from the top of the file through `const router = useRouter();` with:
-
-```tsx
-'use client';
-
-import { useMemo } from 'react';
-import { useRouter } from 'next/navigation';
-import {
-  CAREGIVER_ID,
-  PatientCard,
-  IconBox,
-  IconProfile,
-  IconNotificationFilled,
-  IconPlus,
-  formatBadge,
-  selectPending,
-  useFamilyMessages,
-} from '@alio/ui';
-import { SAMPLE_PATIENTS, SAMPLE_CG_USER } from '@alio/mock-data';
-import { supabase } from '@/lib/supabase';
-
-/**
- * Caregiver Home — Figma CG-Home (390:4831) + CG-Home-patientcarddropdown (390:4151).
- *
- * Layout (top to bottom):
- *   1. User header (caregiver avatar + name + role + profile + Pending bell)
- *   2. "Upcoming Schedule" title + add button
- *   3. List of patient cards (first is expanded by default)
- *
- * The bell sits outside the dashboard's flag stream on purpose (spec §2.1).
- */
-export default function CaregiverHomePage({ onOpenPending }: { onOpenPending?: () => void } = {}) {
-  const router = useRouter();
-  // Home needs only the pending count, so load no confirmed history.
-  const since = useMemo(() => new Date(), []);
-  const { messages } = useFamilyMessages(supabase, {
-    by: 'recipient',
-    recipientId: CAREGIVER_ID,
-    since,
-  });
-  const pendingCount = selectPending(messages, CAREGIVER_ID).length;
-  const badge = formatBadge(pendingCount);
-```
-
-- [ ] **Step 2: Turn the notifications button into the Pending bell**
-
-Replace the `aria-label="Notifications"` `<button>`, from its opening tag through `</button>`, with:
-
-```tsx
-        <button
-          type="button"
-          aria-label={badge ? `Pending, ${pendingCount}` : 'Pending'}
-          onClick={onOpenPending}
-          className="relative flex size-[42px] items-center justify-center rounded-lg bg-brand-tint-1 transition-colors active:bg-brand-border"
-        >
-          <IconNotificationFilled className="size-[22px] text-gray-100" />
-          {badge && (
-            <span className="absolute -right-[4px] -top-[4px] flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-brand-primary px-[4px] text-[11px] font-bold text-white">
-              {badge}
-            </span>
-          )}
-        </button>
-```
-
-`SAMPLE_CG_USER.notifications` is no longer read here. Leave it in `packages/mock-data` — that file is also being edited on `renew-ui-sep02`.
-
-- [ ] **Step 3: Verify the bell**
-
-With `pnpm dev` running:
-1. Confirm everything pending. Home shows the bell with **no badge**.
-2. From the family app, tag and send one message. The badge shows **1** live, without a reload.
-3. Tap the bell. The Pending list opens. Tap Back. Home.
-4. Tag and send ten more. The badge reads **9+**.
-5. Confirm one from the thread bubble. The badge count drops on returning to Home.
-
-- [ ] **Step 4: Full verification**
-
-Run:
+- [ ] **Step 6: Full verification**
 
 ```bash
 pnpm test
 pnpm -r typecheck
 pnpm -r build
-cd backend && pytest && cd ..
+git diff main --stat -- backend    # must be empty
 ```
 
-Expected:
-- `pnpm test` — 29 tests pass in `@alio/ui`.
-- `pnpm -r typecheck` — `@alio/mock-data`, `@alio/theme`, `@alio/ui` clean. The apps report only `PageProps` errors in `.next/types`: the seven that existed on `main` plus the one for `home/page.ts` added in Task 7 — eight total, one root cause.
-- `pnpm -r build` — both apps build.
-- `pytest` — 21 passed. Nothing in `backend/` changed.
+Expected: all tests pass; typecheck shows only the known `PageProps` errors;
+both apps build; backend untouched.
 
-Then grep the new code for the spec's banned vocabulary:
+Then check the banned vocabulary (note `inbox` was un-banned on 2026-09-16 for
+the chat-list header only):
 
 ```bash
 git diff main --name-only | grep -E '\.(ts|tsx|sql)$' \
-  | xargs grep -n -i -E '\b(ticket|approv|inbox|notification hub)' || echo "clean"
+  | xargs grep -n -i -E '\b(ticket|approv|notification hub)' || echo "clean"
 ```
 
-Expected: `clean`. (Docs are excluded because the spec and this plan name the banned terms in order to ban them.)
-
-- [ ] **Step 5: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add "apps/caregiver/app/(tabs)/home/page.tsx"
-git commit -m "feat(caregiver): show the pending count on the Home bell
+git add packages/ui apps/caregiver
+git commit -m "feat(caregiver): rebuild the Inbox with Pending and Confirmed cards
 
-Spec build step 4. No badge at zero, caps at 9+, opens the Pending list.
-Completes the human loop: tag, Confirm in the bubble, Pending list, pinned
-bar, bell.
+The chat list becomes the Inbox: two always-visible cards summarising what is
+waiting and what was confirmed, either one opening the Pending screen on its
+tab. The header's second action is now a filter. The Home bell opens the same
+screen.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ```
 
 ---
+
 
 ## After this plan
 

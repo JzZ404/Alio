@@ -28,8 +28,14 @@ Use these terms and no others, in code, copy, and design files.
   loop into a question of authority. They confirm; if they can't do it, they
   reply in the thread like a person.
 - **notification hub** — these aren't notifications. They're messages.
-- **inbox** — implies a mailbox separate from the conversation. It isn't one.
 - **task** — already used by the routine/anchor system. Collision.
+
+**Un-banned 2026-09-16: `inbox`.** It was banned for implying a mailbox separate
+from the conversation. The caregiver screens label the chat list itself `Inbox`,
+with the Pending and Confirmed cards pinned above the threads — one place, not a
+second mailbox — so the original objection does not apply to that usage. `Inbox`
+is product copy for the chat list header only; the Pending screen is still
+`Pending`, never "inbox".
 
 ---
 
@@ -71,12 +77,16 @@ carries visit-report exceptions and symptom-pattern flags; adding a third stream
 to that column makes all three unreadable. The bell sits deliberately outside
 it.
 
-### 2.2 Chat — pinned bar at top of thread
+### 2.2 Inbox — two summary cards, pinned above the thread list
 
-- Renders only when pending count is above zero. Never a permanent fixture.
-- Content: count plus a preview of the **longest-waiting** item.
-  - `1 pending · Pick up prescription, order 4471`
-- Tap opens the Pending list.
+**Revised 2026-09-16.** The in-thread pinned bar is replaced by two cards at the
+top of the caregiver's Inbox (the Chat tab). They are always visible, not
+conditional on a count.
+
+- Left card: pending count, the word `Pending`, and when the oldest has been
+  waiting since (`Waiting since 9:14 AM`).
+- Right card: confirmed count, the word `Confirmed`, and its recency (`Today`).
+- Tapping either opens the Pending screen on that tab.
 
 ### 2.3 In the bubble itself
 
@@ -97,7 +107,10 @@ notification detail list, one full card per item, newest at the bottom.
 ### Card contents
 
 - Sender name and timestamp
-- Time waiting, shown once past two hours: `Waiting 5 hours`
+- Time waiting, always shown as a pill: minutes below an hour (`Waiting 40m`),
+  then hours (`Waiting 3h`). **Revised 2026-09-16** — this replaces the original
+  "only once past two hours" rule, which contradicted the screens.
+- Sender line reads `name · relationship` (`Emily · Granddaughter`).
 - **Full message text, not truncated.** The caregiver must be able to act
   without leaving the screen. Truncation forces a round trip and defeats the
   surface.
@@ -105,7 +118,14 @@ notification detail list, one full card per item, newest at the bottom.
 - Tapping the card body, not the button, jumps to that message in the thread,
   scrolled into position and briefly highlighted.
 
-### Ordering
+### Tabs and ordering
+
+**Revised 2026-09-16.** The screen is two tabs, `Pending` and `Confirmed`, as a
+segmented control at the top. The Pending tab carries a count badge on both
+tabs' states. Under the control, the Pending tab shows a section header
+`WAITING ON YOU` with the longest wait on the right (`Oldest: 5h`). The
+Confirmed tab groups its rows by day under `TODAY`, `YESTERDAY` and `EARLIER`,
+each row a single line with a check mark plus `sender · relationship · time`.
 
 Oldest first. Longest-waiting at the top.
 
