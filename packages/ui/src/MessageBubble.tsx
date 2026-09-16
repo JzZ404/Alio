@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import clsx from 'clsx';
 import { IconAttention } from './icons';
 import type { ThreadMessage } from './messaging/types';
@@ -53,6 +53,11 @@ export function MessageBubble({
     pressTimer.current = setTimeout(() => onLongPress(message), LONG_PRESS_MS);
   };
 
+  // If the thread unmounts (navigating away, a live update reordering the
+  // list) mid-hold, the timer must not fire afterward against a stale
+  // `message`/`onLongPress` closure.
+  useEffect(() => clearPressTimer, []);
+
   return (
     <div
       data-message-id={message.id}
@@ -81,10 +86,16 @@ export function MessageBubble({
           highlighted && 'ring-[3px] ring-brand-accent ring-offset-2',
         )}
       >
+        {/*
+         * One line states the state, so it cannot contradict itself: this
+         * used to be a separate "Confirmed" line below the Confirm button,
+         * left in place after the header above it kept reading "Pending" —
+         * both were visible on the same bubble once acknowledged.
+         */}
         {needsResponse && (
           <p className="mb-[6px] flex items-center gap-[6px] text-[12px] font-bold">
             <IconAttention aria-hidden className="size-[16px] text-brand-primary" />
-            Pending
+            {confirmed ? 'Confirmed' : 'Pending'}
           </p>
         )}
         <p className="whitespace-pre-wrap text-[14px] leading-snug">{message.text}</p>
@@ -98,14 +109,6 @@ export function MessageBubble({
           >
             Confirm
           </button>
-        )}
-        {/*
-         * The header above already reads "Pending" for the whole time a
-         * message is untagged-but-open, on both sides. This line only needs
-         * to add the one thing the header can't say: that it's done.
-         */}
-        {needsResponse && !canConfirm && confirmed && (
-          <p className="mt-[8px] text-[12px] font-bold">Confirmed</p>
         )}
       </div>
     </div>

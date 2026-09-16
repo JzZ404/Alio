@@ -23,6 +23,7 @@ describe('MessageBubble', () => {
     const onConfirm = vi.fn();
     render(<MessageBubble message={tagged} viewerId="caregiver-001" onConfirm={onConfirm} />);
     expect(screen.getByText('Pending')).toBeTruthy();
+    expect(screen.queryByText('Confirmed')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
     expect(onConfirm).toHaveBeenCalledWith('m1');
   });
@@ -30,17 +31,20 @@ describe('MessageBubble', () => {
   it('shows the sender Pending, with no Confirm button', () => {
     render(<MessageBubble message={tagged} viewerId="janet-chen" />);
     expect(screen.getByText('Pending')).toBeTruthy();
+    expect(screen.queryByText('Confirmed')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Confirm' })).toBeNull();
   });
 
-  it('shows both sides Confirmed once acknowledged', () => {
+  it('shows both sides Confirmed once acknowledged, with no lingering Pending', () => {
     const done = { ...tagged, acknowledgedAt: '2026-09-15T10:00:00Z' };
     render(<MessageBubble message={done} viewerId="caregiver-001" onConfirm={() => {}} />);
     expect(screen.getByText('Confirmed')).toBeTruthy();
+    expect(screen.queryByText('Pending')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Confirm' })).toBeNull();
     cleanup();
     render(<MessageBubble message={done} viewerId="janet-chen" />);
     expect(screen.getByText('Confirmed')).toBeTruthy();
+    expect(screen.queryByText('Pending')).toBeNull();
   });
 
   it('renders an untagged message as a plain bubble', () => {

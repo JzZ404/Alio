@@ -165,18 +165,85 @@ create policy "family_messages anon acknowledge" on family_messages
 -- Pending Confirmations, part 2: marking a message after it is sent
 -- docs/superpowers/specs/2026-09-15-pending-confirmations-design.md §2.4
 --
--- The first migration let the browser write only the confirmation columns.
--- The family screens now mark a message by long-pressing it after sending, so
--- the sender must be able to set the tag on a message that already exists.
+-- The first migration let the browser write only the confirmation columns, so
+-- a message could not be marked after it was sent. The family screens now mark
+-- by long-pressing a sent message, which needs one more transition.
 --
--- Kept narrow on purpose: the tag may be set once, only while the message is
--- untagged and unconfirmed, and it can never be removed or changed afterwards.
--- Message text stays unwritable, as before.
+-- Two permissive UPDATE policies cannot express this safely: Postgres OR's
+-- their USING clauses and, separately, OR's their WITH CHECK clauses, so one
+-- policy's row visibility can pair with another's approval — allowing a
+-- message to be confirmed without ever being marked, or an existing tag to be
+-- rewritten. A policy also cannot compare the old row with the new one.
+--
+-- So: one policy decides which rows are touchable, and a trigger validates the
+-- transition itself. Exactly three transitions are allowed, and every other
+-- column is immutable through this path.
+-- Safe to re-run.
 -- =============================================================
-grant update (final_tier, tagged_by) on family_messages to anon, authenticated;
+grant update (final_tier, tagged_by, acknowledged_at, acknowledged_by, suggested_tier, suggested_by) on family_messages to anon, authenticated;
 
+drop policy if exists "family_messages anon acknowledge" on family_messages;
 drop policy if exists "family_messages anon mark pending" on family_messages;
-create policy "family_messages anon mark pending" on family_messages
-  for update
-  using (final_tier is null and acknowledged_at is null)
-  with check (final_tier = 'action' and tagged_by in ('sender_manual', 'sender_confirmed_ai'));
+
+create policy "family_messages anon update" on family_messages
+  for update using (true) with check (true);
+
+create or replace function family_messages_guard_update() returns trigger
+language plpgsql as $$
+begin
+  -- Nothing but the four writable columns may move, whichever transition this is.
+  if new.id is distinct from old.id
+     or new.thread_id is distinct from old.thread_id
+     or new.sender is distinct from old.sender
+     or new.sender_id is distinct from old.sender_id
+     or new.recipient_id is distinct from old.recipient_id
+     or new.text is distinct from old.text
+     or new.report_id is distinct from old.report_id
+     or new.created_at is distinct from old.created_at
+     or new.followup_sent_at is distinct from old.followup_sent_at then
+    raise exception 'family_messages: that column cannot be changed';
+  end if;
+
+  -- 1. Marking an untagged message Pending. Once only: old.final_tier is null.
+  if old.final_tier is null
+     and new.final_tier = 'action'
+     and new.tagged_by in ('sender_manual', 'sender_confirmed_ai')
+     and new.acknowledged_at is not distinct from old.acknowledged_at
+     and new.acknowledged_by is not distinct from old.acknowledged_by
+     and new.suggested_tier is not distinct from old.suggested_tier
+     and new.suggested_by is not distinct from old.suggested_by then
+    return new;
+  end if;
+
+  -- 2. Confirming a message that is Pending and not yet confirmed. One way.
+  if old.final_tier = 'action'
+     and old.acknowledged_at is null
+     and new.acknowledged_at is not null
+     and new.acknowledged_by is not null
+     and new.final_tier is not distinct from old.final_tier
+     and new.tagged_by is not distinct from old.tagged_by
+     and new.suggested_tier is not distinct from old.suggested_tier
+     and new.suggested_by is not distinct from old.suggested_by then
+    return new;
+  end if;
+
+  -- 3. Recording a model suggestion, which never touches the human tag
+  --    (spec §4.3: write suggested_tier, never final_tier).
+  if old.suggested_tier is null
+     and new.suggested_tier in ('action', 'fyi', 'social')
+     and new.suggested_by = 'model'
+     and new.final_tier is not distinct from old.final_tier
+     and new.tagged_by is not distinct from old.tagged_by
+     and new.acknowledged_at is not distinct from old.acknowledged_at
+     and new.acknowledged_by is not distinct from old.acknowledged_by then
+    return new;
+  end if;
+
+  raise exception 'family_messages: only marking Pending, confirming, or recording a suggestion is allowed';
+end;
+$$;
+
+drop trigger if exists family_messages_guard_update on family_messages;
+create trigger family_messages_guard_update
+  before update on family_messages
+  for each row execute function family_messages_guard_update();
