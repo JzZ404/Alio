@@ -58,6 +58,9 @@ export default function ChatConversationPage({
     supabaseThreadId ? { by: 'thread', threadId: supabaseThreadId } : null,
   );
   const [draft, setDraft] = useState('');
+  // Shared banner for both the send path and Confirm below. Every attempt
+  // clears it up front, so a retry never shows a stale message left over
+  // from a different, now-resolved failure.
   const [sendError, setSendError] = useState('');
 
   // Jump-to-message from the Pending list: scroll the target bubble into
@@ -88,6 +91,7 @@ export default function ChatConversationPage({
     const text = draft.trim();
     if (!text) return;
     setDraft('');
+    setSendError('');
     if (!supabaseThreadId) {
       setMockMessages((prev) => [...prev, { id: `m-${Date.now()}`, sender: 'me', text }]);
       return;
@@ -110,10 +114,12 @@ export default function ChatConversationPage({
   };
 
   const handleConfirm = async (messageId: string) => {
+    setSendError('');
     const at = new Date();
     patch(messageId, { acknowledgedAt: at.toISOString() });
     try {
       await acknowledgeMessage(supabase, { messageId, userId: CAREGIVER_ID, at });
+      setSendError('');
     } catch (e) {
       console.error(e);
       patch(messageId, { acknowledgedAt: null });
