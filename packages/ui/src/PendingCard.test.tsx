@@ -69,6 +69,17 @@ describe('ConfirmedRow', () => {
   });
 });
 
+describe('ConfirmedRow dates', () => {
+  it('shows only the time for today, and the date too for older rows', () => {
+    const confirmed = { ...pending, acknowledgedAt: '2026-09-14T16:41:00Z' };
+    const { container: today } = render(<ConfirmedRow message={confirmed} />);
+    expect(today.textContent).not.toMatch(/Sep 14/);
+    cleanup();
+    const { container: older } = render(<ConfirmedRow message={confirmed} showDate />);
+    expect(older.textContent).toMatch(/Sep 14/);
+  });
+});
+
 describe('SegmentedTabs', () => {
   it('marks the selected tab, shows a badge and reports a change', () => {
     const onChange = vi.fn();

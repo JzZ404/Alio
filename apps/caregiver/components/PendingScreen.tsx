@@ -196,7 +196,7 @@ export function PendingScreen({
               </p>
               <div className="flex flex-col gap-[10px]">
                 {group.items.map((message) => (
-                  <ConfirmedRow key={message.id} message={message} />
+                  <ConfirmedRow key={message.id} message={message} showDate={group.label !== 'TODAY'} />
                 ))}
               </div>
             </div>

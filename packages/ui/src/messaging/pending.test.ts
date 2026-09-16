@@ -3,6 +3,7 @@ import type { ThreadMessage } from './types';
 import { CAREGIVER_ID, FAMILY_MEMBER_ID, otherParticipant, personLabel } from './participants';
 import {
   formatBadge,
+  formatMessageDate,
   formatMessageTime,
   isPendingFor,
   mergeMessage,
@@ -114,6 +115,12 @@ describe('pinnedBarLabel', () => {
 
   it('is null when nothing is pending, which hides the bar', () => {
     expect(pinnedBarLabel([msg({ finalTier: null })], CAREGIVER_ID)).toBeNull();
+  });
+});
+
+describe('formatMessageDate', () => {
+  it('formats as a short month and day', () => {
+    expect(formatMessageDate('2026-09-14T16:41:00Z', 'UTC')).toBe('Sep 14');
   });
 });
 

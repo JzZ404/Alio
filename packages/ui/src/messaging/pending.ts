@@ -63,6 +63,11 @@ export function pinnedBarLabel(messages: ThreadMessage[], userId: string): strin
   return `${pending.length} pending · ${pending[0].text}`;
 }
 
+/** "Sep 15" — shown on confirmed rows outside today, where the time alone is ambiguous. */
+export function formatMessageDate(iso: string, timeZone?: string): string {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone });
+}
+
 export function formatMessageTime(iso: string, timeZone?: string): string {
   return new Date(iso).toLocaleTimeString('en-US', {
     hour: 'numeric',
