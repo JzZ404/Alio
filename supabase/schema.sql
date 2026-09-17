@@ -386,12 +386,6 @@ $$;
 -- byte what part 3 applied.
 -- Safe to re-run.
 -- =============================================================
-create or replace function` is the whole delta since part 2: it swaps the
--- body under the existing trigger, which does not need recreating. Part 2's
--- own text is left exactly as it was, because it has already been applied by
--- hand to the live database.
--- Safe to re-run.
--- =============================================================
 create or replace function family_messages_guard_update() returns trigger
 language plpgsql as $$
 begin
