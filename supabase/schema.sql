@@ -42,8 +42,15 @@ alter table family_messages
 create index if not exists family_messages_thread_idx
   on family_messages (thread_id, created_at);
 
--- Enable Postgres LISTEN/NOTIFY so the family app can subscribe in realtime
-alter publication supabase_realtime add table family_messages;
+-- Enable Postgres LISTEN/NOTIFY so the family app can subscribe in realtime.
+-- `alter publication` takes no `if not exists` and re-adding a table raises
+-- duplicate_object, so keeping this file re-runnable means catching it.
+do $$
+begin
+  alter publication supabase_realtime add table family_messages;
+exception
+  when duplicate_object then null;
+end $$;
 
 -- =============================================================
 -- compiled_reports — structured visit reports filled in by Gemma
@@ -75,8 +82,11 @@ create table if not exists patients (
   created_at timestamptz not null default now()
 );
 
+drop policy if exists "patients anon read" on patients;
 create policy "patients anon read" on patients for select using (true);
+drop policy if exists "patients anon insert" on patients;
 create policy "patients anon insert" on patients for insert with check (true);
+drop policy if exists "patients anon update" on patients;
 create policy "patients anon update" on patients for update using (true);
 
 alter table patients enable row level security;
@@ -97,7 +107,9 @@ create index if not exists ai_chat_history_lookup_idx
 
 alter table ai_chat_history enable row level security;
 
+drop policy if exists "ai_chat_history anon read" on ai_chat_history;
 create policy "ai_chat_history anon read"   on ai_chat_history for select using (true);
+drop policy if exists "ai_chat_history anon insert" on ai_chat_history;
 create policy "ai_chat_history anon insert" on ai_chat_history for insert with check (true);
 
 -- =============================================================
@@ -108,13 +120,19 @@ alter table caregiver_logs    enable row level security;
 alter table family_messages   enable row level security;
 alter table compiled_reports  enable row level security;
 
+drop policy if exists "caregiver_logs anon read" on caregiver_logs;
 create policy "caregiver_logs anon read"   on caregiver_logs  for select using (true);
+drop policy if exists "caregiver_logs anon insert" on caregiver_logs;
 create policy "caregiver_logs anon insert" on caregiver_logs  for insert with check (true);
 
+drop policy if exists "family_messages anon read" on family_messages;
 create policy "family_messages anon read"   on family_messages for select using (true);
+drop policy if exists "family_messages anon insert" on family_messages;
 create policy "family_messages anon insert" on family_messages for insert with check (true);
 
+drop policy if exists "compiled_reports anon read" on compiled_reports;
 create policy "compiled_reports anon read"   on compiled_reports for select using (true);
+drop policy if exists "compiled_reports anon insert" on compiled_reports;
 create policy "compiled_reports anon insert" on compiled_reports for insert with check (true);
 
 -- =============================================================
@@ -141,6 +159,9 @@ alter table family_messages add column if not exists followup_sent_at timestampt
 
 -- Every row written to the live thread before sender_id existed came from the
 -- caregiver app's "Send to family" button, so its direction is known.
+-- Must run before the trigger exists: the guard below declares sender_id and
+-- recipient_id immutable, so on a re-run this statement is saved only by its
+-- `sender_id is null` filter matching zero rows.
 update family_messages
   set sender_id = 'caregiver-001', recipient_id = 'janet-chen'
   where thread_id = 'caregiver-001__erin-yeung' and sender_id is null;
@@ -248,3 +269,93 @@ drop trigger if exists family_messages_guard_update on family_messages;
 create trigger family_messages_guard_update
   before update on family_messages
   for each row execute function family_messages_guard_update();
+
+-- =============================================================
+-- Pending Confirmations, part 3: let trusted writers through the guard
+-- docs/superpowers/specs/2026-09-15-pending-confirmations-design.md §5
+--
+-- `family_messages_guard_update` is a BEFORE UPDATE ... FOR EACH ROW trigger,
+-- which means it fires for *every* writer — service_role, postgres, and
+-- anyone typing into the SQL editor — not just the browser it was written for.
+-- Two consequences, both bad:
+--
+--   1. The timeout follow-up job (spec §5) exists to stamp followup_sent_at,
+--      and the guard lists that column as immutable. So the job cannot do the
+--      one thing it is for.
+--   2. A human cannot repair a row by hand, which on a shared prototype
+--      database is how most repairs happen.
+--
+-- The guard exists to constrain the public anon key, which anybody who opens
+-- the app already holds. Server-side writers are trusted by definition — they
+-- hold a secret — so the body only needs to run for the two browser roles.
+--
+-- `create or replace function` is the whole delta since part 2: it swaps the
+-- body under the existing trigger, which does not need recreating. Part 2's
+-- own text is left exactly as it was, because it has already been applied by
+-- hand to the live database.
+-- Safe to re-run.
+-- =============================================================
+create or replace function family_messages_guard_update() returns trigger
+language plpgsql as $$
+begin
+  -- The whole point of this function is the anon key. Anything else reaching
+  -- this table authenticated as a role the browser cannot assume is trusted.
+  if current_user not in ('anon', 'authenticated') then
+    return new;
+  end if;
+
+  -- Nothing but the four writable columns may move, whichever transition this is.
+  if new.id is distinct from old.id
+     or new.thread_id is distinct from old.thread_id
+     or new.sender is distinct from old.sender
+     or new.sender_id is distinct from old.sender_id
+     or new.recipient_id is distinct from old.recipient_id
+     or new.text is distinct from old.text
+     or new.report_id is distinct from old.report_id
+     or new.created_at is distinct from old.created_at
+     or new.followup_sent_at is distinct from old.followup_sent_at then
+    raise exception 'family_messages: that column cannot be changed';
+  end if;
+
+  -- 1. Marking an untagged message Pending. Once only: old.final_tier is null.
+  --    Only 'action' is accepted here, so 'fyi' and 'social' are unreachable
+  --    through the app by design: the Pending list is the only surface a human
+  --    tag drives (spec §1), and the other two tiers exist for the model's
+  --    suggested_tier, handled by transition 3.
+  if old.final_tier is null
+     and new.final_tier = 'action'
+     and new.tagged_by in ('sender_manual', 'sender_confirmed_ai')
+     and new.acknowledged_at is not distinct from old.acknowledged_at
+     and new.acknowledged_by is not distinct from old.acknowledged_by
+     and new.suggested_tier is not distinct from old.suggested_tier
+     and new.suggested_by is not distinct from old.suggested_by then
+    return new;
+  end if;
+
+  -- 2. Confirming a message that is Pending and not yet confirmed. One way.
+  if old.final_tier = 'action'
+     and old.acknowledged_at is null
+     and new.acknowledged_at is not null
+     and new.acknowledged_by is not null
+     and new.final_tier is not distinct from old.final_tier
+     and new.tagged_by is not distinct from old.tagged_by
+     and new.suggested_tier is not distinct from old.suggested_tier
+     and new.suggested_by is not distinct from old.suggested_by then
+    return new;
+  end if;
+
+  -- 3. Recording a model suggestion, which never touches the human tag
+  --    (spec §4.3: write suggested_tier, never final_tier).
+  if old.suggested_tier is null
+     and new.suggested_tier in ('action', 'fyi', 'social')
+     and new.suggested_by = 'model'
+     and new.final_tier is not distinct from old.final_tier
+     and new.tagged_by is not distinct from old.tagged_by
+     and new.acknowledged_at is not distinct from old.acknowledged_at
+     and new.acknowledged_by is not distinct from old.acknowledged_by then
+    return new;
+  end if;
+
+  raise exception 'family_messages: only marking Pending, confirming, or recording a suggestion is allowed';
+end;
+$$;
