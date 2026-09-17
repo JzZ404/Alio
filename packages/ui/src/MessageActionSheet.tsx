@@ -1,3 +1,5 @@
+'use client';
+
 import { useEffect } from 'react';
 import { IconPinFilled } from './icons';
 import type { ThreadMessage } from './messaging/types';
