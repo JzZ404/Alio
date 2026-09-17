@@ -151,7 +151,7 @@ export function MessageActionSheet({
         }}
         className="absolute overflow-hidden"
       >
-        <MessageBubble message={message} viewerId={viewerId} selected />
+        <MessageBubble message={message} viewerId={viewerId} selected lifted />
       </div>
 
       <div
@@ -165,9 +165,13 @@ export function MessageActionSheet({
         }}
         className="absolute flex flex-col gap-[10px]"
       >
+        {/* The card is a container with padding, not a stack of full-bleed
+            rows: the primary action sits inside it as its own rounded box
+            (design 2026-09-17), which is why there are no dividers — the
+            green box is what separates it from the plain actions. */}
         <div
           className={clsx(
-            'animate-sheet-in overflow-hidden rounded-[16px] bg-white',
+            'animate-sheet-in rounded-[24px] bg-white p-[8px]',
             block?.placement === 'above' ? 'origin-bottom' : 'origin-top',
           )}
         >
@@ -175,7 +179,7 @@ export function MessageActionSheet({
             <button
               type="button"
               onClick={() => onMarkPending(message)}
-              className="flex w-full items-center gap-[10px] bg-brand-accent px-[16px] py-[14px] text-left text-[16px] font-bold text-gray-100"
+              className="flex w-full items-center gap-[10px] rounded-[16px] bg-brand-accent px-[14px] py-[14px] text-left text-[16px] font-bold text-gray-100"
             >
               <IconPinFilled aria-hidden className="size-[18px]" />
               Mark as Pending
@@ -186,19 +190,16 @@ export function MessageActionSheet({
            * everywhere in the design, and the user asked to keep the item
            * visible in the menu rather than remove it. It calls nothing.
            */}
-          {/* `first:border-t-0`: on an already-marked message Mark as Pending
-              is gone, so Reply is the first row and its divider had nothing
-              above it to divide. */}
           <button
             type="button"
-            className="flex w-full items-center border-t border-gray-30 px-[16px] py-[14px] text-left text-[16px] text-gray-100 first:border-t-0"
+            className="flex w-full items-center px-[14px] py-[14px] text-left text-[16px] text-gray-100"
           >
             Reply
           </button>
           <button
             type="button"
             onClick={() => onCopy(message)}
-            className="flex w-full items-center border-t border-gray-30 px-[16px] py-[14px] text-left text-[16px] text-gray-100"
+            className="flex w-full items-center px-[14px] py-[14px] text-left text-[16px] text-gray-100"
           >
             Copy text
           </button>

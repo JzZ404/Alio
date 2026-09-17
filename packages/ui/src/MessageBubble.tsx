@@ -26,6 +26,13 @@ const LONG_PRESS_MS = 450;
  *
  * `selected` rings the bubble while it is held open in the action sheet, so
  * the bubble and the lifted copy above the sheet read as the same object.
+ *
+ * `lifted` is for that copy. In the thread this component fills the row and
+ * the bubble takes at most 75% of it; the action sheet instead renders it
+ * into a wrapper already sized to the bubble's own measured width, where
+ * `max-w-[75%]` would mean 75% of the bubble — squeezing the text into a
+ * narrower, taller shape the instant you pressed it. `lifted` fills the
+ * wrapper instead, so the copy is the same size as the thing you pressed.
  */
 export function MessageBubble({
   message,
@@ -34,6 +41,7 @@ export function MessageBubble({
   onLongPress,
   highlighted = false,
   selected = false,
+  lifted = false,
 }: {
   message: ThreadMessage;
   viewerId: string;
@@ -41,6 +49,7 @@ export function MessageBubble({
   onLongPress?: (message: ThreadMessage, rect: DOMRect) => void;
   highlighted?: boolean;
   selected?: boolean;
+  lifted?: boolean;
 }) {
   const isMine = message.senderId === viewerId;
   const needsResponse = message.finalTier === 'action';
@@ -89,7 +98,8 @@ export function MessageBubble({
           onLongPress(message, e.currentTarget.getBoundingClientRect());
         }}
         className={clsx(
-          'max-w-[75%] rounded-[20px] px-[14px] py-[12px] transition-shadow duration-300',
+          'rounded-[20px] px-[14px] py-[12px] transition-shadow duration-300',
+          lifted ? 'w-full' : 'max-w-[75%]',
           isMine ? 'rounded-tr-[6px]' : 'rounded-tl-[6px]',
           needsResponse
             ? 'border border-attention-border bg-attention-surface text-attention-text'

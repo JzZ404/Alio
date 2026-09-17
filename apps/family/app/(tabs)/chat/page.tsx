@@ -62,10 +62,12 @@ export default function FamilyChatConversationPage() {
   // against.
   const frameRef = useRef<HTMLDivElement>(null);
   const [sheetFor, setSheetFor] = useState<{ message: ThreadMessage; rect: DOMRect } | null>(null);
-  // The message the ALIO SUGGESTS card is currently attached to (spec §4).
-  // The stub only ever proposes a message this device just sent, so there is
-  // at most one candidate at a time.
-  const [suggestedFor, setSuggestedFor] = useState<string | null>(null);
+  // Suggestions waved off with "No need". That answer writes nothing to the
+  // database by design (spec §4.3), so this is the only place it lives, and
+  // it lasts as long as the screen does.
+  const [dismissedSuggestions, setDismissedSuggestions] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
   // Shared banner for both the send path and the Mark-as-Pending path below.
   // Every attempt clears it up front, so a retry never shows a stale message
   // left over from a different, now-resolved failure.
@@ -78,6 +80,28 @@ export default function FamilyChatConversationPage() {
     const timer = setTimeout(() => setHighlightedId(null), HIGHLIGHT_MS);
     return () => clearTimeout(timer);
   }, [highlightedId]);
+
+  // The message the ALIO SUGGESTS card is attached to (spec §4).
+  //
+  // This reads the loaded thread rather than firing on the INSERT this device
+  // just made. That is both closer to what the classifier will actually do —
+  // it scores messages, not send events — and the only way to look at the
+  // card twice: the old version vanished on reload, so revising its design
+  // meant sending a fresh matching message every time.
+  //
+  // Newest match wins (the hook orders by `created_at` ascending), and
+  // only one card is ever on screen, so an old message cannot quietly sprout
+  // a suggestion above the one you are reading.
+  const suggestedFor = useMemo(() => {
+    const matches = live.filter(
+      (m) =>
+        m.senderId === FAMILY_MEMBER_ID &&
+        m.finalTier === null &&
+        !dismissedSuggestions.has(m.id) &&
+        suggestsPending(m.text),
+    );
+    return matches.length > 0 ? matches[matches.length - 1].id : null;
+  }, [live, dismissedSuggestions]);
 
   // What Sarah is waiting on: this family member's own messages, marked and
   // not yet confirmed.
@@ -130,7 +154,6 @@ export default function FamilyChatConversationPage() {
         needsResponse: false,
       });
       upsert(row);
-      if (row.final_tier === null && suggestsPending(text)) setSuggestedFor(row.id);
       setSendError('');
     } catch (e) {
       console.error(e);
@@ -158,8 +181,10 @@ export default function FamilyChatConversationPage() {
   // sender_manual — so the two entry points stay distinguishable later.
   const handleMarkSuggested = async (message: ThreadMessage) => {
     setSendError('');
+    // No dismissal needed: the card's own condition is `finalTier === null`,
+    // so tagging the message is what removes it. A rollback brings it back,
+    // which is right — the suggestion was never answered.
     patch(message.id, { finalTier: 'action' });
-    setSuggestedFor(null);
     try {
       await markPending(supabase, { messageId: message.id, taggedBy: 'sender_confirmed_ai' });
       setSendError('');
@@ -171,7 +196,8 @@ export default function FamilyChatConversationPage() {
   };
 
   // "No need" writes nothing — the suggestion is just dismissed from view.
-  const handleDismissSuggestion = () => setSuggestedFor(null);
+  const handleDismissSuggestion = (messageId: string) =>
+    setDismissedSuggestions((prev) => new Set(prev).add(messageId));
 
   const handleCopy = async (message: ThreadMessage) => {
     setSendError('');
@@ -252,7 +278,7 @@ export default function FamilyChatConversationPage() {
                   {suggestedFor === m.id && m.senderId === FAMILY_MEMBER_ID && m.finalTier === null && (
                     <SuggestionCard
                       onMark={() => handleMarkSuggested(m)}
-                      onDismiss={handleDismissSuggestion}
+                      onDismiss={() => handleDismissSuggestion(m.id)}
                     />
                   )}
                 </div>

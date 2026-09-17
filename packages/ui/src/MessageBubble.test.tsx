@@ -57,4 +57,22 @@ describe('MessageBubble', () => {
     const { container } = render(<MessageBubble message={tagged} viewerId="caregiver-001" />);
     expect(container.querySelector('[data-message-id="m1"]')).not.toBeNull();
   });
+
+  /*
+   * The action sheet renders this component into a wrapper already sized to
+   * the pressed bubble's measured width, so `max-w-[75%]` there means 75% of
+   * the bubble itself: the text reflowed narrower and the copy grew taller
+   * the instant you pressed it, which read as the message shrinking and
+   * moving. jsdom does no layout, so the cap is pinned by class instead.
+   */
+  it('fills its wrapper when lifted, and is capped at 75% of the row when not', () => {
+    const { container } = render(<MessageBubble message={tagged} viewerId="caregiver-001" lifted />);
+    const lifted = container.querySelector('[data-message-id="m1"]')?.firstElementChild;
+    expect(lifted?.className).toContain('w-full');
+    expect(lifted?.className).not.toContain('max-w-[75%]');
+    cleanup();
+    const plain = render(<MessageBubble message={tagged} viewerId="caregiver-001" />);
+    const bubble = plain.container.querySelector('[data-message-id="m1"]')?.firstElementChild;
+    expect(bubble?.className).toContain('max-w-[75%]');
+  });
 });
