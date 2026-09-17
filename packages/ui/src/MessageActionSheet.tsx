@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { IconPinFilled } from './icons';
+import { MessageBubble } from './MessageBubble';
 import type { ThreadMessage } from './messaging/types';
 
 /** Gap between the lifted message and the menu that rises from it. */
@@ -11,17 +12,34 @@ const MENU_GAP = 10;
 const FRAME_MARGIN = 12;
 /** The menu's own width — independent of the pressed message's, which can be much narrower. */
 const MENU_WIDTH = 240;
+/**
+ * Cap on the lifted copy's own height, as a fraction of the frame's height.
+ * Bounding it makes overlap with the menu impossible by construction rather
+ * than merely unlikely: an uncapped copy could be tall enough that neither
+ * "below" nor "above" has room, forcing the menu into the copy's own space.
+ * A capped preview still shows the opening lines; the full text is still in
+ * the thread behind the blur.
+ */
+const COPY_MAX_HEIGHT_RATIO = 0.4;
 
 /**
  * Long-press action sheet (spec §2.4). Opened by pressing a message; the
- * thread blurs behind it and a lifted copy of the pressed message sits at
- * the message's own position — supplied by the caller as `anchor`, measured
- * from the pressed bubble's own `getBoundingClientRect()` — with the menu
- * rising directly below it. Nothing is centred, so nothing appears to jump.
+ * thread blurs behind it and the pressed message's own `MessageBubble` is
+ * lifted — inert, with no `onConfirm` or `onLongPress` — to the message's
+ * own position, supplied by the caller as `anchor` and measured from the
+ * pressed bubble's own `getBoundingClientRect()`. The menu rises directly
+ * below it. Nothing is centred, so nothing appears to jump.
+ *
+ * Rendering the real `MessageBubble` here (rather than a hand-rolled copy)
+ * means an already-marked message's tinted surface and Pending/Confirmed
+ * header can never drift from what the real bubble underneath shows — the
+ * two are, literally, the same component.
  *
  * If the menu would run past the bottom of the frame it rises above the
- * message instead; both the lifted copy and the menu stay clamped inside
- * the frame either way.
+ * message instead. The lifted copy's height is capped (see
+ * `COPY_MAX_HEIGHT_RATIO`) before that decision is made, and the "neither
+ * fits" fallback always prefers a position that cannot overlap the copy, so
+ * the menu and the lifted copy can never occupy the same space.
  *
  * Renders nothing when `message` or `anchor` is null, so a screen can always
  * mount this and just drive it with state.
@@ -29,19 +47,22 @@ const MENU_WIDTH = 240;
 export function MessageActionSheet({
   message,
   anchor,
+  viewerId,
   onMarkPending,
   onCopy,
   onClose,
 }: {
   message: ThreadMessage | null;
   anchor: { top: number; left: number; width: number } | null;
+  viewerId: string;
   onMarkPending: (message: ThreadMessage) => void;
   onCopy: (message: ThreadMessage) => void;
   onClose: () => void;
 }) {
   const overlayRef = useRef<HTMLDivElement>(null);
-  const copyRef = useRef<HTMLParagraphElement>(null);
+  const copyRef = useRef<HTMLDivElement>(null);
   const blockRef = useRef<HTMLDivElement>(null);
+  const [copyMaxHeight, setCopyMaxHeight] = useState<number | null>(null);
   const [block, setBlock] = useState<{ top: number; placement: 'below' | 'above' } | null>(null);
 
   useEffect(() => {
@@ -60,18 +81,36 @@ export function MessageActionSheet({
   // flashes the "below" position first.
   useLayoutEffect(() => {
     if (!message || !anchor || !overlayRef.current || !copyRef.current || !blockRef.current) {
+      setCopyMaxHeight(null);
       setBlock(null);
       return;
     }
     const frameHeight = overlayRef.current.clientHeight;
-    const copyHeight = copyRef.current.offsetHeight;
+    // Cap first: the below/above decision below only ever has to reason
+    // about a bounded copy height, never an arbitrary one.
+    const cappedCopyHeight = frameHeight * COPY_MAX_HEIGHT_RATIO;
+    setCopyMaxHeight(cappedCopyHeight);
+    const copyHeight = Math.min(copyRef.current.offsetHeight, cappedCopyHeight);
     const blockHeight = blockRef.current.offsetHeight;
-    const below = anchor.top + copyHeight + MENU_GAP;
-    const fitsBelow = frameHeight === 0 || below + blockHeight <= frameHeight - FRAME_MARGIN;
+
+    const copyBottom = anchor.top + copyHeight;
+    const below = copyBottom + MENU_GAP;
+    const fitsBelow = below + blockHeight <= frameHeight - FRAME_MARGIN;
+
+    const aboveTop = anchor.top - blockHeight - MENU_GAP;
+    const fitsAbove = aboveTop >= FRAME_MARGIN;
+
     if (fitsBelow) {
       setBlock({ top: below, placement: 'below' });
+    } else if (fitsAbove) {
+      setBlock({ top: aboveTop, placement: 'above' });
     } else {
-      setBlock({ top: Math.max(FRAME_MARGIN, anchor.top - blockHeight - MENU_GAP), placement: 'above' });
+      // Neither placement has room to spare — only possible with a very
+      // short frame or an oversized menu. "below" is the safer of the two
+      // failures: it can only run past the frame's bottom edge, never back
+      // into the copy sitting above it, which "above" clamped to
+      // FRAME_MARGIN could do.
+      setBlock({ top: below, placement: 'below' });
     }
   }, [message, anchor]);
 
@@ -92,23 +131,32 @@ export function MessageActionSheet({
     // viewport around it in the dev preview.
     <div
       ref={overlayRef}
+      data-testid="action-sheet-overlay"
       className="absolute inset-0 z-50 animate-backdrop-in bg-gray-100/20 backdrop-blur-md"
     >
       <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 cursor-default" />
 
-      {/* The pressed message, lifted in place — not centred. Its ring matches
-          the one the real bubble underneath picks up via `selected`, so the
-          two read as one object. */}
-      <p
+      {/* The pressed message's own bubble, lifted in place — not centred,
+          and not a hand-rolled copy, so an already-marked message's tinted
+          surface and header can never drift from what's shown here. Height
+          is capped so a long message can never crowd out the menu. */}
+      <div
         ref={copyRef}
-        style={{ top: anchor.top, left: anchor.left, width: anchor.width }}
-        className="absolute rounded-[20px] rounded-tr-[6px] bg-brand-primary px-[14px] py-[12px] text-[14px] leading-snug text-white ring-2 ring-brand-primary ring-offset-2"
+        data-testid="lifted-message"
+        style={{
+          top: anchor.top,
+          left: anchor.left,
+          width: anchor.width,
+          maxHeight: copyMaxHeight ?? undefined,
+        }}
+        className="absolute overflow-hidden"
       >
-        {message.text}
-      </p>
+        <MessageBubble message={message} viewerId={viewerId} selected />
+      </div>
 
       <div
         ref={blockRef}
+        data-testid="action-sheet-menu-block"
         style={{
           top: block?.top ?? anchor.top,
           left: blockLeft,
@@ -153,7 +201,13 @@ export function MessageActionSheet({
           </button>
         </div>
 
-        <p className="text-center text-[12px] text-gray-60">Sarah Confirms it when she sees it</p>
+        {/* On its own subtle surface rather than floating directly on the
+            blur, which left it hard to read. */}
+        <div className="flex justify-center">
+          <p className="rounded-full bg-white/70 px-[12px] py-[6px] text-[12px] text-gray-60">
+            Sarah Confirms it when she sees it
+          </p>
+        </div>
       </div>
     </div>
   );

@@ -313,6 +313,7 @@ export default function FamilyChatConversationPage() {
       <MessageActionSheet
         message={sheetFor?.message ?? null}
         anchor={anchor}
+        viewerId={FAMILY_MEMBER_ID}
         onMarkPending={handleMarkPending}
         onCopy={handleCopy}
         onClose={() => setSheetFor(null)}
