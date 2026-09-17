@@ -56,12 +56,24 @@ export const tailwindPreset: Partial<Config> = {
           from: { opacity: '0', transform: 'translateY(6px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
+        // Long-press menu: rises from the message it belongs to.
+        'sheet-in': {
+          from: { opacity: '0', transform: 'translateY(-6px) scale(0.96)' },
+          to: { opacity: '1', transform: 'translateY(0) scale(1)' },
+        },
+        // The blur behind it fades rather than snapping on.
+        'backdrop-in': {
+          from: { opacity: '0' },
+          to: { opacity: '1' },
+        },
       },
       animation: {
         'tab-in': 'tab-in 260ms cubic-bezier(0.22, 1, 0.36, 1)',
         'screen-in-right': 'screen-in-right 280ms cubic-bezier(0.22, 1, 0.36, 1)',
         'screen-in-left': 'screen-in-left 280ms cubic-bezier(0.22, 1, 0.36, 1)',
         'screen-fade': 'screen-fade 220ms cubic-bezier(0.22, 1, 0.36, 1)',
+        'sheet-in': 'sheet-in 200ms cubic-bezier(0.22, 1, 0.36, 1)',
+        'backdrop-in': 'backdrop-in 160ms ease-out',
       },
       fontSize: fontSize as never,
       borderRadius: borderRadius as never,

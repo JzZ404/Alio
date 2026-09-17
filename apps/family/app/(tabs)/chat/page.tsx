@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChatBubble,
   CircleHeaderCard,
@@ -56,7 +56,12 @@ export default function FamilyChatConversationPage() {
     supabaseThreadId ? { by: 'thread', threadId: supabaseThreadId } : null,
   );
   const [draft, setDraft] = useState('');
-  const [sheetFor, setSheetFor] = useState<ThreadMessage | null>(null);
+  // The screen's own root, so a long-press's viewport-space rect can be
+  // converted into the action sheet's overlay coordinate space (Step 1) —
+  // the same positioned ancestor the overlay's `absolute inset-0` resolves
+  // against.
+  const frameRef = useRef<HTMLDivElement>(null);
+  const [sheetFor, setSheetFor] = useState<{ message: ThreadMessage; rect: DOMRect } | null>(null);
   // The message the ALIO SUGGESTS card is currently attached to (spec §4).
   // The stub only ever proposes a message this device just sent, so there is
   // at most one candidate at a time.
@@ -82,6 +87,22 @@ export default function FamilyChatConversationPage() {
 
   // The fixtures stay the source of truth for who's in the circle.
   const circleAvatars = SAMPLE_FM_CHAT_THREADS.find((t) => t.id === 'erin-circle')?.groupAvatars ?? [];
+
+  // The pressed bubble's rect arrives in viewport coordinates; the sheet's
+  // overlay is `absolute inset-0` inside `frameRef`, so its own coordinate
+  // space is relative to that element's box, not the viewport. Recomputed
+  // whenever the held message changes, using the frame's current rect.
+  const anchor = useMemo(() => {
+    if (!sheetFor || !frameRef.current) return null;
+    const frameRect = frameRef.current.getBoundingClientRect();
+    return {
+      top: sheetFor.rect.top - frameRect.top,
+      left: sheetFor.rect.left - frameRect.left,
+      width: sheetFor.rect.width,
+    };
+  }, [sheetFor]);
+
+  const handleLongPress = (message: ThreadMessage, rect: DOMRect) => setSheetFor({ message, rect });
 
   const handleSeeAll = () => {
     // Oldest by createdAt, never list order — `live` isn't sorted that way,
@@ -164,6 +185,7 @@ export default function FamilyChatConversationPage() {
 
   return (
     <div
+      ref={frameRef}
       className="relative h-full overflow-hidden"
       style={{
         background:
@@ -210,8 +232,9 @@ export default function FamilyChatConversationPage() {
                   <MessageBubble
                     message={m}
                     viewerId={FAMILY_MEMBER_ID}
-                    onLongPress={m.senderId === FAMILY_MEMBER_ID ? setSheetFor : undefined}
+                    onLongPress={m.senderId === FAMILY_MEMBER_ID ? handleLongPress : undefined}
                     highlighted={m.id === highlightedId}
+                    selected={sheetFor?.message.id === m.id}
                   />
                   {/*
                    * ALIO SUGGESTS (spec §4): only on the family member's own
@@ -288,7 +311,8 @@ export default function FamilyChatConversationPage() {
       </div>
 
       <MessageActionSheet
-        message={sheetFor}
+        message={sheetFor?.message ?? null}
+        anchor={anchor}
         onMarkPending={handleMarkPending}
         onCopy={handleCopy}
         onClose={() => setSheetFor(null)}

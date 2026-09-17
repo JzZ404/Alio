@@ -19,7 +19,13 @@ const LONG_PRESS_MS = 450;
  *
  * `onLongPress` opens the action sheet (spec §2.4): a 450ms pointer hold, or
  * a desktop right-click so the interaction is testable without a touch
- * device. A bubble without `onLongPress` behaves exactly as it does today.
+ * device. It reports the bubble's own `getBoundingClientRect()` alongside
+ * the message, so the caller can open the sheet at the message's actual
+ * position instead of centring it. A bubble without `onLongPress` behaves
+ * exactly as it does today.
+ *
+ * `selected` rings the bubble while it is held open in the action sheet, so
+ * the bubble and the lifted copy above the sheet read as the same object.
  */
 export function MessageBubble({
   message,
@@ -27,12 +33,14 @@ export function MessageBubble({
   onConfirm,
   onLongPress,
   highlighted = false,
+  selected = false,
 }: {
   message: ThreadMessage;
   viewerId: string;
   onConfirm?: (messageId: string) => void;
-  onLongPress?: (message: ThreadMessage) => void;
+  onLongPress?: (message: ThreadMessage, rect: DOMRect) => void;
   highlighted?: boolean;
+  selected?: boolean;
 }) {
   const isMine = message.senderId === viewerId;
   const needsResponse = message.finalTier === 'action';
@@ -40,6 +48,7 @@ export function MessageBubble({
   const canConfirm =
     onConfirm !== undefined && needsResponse && !confirmed && message.recipientId === viewerId;
 
+  const bubbleRef = useRef<HTMLDivElement>(null);
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearPressTimer = () => {
@@ -52,7 +61,10 @@ export function MessageBubble({
   const startPressTimer = () => {
     if (!onLongPress) return;
     clearPressTimer();
-    pressTimer.current = setTimeout(() => onLongPress(message), LONG_PRESS_MS);
+    pressTimer.current = setTimeout(() => {
+      const rect = bubbleRef.current?.getBoundingClientRect();
+      if (rect) onLongPress(message, rect);
+    }, LONG_PRESS_MS);
   };
 
   // If the thread unmounts (navigating away, a live update reordering the
@@ -66,6 +78,7 @@ export function MessageBubble({
       className={clsx('flex', isMine ? 'justify-end' : 'justify-start')}
     >
       <div
+        ref={bubbleRef}
         onPointerDown={startPressTimer}
         onPointerUp={clearPressTimer}
         onPointerLeave={clearPressTimer}
@@ -73,7 +86,7 @@ export function MessageBubble({
         onContextMenu={(e) => {
           if (!onLongPress) return;
           e.preventDefault();
-          onLongPress(message);
+          onLongPress(message, e.currentTarget.getBoundingClientRect());
         }}
         className={clsx(
           'max-w-[75%] rounded-[20px] px-[14px] py-[12px] transition-shadow duration-300',
@@ -86,6 +99,8 @@ export function MessageBubble({
           // Jumped-to from the Pending list: brand accent, thick enough to
           // register — the accent green is only 1.3:1 against these surfaces.
           highlighted && 'ring-[3px] ring-brand-accent ring-offset-2',
+          // Held open in the long-press action sheet.
+          selected && 'ring-2 ring-brand-primary ring-offset-2',
         )}
       >
         {/*
