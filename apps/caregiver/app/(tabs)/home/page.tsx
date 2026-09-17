@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   PatientCard,
@@ -7,8 +8,10 @@ import {
   IconProfile,
   IconNotificationFilled,
   IconPlus,
+  formatBadge,
 } from '@alio/ui';
 import { SAMPLE_PATIENTS, SAMPLE_CG_USER } from '@alio/mock-data';
+import { useCaregiverPending } from '@/lib/use-caregiver-pending';
 
 /**
  * Caregiver Home — Figma CG-Home (390:4831) + CG-Home-patientcarddropdown (390:4151).
@@ -20,6 +23,14 @@ import { SAMPLE_PATIENTS, SAMPLE_CG_USER } from '@alio/mock-data';
  */
 export default function CaregiverHomePage({ onOpenPending }: { onOpenPending?: () => void } = {}) {
   const router = useRouter();
+
+  // The bell is a second door into the Pending screen (spec §2.1), so its
+  // badge reads the same merge that screen and the Inbox cards read. It used
+  // to render a hardcoded fixture count, which never moved however much the
+  // caregiver confirmed.
+  const now = useMemo(() => new Date(), []);
+  const { pending } = useCaregiverPending(now);
+  const badge = formatBadge(pending.length);
 
   return (
     <div
@@ -64,9 +75,11 @@ export default function CaregiverHomePage({ onOpenPending }: { onOpenPending?: (
           className="relative flex size-[42px] items-center justify-center rounded-lg bg-brand-tint-1 transition-colors active:bg-brand-border"
         >
           <IconNotificationFilled className="size-[22px] text-gray-100" />
-          {SAMPLE_CG_USER.notifications > 0 && (
-            <span className="absolute -right-[4px] -top-[4px] flex size-[18px] items-center justify-center rounded-full bg-brand-primary text-[11px] font-bold text-white">
-              {SAMPLE_CG_USER.notifications}
+          {/* No badge at zero — the icon stays, and stays quiet (spec §2.1).
+              `min-w` rather than a fixed square so the capped `9+` still fits. */}
+          {badge && (
+            <span className="absolute -right-[4px] -top-[4px] flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-brand-primary px-[4px] text-[11px] font-bold text-white">
+              {badge}
             </span>
           )}
         </button>

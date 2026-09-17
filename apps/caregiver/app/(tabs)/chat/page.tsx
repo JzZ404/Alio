@@ -2,23 +2,16 @@
 
 import { useMemo } from 'react';
 import {
-  CAREGIVER_ID,
   ChatListItem,
   IconBox,
   IconFilter,
   IconSearch,
   InboxSummaryCard,
   confirmedRecencyLabel,
-  selectPending,
-  selectRecentlyConfirmed,
-  useFamilyMessages,
   waitingSinceLabel,
 } from '@alio/ui';
 import { SAMPLE_CHAT_THREADS } from '@alio/mock-data';
-import { supabase } from '@/lib/supabase';
-import { DEMO_CONFIRMED, DEMO_PENDING } from '@/lib/pending-fixtures';
-
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+import { useCaregiverPending } from '@/lib/use-caregiver-pending';
 
 /**
  * Caregiver Inbox tab — the chat-list header renamed for the Pending
@@ -30,10 +23,9 @@ const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
  * "Alio voice" pill position on the Logs screen — keeps the top toolbar
  * height consistent across the app.
  *
- * The Pending/Confirmed counts mirror `PendingScreen`'s live+demo merge
- * exactly (live `useFamilyMessages` rows first, then the `demo-` fixtures,
- * re-sorted through the same `selectPending` / `selectRecentlyConfirmed`
- * helpers) so the cards here never disagree with what that screen shows.
+ * The Pending/Confirmed counts come from `useCaregiverPending` — the one
+ * live+demo merge the Home bell and the Pending screen also read, so the
+ * three surfaces can never disagree about how much is waiting.
  */
 export default function CaregiverChatPage({
   onOpenThread,
@@ -42,26 +34,9 @@ export default function CaregiverChatPage({
   onOpenThread?: (id: string) => void;
   onOpenPending?: (tab: 'pending' | 'confirmed') => void;
 } = {}) {
-  const since = useMemo(() => new Date(Date.now() - SEVEN_DAYS_MS), []);
-  const { messages } = useFamilyMessages(supabase, {
-    by: 'recipient',
-    recipientId: CAREGIVER_ID,
-    since,
-  });
-
-  // Generated once, from the clock at mount — this screen only ever reads
-  // counts, it never confirms anything, so the fixtures don't need state.
+  // This screen only reads counts, so one clock reading at mount is enough.
   const now = useMemo(() => new Date(), []);
-  const demoPending = useMemo(() => DEMO_PENDING(now), [now]);
-  const demoConfirmed = useMemo(() => DEMO_CONFIRMED(now), [now]);
-
-  const livePending = selectPending(messages, CAREGIVER_ID);
-  const liveConfirmed = selectRecentlyConfirmed(messages, CAREGIVER_ID, now);
-
-  // Merge live and demo with live first, then re-sort with the same helpers
-  // PendingScreen uses, so ordering and membership always agree with it.
-  const pending = selectPending([...livePending, ...demoPending], CAREGIVER_ID);
-  const confirmed = selectRecentlyConfirmed([...liveConfirmed, ...demoConfirmed], CAREGIVER_ID, now);
+  const { pending, confirmed } = useCaregiverPending(now);
 
   return (
     <div

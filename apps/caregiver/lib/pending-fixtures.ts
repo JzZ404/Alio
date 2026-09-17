@@ -31,7 +31,7 @@ function demo(
   };
 }
 
-export function DEMO_PENDING(now: Date): ThreadMessage[] {
+function pendingFixtures(now: Date): ThreadMessage[] {
   return [
     demo(
       'demo-pending-emily',
@@ -50,7 +50,7 @@ export function DEMO_PENDING(now: Date): ThreadMessage[] {
   ];
 }
 
-export function DEMO_CONFIRMED(now: Date): ThreadMessage[] {
+function confirmedFixtures(now: Date): ThreadMessage[] {
   const day = 24 * 60;
   return [
     demo(
@@ -82,4 +82,66 @@ export function DEMO_CONFIRMED(now: Date): ThreadMessage[] {
       ago(now, 4 * day - 60),
     ),
   ];
+}
+
+/**
+ * Confirmed demo ids, and when each was confirmed. Module-level on purpose.
+ *
+ * These used to live in `PendingScreen`'s own state, and the tab layout
+ * unmounts that screen on Back while `ChatTab` remounts on every tab switch —
+ * so confirming Emily, going Back and reopening Pending brought her straight
+ * back, and the Inbox card never stopped counting her. A module-level store is
+ * the right scope for demo fixture state: it lasts exactly one page load, which
+ * is as long as a demo needs to hold together, and it can never reach Supabase.
+ */
+const confirmedAt = new Map<string, string>();
+const listeners = new Set<() => void>();
+let version = 0;
+
+/** Idempotent, so a double-tap cannot insert the same row twice. */
+export function confirmDemoMessage(id: string, at: string): void {
+  if (confirmedAt.has(id)) return;
+  confirmedAt.set(id, at);
+  version += 1;
+  for (const listener of listeners) listener();
+}
+
+export function subscribeDemoConfirmations(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+export function demoConfirmationsVersion(): number {
+  return version;
+}
+
+/**
+ * Generated once per page load rather than per mount: regenerating from a
+ * fresh clock every time a screen mounts would slide the fixtures' timestamps,
+ * so the Inbox card and the Pending screen would disagree about how long Emily
+ * has been waiting.
+ */
+let generated: { pending: ThreadMessage[]; confirmed: ThreadMessage[] } | null = null;
+
+function fixtures(): { pending: ThreadMessage[]; confirmed: ThreadMessage[] } {
+  if (generated === null) {
+    const now = new Date();
+    generated = { pending: pendingFixtures(now), confirmed: confirmedFixtures(now) };
+  }
+  return generated;
+}
+
+/** Demo items still waiting, minus anything confirmed on screen this session. */
+export function demoPending(): ThreadMessage[] {
+  return fixtures().pending.filter((m) => !confirmedAt.has(m.id));
+}
+
+/** Demo history, plus whatever was confirmed on screen this session. */
+export function demoConfirmed(): ThreadMessage[] {
+  const justConfirmed = fixtures()
+    .pending.filter((m) => confirmedAt.has(m.id))
+    .map((m) => ({ ...m, acknowledgedAt: confirmedAt.get(m.id) ?? null }));
+  return [...justConfirmed, ...fixtures().confirmed];
 }
