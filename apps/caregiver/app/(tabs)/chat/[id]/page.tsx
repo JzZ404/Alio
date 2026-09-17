@@ -14,6 +14,7 @@ import {
   IconRefresh,
   IconProfile,
   MessageBubble,
+  endsStack,
   SUPABASE_THREAD_FOR_CAREGIVER,
   acknowledgeMessage,
   sendMessage,
@@ -192,18 +193,27 @@ export default function ChatConversationPage({
             No messages yet — say hi 👋
           </p>
         ) : (
-          <div className="flex flex-col gap-[12px]">
+          // No container gap: a stack sits tighter than the space between
+          // turns, so every child states its own spacing.
+          <div className="flex flex-col">
             {mockMessages.map((m) => (
-              <ChatBubble key={m.id} message={m} />
+              <div key={m.id} className="mb-[12px]">
+                <ChatBubble message={m} />
+              </div>
             ))}
-            {live.map((m) => (
-              <MessageBubble
+            {live.map((m, i) => (
+              <div
                 key={m.id}
-                message={m}
-                viewerId={CAREGIVER_ID}
-                onConfirm={handleConfirm}
-                highlighted={m.id === highlightedId}
-              />
+                className={endsStack(m, live[i + 1]) ? 'mb-[10px] last:mb-0' : 'mb-[2px]'}
+              >
+                <MessageBubble
+                  message={m}
+                  viewerId={CAREGIVER_ID}
+                  onConfirm={handleConfirm}
+                  highlighted={m.id === highlightedId}
+                  showStatus={endsStack(m, live[i + 1])}
+                />
+              </div>
             ))}
           </div>
         )}

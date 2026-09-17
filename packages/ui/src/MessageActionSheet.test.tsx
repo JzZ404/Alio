@@ -121,7 +121,7 @@ describe('MessageActionSheet', () => {
     expect(lifted.style.width).toBe(`${anchor.width}px`);
   });
 
-  it('lifts the real MessageBubble, so an already-marked message keeps its tinted header', () => {
+  it('lifts the real MessageBubble rather than a hand-rolled copy', () => {
     render(
       <MessageActionSheet
         message={{ ...mine, finalTier: 'action' }}
@@ -134,10 +134,32 @@ describe('MessageActionSheet', () => {
       />,
     );
     const lifted = screen.getByTestId('lifted-message');
-    // The Pending header and tinted surface only exist on the real
-    // MessageBubble render path — a hand-rolled copy could never show these.
-    expect(lifted.textContent).toContain('Pending');
-    expect(lifted.querySelector('.bg-attention-surface')).not.toBeNull();
+    // `data-message-id` and the `lifted` width class are both written by
+    // MessageBubble itself, so a hand-rolled copy would fail this. Pinning
+    // markup the component owns is the point: the two can never drift,
+    // whatever the bubble's design does next.
+    const bubble = lifted.querySelector(`[data-message-id="${mine.id}"]`);
+    expect(bubble).not.toBeNull();
+    expect(bubble?.firstElementChild?.className).toContain('w-full');
+    expect(lifted.textContent).toContain(mine.text);
+  });
+
+  // The status line lives under the bubble and the lift is only as wide as
+  // the bubble, so it would wrap; the menu below already says what can be
+  // done with the message.
+  it('leaves the status line out of the lifted copy', () => {
+    render(
+      <MessageActionSheet
+        message={{ ...mine, finalTier: 'action' }}
+        anchor={anchor}
+        viewerId={viewerId}
+        onMarkPending={() => {}}
+        onReply={() => {}}
+        onCopy={() => {}}
+        onClose={() => {}}
+      />,
+    );
+    expect(screen.getByTestId('lifted-message').textContent).not.toContain('Pending');
   });
 
   it('reports the action taken and closes on the backdrop', () => {

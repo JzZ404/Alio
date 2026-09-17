@@ -14,6 +14,7 @@ import {
   MessageBubble,
   ReplyComposer,
   SUPABASE_THREAD_FOR_FAMILY,
+  endsStack,
   SuggestionCard,
   Toast,
   findOldest,
@@ -282,22 +283,30 @@ export default function FamilyChatConversationPage() {
             No messages yet — say hi 👋
           </p>
         ) : (
-          <div className="flex flex-col gap-[12px]">
+          <div className="flex flex-col">
             {mockMessages.map((m) => (
-              <ChatBubble key={m.id} message={m} />
+              <div key={m.id} className="mb-[12px]">
+                <ChatBubble message={m} />
+              </div>
             ))}
-            {live.map((m) =>
+            {live.map((m, i) =>
               m.reportId ? (
-                <div key={m.id} className="flex" data-message-id={m.id}>
+                <div key={m.id} className="mb-[12px] flex" data-message-id={m.id}>
                   <ReportCard reportId={m.reportId} />
                 </div>
               ) : (
-                <div key={m.id} className="flex flex-col">
+                // A burst of messages sits tight together and shares the one
+                // status line under the last of them; a new turn gets air.
+                <div
+                  key={m.id}
+                  className={`flex flex-col ${endsStack(m, live[i + 1]) ? 'mb-[10px] last:mb-0' : 'mb-[2px]'}`}
+                >
                   <MessageBubble
                     message={m}
                     viewerId={FAMILY_MEMBER_ID}
                     onLongPress={m.senderId === FAMILY_MEMBER_ID ? handleLongPress : undefined}
                     highlighted={m.id === highlightedId}
+                    showStatus={endsStack(m, live[i + 1])}
                   />
                   {/*
                    * ALIO SUGGESTS (spec §4): only on the family member's own

@@ -2,17 +2,23 @@
 
 import { useEffect, useRef } from 'react';
 import clsx from 'clsx';
-import { IconAttention } from './icons';
+import { MessageStatusLine } from './MessageStatusLine';
 import type { ThreadMessage } from './messaging/types';
 
 /** How long a press must hold before it counts as a long-press (spec §2.4). */
 const LONG_PRESS_MS = 450;
 
 /**
- * A live chat message. The primary Pending surface (spec §2.3): a
- * "Pending" message carries its Confirm button in the bubble, and both
- * sides see the state — the recipient gets Confirm, the sender sees Pending,
- * everyone sees Confirmed.
+ * A live chat message. The primary Pending surface (spec §2.3).
+ *
+ * State lives in the line *under* the bubble, not in it (design 2026-09-17):
+ * a marked message is still an ordinary message, so it keeps the ordinary
+ * bubble and `MessageStatusLine` says what became of it. The tinted surface
+ * is now only what the recipient must act on — it marks the one bubble
+ * carrying a Confirm button, rather than every marked message on both sides.
+ *
+ * `showStatus` is false for all but the last message of a stack, so a burst
+ * of messages sent together reads as one turn with one timestamp.
  *
  * Confirm renders only when `onConfirm` is passed, so a screen that cannot
  * confirm never shows a dead button.
@@ -44,6 +50,7 @@ export function MessageBubble({
   onLongPress,
   highlighted = false,
   lifted = false,
+  showStatus = true,
 }: {
   message: ThreadMessage;
   viewerId: string;
@@ -51,6 +58,7 @@ export function MessageBubble({
   onLongPress?: (message: ThreadMessage, rect: DOMRect) => void;
   highlighted?: boolean;
   lifted?: boolean;
+  showStatus?: boolean;
 }) {
   const isMine = message.senderId === viewerId;
   const needsResponse = message.finalTier === 'action';
@@ -85,7 +93,7 @@ export function MessageBubble({
   return (
     <div
       data-message-id={message.id}
-      className={clsx('flex', isMine ? 'justify-end' : 'justify-start')}
+      className={clsx('flex flex-col', isMine ? 'items-end' : 'items-start')}
     >
       <div
         ref={bubbleRef}
@@ -102,7 +110,10 @@ export function MessageBubble({
           'rounded-[20px] px-[14px] py-[12px] transition-shadow duration-300',
           lifted ? 'w-full' : 'max-w-[75%]',
           isMine ? 'rounded-tr-[6px]' : 'rounded-tl-[6px]',
-          needsResponse
+          // Tinted only where it is an instruction. For everyone else a
+          // marked message looks like a message and the status line below
+          // carries the state.
+          canConfirm
             ? 'border border-attention-border bg-attention-surface text-attention-text'
             : isMine
               ? 'bg-brand-primary text-white'
@@ -112,18 +123,6 @@ export function MessageBubble({
           highlighted && 'ring-[3px] ring-brand-accent ring-offset-2',
         )}
       >
-        {/*
-         * One line states the state, so it cannot contradict itself: this
-         * used to be a separate "Confirmed" line below the Confirm button,
-         * left in place after the header above it kept reading "Pending" —
-         * both were visible on the same bubble once acknowledged.
-         */}
-        {needsResponse && (
-          <p className="mb-[6px] flex items-center gap-[6px] text-[12px] font-bold">
-            <IconAttention aria-hidden className="size-[16px] text-brand-primary" />
-            {confirmed ? 'Confirmed' : 'Pending'}
-          </p>
-        )}
         <p className="whitespace-pre-wrap text-[14px] leading-snug">{message.text}</p>
         {canConfirm && (
           <button
@@ -137,6 +136,7 @@ export function MessageBubble({
           </button>
         )}
       </div>
+      {showStatus && <MessageStatusLine message={message} viewerId={viewerId} />}
     </div>
   );
 }

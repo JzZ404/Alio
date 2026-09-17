@@ -153,7 +153,10 @@ export function MessageActionSheet({
         }}
         className="absolute overflow-hidden"
       >
-        <MessageBubble message={message} viewerId={viewerId} lifted />
+        {/* No status line in the lift: the wrapper is the bubble's own
+            width, so the line would wrap, and the menu below already says
+            what can be done with it. */}
+        <MessageBubble message={message} viewerId={viewerId} lifted showStatus={false} />
       </div>
 
       <div
