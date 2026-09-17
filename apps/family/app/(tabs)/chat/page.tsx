@@ -148,7 +148,7 @@ export default function FamilyChatConversationPage() {
       setSendError('');
     } catch (e) {
       console.error(e);
-      patch(message.id, { finalTier: null });
+      patch(message.id, { finalTier: null }, { rollback: true });
       setSendError("Couldn't mark that as Pending. Check your connection and try again.");
     }
   };
@@ -165,7 +165,7 @@ export default function FamilyChatConversationPage() {
       setSendError('');
     } catch (e) {
       console.error(e);
-      patch(message.id, { finalTier: null });
+      patch(message.id, { finalTier: null }, { rollback: true });
       setSendError("Couldn't mark that as Pending. Check your connection and try again.");
     }
   };

@@ -92,7 +92,7 @@ export function PendingScreen({
       await acknowledgeMessage(supabase, { messageId, userId: CAREGIVER_ID, at });
     } catch (e) {
       console.error(e);
-      patch(messageId, { acknowledgedAt: null });
+      patch(messageId, { acknowledgedAt: null }, { rollback: true });
     }
   };
 

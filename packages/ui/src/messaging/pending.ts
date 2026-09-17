@@ -6,7 +6,7 @@ const DAY_MS = 24 * HOUR_MS;
 /** Compare instants, not strings: Supabase writes "+00:00", toISOString() writes "Z". */
 const instant = (iso: string) => Date.parse(iso);
 
-/** An unconfirmed, human-tagged "Needs response" message addressed to this user. */
+/** An unconfirmed, human-tagged Pending message addressed to this user. */
 export function isPendingFor(m: ThreadMessage, userId: string): boolean {
   return m.recipientId === userId && m.finalTier === 'action' && m.acknowledgedAt === null;
 }
@@ -70,16 +70,36 @@ export function formatMessageTime(iso: string, timeZone?: string): string {
 }
 
 /**
+ * The human tag and the confirmation are both one-way in the database — a
+ * message is marked once and never un-marked, confirmed once and never
+ * un-confirmed — so they have to be one-way here too.
+ *
+ * They need it because the initial load runs only after the channel reports
+ * SUBSCRIBED, so a realtime UPDATE can be applied before the snapshot row it
+ * supersedes is read. A mark or a Confirm landing in that window would
+ * otherwise be reverted locally until the next event.
+ *
+ * Losing both at once is worse than losing either: `finalTier: null` with
+ * `acknowledgedAt` set is rejected by `isPendingFor` *and* by
+ * `selectRecentlyConfirmed`, so the row falls out of both lists and the
+ * caregiver simply never sees it again.
+ */
+export function keepOneWayFields(prev: ThreadMessage, next: ThreadMessage): ThreadMessage {
+  return {
+    ...next,
+    finalTier: next.finalTier ?? prev.finalTier,
+    acknowledgedAt: next.acknowledgedAt ?? prev.acknowledgedAt,
+  };
+}
+
+/**
  * Insert or replace by id, keeping chronological order, so realtime echoes of
- * our own writes are harmless. Confirmation is one-way: an event that arrives
- * late carrying acknowledged_at = null must not undo it.
+ * our own writes are harmless — and so a late event cannot undo a tag or a
+ * confirmation (`keepOneWayFields`).
  */
 export function mergeMessage(list: ThreadMessage[], next: ThreadMessage): ThreadMessage[] {
   const prev = list.find((m) => m.id === next.id);
-  const merged =
-    prev?.acknowledgedAt && !next.acknowledgedAt
-      ? { ...next, acknowledgedAt: prev.acknowledgedAt }
-      : next;
+  const merged = prev ? keepOneWayFields(prev, next) : next;
   return [...list.filter((m) => m.id !== next.id), merged].sort(
     (a, b) => instant(a.createdAt) - instant(b.createdAt),
   );

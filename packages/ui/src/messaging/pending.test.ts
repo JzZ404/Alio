@@ -157,6 +157,27 @@ describe('mergeMessage', () => {
       '2026-09-15T10:00:00Z',
     );
   });
+
+  it('never un-tags a message because of a stale event', () => {
+    const tagged = msg({ finalTier: 'action' });
+    const staleUntagged = msg({ finalTier: null });
+    expect(mergeMessage([tagged], staleUntagged)[0].finalTier).toBe('action');
+  });
+
+  it('keeps a confirmed item in exactly one list when the stale row is also untagged', () => {
+    // The interaction is the dangerous case: carrying acknowledgedAt forward
+    // while letting finalTier revert produces a row that isPendingFor rejects
+    // (no tag) *and* selectRecentlyConfirmed rejects (it requires 'action'),
+    // so the caregiver's evidence that they responded simply vanishes.
+    const confirmed = msg({ finalTier: 'action', acknowledgedAt: '2026-09-15T10:00:00Z' });
+    const stale = msg({ finalTier: null, acknowledgedAt: null });
+    const [merged] = mergeMessage([confirmed], stale);
+
+    expect(merged.finalTier).toBe('action');
+    expect(merged.acknowledgedAt).toBe('2026-09-15T10:00:00Z');
+    expect(selectPending([merged], CAREGIVER_ID)).toHaveLength(0);
+    expect(selectRecentlyConfirmed([merged], CAREGIVER_ID, NOW)).toHaveLength(1);
+  });
 });
 
 describe('personLabel', () => {

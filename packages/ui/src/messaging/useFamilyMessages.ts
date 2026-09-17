@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { fromRow, type FamilyMessageRow, type ThreadMessage } from './types';
-import { mergeMessage } from './pending';
+import { keepOneWayFields, mergeMessage } from './pending';
 
 export type MessageScope =
   | { by: 'thread'; threadId: string }
@@ -17,11 +17,17 @@ export type MessageScope =
  * again and the reload heals whatever was missed while it was away, which is
  * safe because mergeMessage merges by id.
  *
+ * `error` is the flip side of that choice. When the load fails, or the channel
+ * never goes live, this hook has nothing to show — and for a feature whose
+ * premise is that a request never gets lost, an unreachable backend must not
+ * render as a confident empty inbox. Screens read this flag and say so.
+ *
  * `patch` is for optimistic updates — a Confirm tap should not wait on the
  * network. `upsert` takes the row a write returned.
  */
 export function useFamilyMessages(client: SupabaseClient, scope: MessageScope | null) {
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
+  const [error, setError] = useState(false);
 
   const filter =
     scope === null
@@ -35,6 +41,7 @@ export function useFamilyMessages(client: SupabaseClient, scope: MessageScope | 
     if (scope === null || filter === null) return;
     let cancelled = false;
     setMessages([]);
+    setError(false);
 
     const apply = (row: FamilyMessageRow) => {
       if (!cancelled) setMessages((prev) => mergeMessage(prev, fromRow(row)));
@@ -49,12 +56,17 @@ export function useFamilyMessages(client: SupabaseClient, scope: MessageScope | 
               .eq('recipient_id', scope.recipientId)
               .eq('final_tier', 'action')
               .or(`acknowledged_at.is.null,acknowledged_at.gte.${since}`);
-      const { data, error } = await query.order('created_at');
-      if (error) {
-        console.error('useFamilyMessages:', error.message);
+      const { data, error: loadError } = await query.order('created_at');
+      if (cancelled) return;
+      if (loadError) {
+        console.error('useFamilyMessages:', loadError.message);
+        setError(true);
         return;
       }
       for (const row of (data ?? []) as FamilyMessageRow[]) apply(row);
+      // A rejoin after a failure clears the flag, so the line a screen shows
+      // disappears on its own once the data is actually there.
+      setError(false);
     };
 
     const channel = client
@@ -69,9 +81,19 @@ export function useFamilyMessages(client: SupabaseClient, scope: MessageScope | 
         { event: 'UPDATE', schema: 'public', table: 'family_messages', filter },
         (payload) => apply(payload.new as FamilyMessageRow),
       )
-      .subscribe((status) => {
-        if (status !== 'SUBSCRIBED') return;
-        void load();
+      .subscribe((status, subscribeError) => {
+        // `cancelled` first: removeChannel on unmount reports CLOSED, which is
+        // the expected end of a channel's life, not a failure worth logging.
+        if (cancelled) return;
+        if (status === 'SUBSCRIBED') {
+          void load();
+          return;
+        }
+        // TIMED_OUT / CLOSED / CHANNEL_ERROR. Silence here was the worst of the
+        // failure modes: no load ever ran, nothing was logged, and the screen
+        // said "Nothing pending" with complete confidence.
+        console.error('useFamilyMessages: channel', status, subscribeError?.message ?? '');
+        setError(true);
       });
 
     return () => {
@@ -82,13 +104,31 @@ export function useFamilyMessages(client: SupabaseClient, scope: MessageScope | 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client, filter, since]);
 
-  const patch = useCallback((id: string, changes: Partial<ThreadMessage>) => {
-    setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, ...changes } : m)));
-  }, []);
+  /**
+   * Optimistic local update, through the same one-way guard realtime merges
+   * use, so an in-flight change can never quietly un-tag or un-confirm a
+   * message.
+   *
+   * `rollback` is the one deliberate exception: undoing an optimistic update
+   * the database refused is exactly when a one-way field must move back, and
+   * the caller has to ask for it by name.
+   */
+  const patch = useCallback(
+    (id: string, changes: Partial<ThreadMessage>, { rollback = false } = {}) => {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== id) return m;
+          const next = { ...m, ...changes };
+          return rollback ? next : keepOneWayFields(m, next);
+        }),
+      );
+    },
+    [],
+  );
 
   const upsert = useCallback((row: FamilyMessageRow) => {
     setMessages((prev) => mergeMessage(prev, fromRow(row)));
   }, []);
 
-  return { messages, patch, upsert };
+  return { messages, error, patch, upsert };
 }

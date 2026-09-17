@@ -32,8 +32,8 @@ const HIGHLIGHT_MS = 1600;
  * Caregiver Chat conversation — Figma: `GC - Chat - conversation` (388:3940).
  * Header with back + avatar + name + online + search, message bubbles
  * (right=me, left=them), quick actions row, input bar. Threads with a Supabase
- * mapping show mock history, then the live thread, where Needs response
- * messages carry Confirm in the bubble.
+ * mapping show mock history, then the live thread, where Pending messages
+ * carry Confirm in the bubble.
  */
 export default function ChatConversationPage({
   id: propId,
@@ -122,7 +122,7 @@ export default function ChatConversationPage({
       setSendError('');
     } catch (e) {
       console.error(e);
-      patch(messageId, { acknowledgedAt: null });
+      patch(messageId, { acknowledgedAt: null }, { rollback: true });
       setSendError("Couldn't confirm. Check your connection and tap Confirm again.");
     }
   };
