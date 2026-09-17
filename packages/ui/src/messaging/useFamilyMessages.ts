@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { fromRow, type FamilyMessageRow, type ThreadMessage } from './types';
 import { keepOneWayFields, mergeMessage } from './pending';
@@ -22,12 +22,22 @@ export type MessageScope =
  * premise is that a request never gets lost, an unreachable backend must not
  * render as a confident empty inbox. Screens read this flag and say so.
  *
+ * A live event always beats the snapshot for the same message. The load's
+ * query is sent after SUBSCRIBED, but events can still arrive while it is in
+ * flight, and those are newer than the rows coming back. `liveIds` records
+ * which messages that happened to, and the snapshot skips them. This replaced
+ * making `finalTier` one-way in the merge, which only protected changes in
+ * one direction and so could not survive un-marking.
+ *
  * `patch` is for optimistic updates — a Confirm tap should not wait on the
  * network. `upsert` takes the row a write returned.
  */
 export function useFamilyMessages(client: SupabaseClient, scope: MessageScope | null) {
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
   const [error, setError] = useState(false);
+  // Messages this client has newer knowledge of than any snapshot in flight.
+  // Cleared when a load starts, so a rejoin still heals everything it missed.
+  const liveIds = useRef<Set<string>>(new Set());
 
   const filter =
     scope === null
@@ -47,7 +57,15 @@ export function useFamilyMessages(client: SupabaseClient, scope: MessageScope | 
       if (!cancelled) setMessages((prev) => mergeMessage(prev, fromRow(row)));
     };
 
+    /** A realtime event, or a row a write just returned: authoritative. */
+    const applyLive = (row: FamilyMessageRow) => {
+      liveIds.current.add(row.id);
+      apply(row);
+    };
+
     const load = async () => {
+      // From here on, anything arriving live is newer than what comes back.
+      liveIds.current.clear();
       const base = client.from('family_messages').select('*');
       const query =
         scope.by === 'thread'
@@ -63,7 +81,12 @@ export function useFamilyMessages(client: SupabaseClient, scope: MessageScope | 
         setError(true);
         return;
       }
-      for (const row of (data ?? []) as FamilyMessageRow[]) apply(row);
+      for (const row of (data ?? []) as FamilyMessageRow[]) {
+        // An event landed for this message while the query was in flight, so
+        // the snapshot is the older of the two and has nothing to add.
+        if (liveIds.current.has(row.id)) continue;
+        apply(row);
+      }
       // A rejoin after a failure clears the flag, so the line a screen shows
       // disappears on its own once the data is actually there.
       setError(false);
@@ -74,12 +97,12 @@ export function useFamilyMessages(client: SupabaseClient, scope: MessageScope | 
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'family_messages', filter },
-        (payload) => apply(payload.new as FamilyMessageRow),
+        (payload) => applyLive(payload.new as FamilyMessageRow),
       )
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'family_messages', filter },
-        (payload) => apply(payload.new as FamilyMessageRow),
+        (payload) => applyLive(payload.new as FamilyMessageRow),
       )
       .subscribe((status, subscribeError) => {
         // `cancelled` first: removeChannel on unmount reports CLOSED, which is
@@ -105,16 +128,19 @@ export function useFamilyMessages(client: SupabaseClient, scope: MessageScope | 
   }, [client, filter, since]);
 
   /**
-   * Optimistic local update, through the same one-way guard realtime merges
-   * use, so an in-flight change can never quietly un-tag or un-confirm a
-   * message.
+   * Optimistic local update, through the same guard realtime merges use, so
+   * an in-flight change can never quietly un-confirm a message.
    *
    * `rollback` is the one deliberate exception: undoing an optimistic update
    * the database refused is exactly when a one-way field must move back, and
    * the caller has to ask for it by name.
+   *
+   * Either way the message counts as locally known, so a snapshot still in
+   * flight cannot overwrite it with what the row looked like beforehand.
    */
   const patch = useCallback(
     (id: string, changes: Partial<ThreadMessage>, { rollback = false } = {}) => {
+      liveIds.current.add(id);
       setMessages((prev) =>
         prev.map((m) => {
           if (m.id !== id) return m;
@@ -127,6 +153,7 @@ export function useFamilyMessages(client: SupabaseClient, scope: MessageScope | 
   );
 
   const upsert = useCallback((row: FamilyMessageRow) => {
+    liveIds.current.add(row.id);
     setMessages((prev) => mergeMessage(prev, fromRow(row)));
   }, []);
 

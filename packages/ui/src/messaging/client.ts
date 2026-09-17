@@ -59,3 +59,25 @@ export async function markPending(
     .is('final_tier', null);
   if (error) throw new Error(`markPending: ${error.message}`);
 }
+
+/**
+ * Take a mark back (design 2026-09-17) — a long-press is easy to hit by
+ * accident. Filtered on final_tier = 'action' and acknowledged_at is null, so
+ * it can only undo a mark that is still waiting: once Sarah has Confirmed,
+ * she has acted on it, and erasing the mark would erase that too.
+ *
+ * Clears tagged_by as well, so the row goes back to genuinely untagged and
+ * can be marked again rather than half-carrying its old provenance.
+ */
+export async function unmarkPending(
+  client: SupabaseClient,
+  params: { messageId: string },
+): Promise<void> {
+  const { error } = await client
+    .from('family_messages')
+    .update({ final_tier: null, tagged_by: null })
+    .eq('id', params.messageId)
+    .eq('final_tier', 'action')
+    .is('acknowledged_at', null);
+  if (error) throw new Error(`unmarkPending: ${error.message}`);
+}

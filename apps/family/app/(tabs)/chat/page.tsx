@@ -19,6 +19,7 @@ import {
   Toast,
   findOldest,
   markPending,
+  unmarkPending,
   sendMessage,
   suggestsPending,
   useFamilyMessages,
@@ -193,6 +194,23 @@ export default function FamilyChatConversationPage() {
       console.error(e);
       patch(message.id, { finalTier: null }, { rollback: true });
       setSendError("Couldn't mark that as Pending. Check your connection and try again.");
+    }
+  };
+
+  // Taking a mark back (design 2026-09-17). Same optimistic shape as marking,
+  // reversed: the bubble drops back to Sent immediately, and a refusal from
+  // the database puts the mark back rather than leaving the screen lying.
+  const handleUnmarkPending = async (message: ThreadMessage) => {
+    setSendError('');
+    patch(message.id, { finalTier: null });
+    setSheetFor(null);
+    try {
+      await unmarkPending(supabase, { messageId: message.id });
+      setSendError('');
+    } catch (e) {
+      console.error(e);
+      patch(message.id, { finalTier: 'action' }, { rollback: true });
+      setSendError("Couldn't unmark that. Check your connection and try again.");
     }
   };
 
@@ -409,6 +427,7 @@ export default function FamilyChatConversationPage() {
         anchor={anchor}
         viewerId={FAMILY_MEMBER_ID}
         onMarkPending={handleMarkPending}
+        onUnmarkPending={handleUnmarkPending}
         onReply={handleReply}
         onCopy={handleCopy}
         onClose={() => setSheetFor(null)}

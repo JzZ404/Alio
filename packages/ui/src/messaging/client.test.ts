@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { acknowledgeMessage, markPending, sendMessage } from './client';
+import { acknowledgeMessage, markPending, sendMessage, unmarkPending } from './client';
 
 /**
  * Records every builder call and resolves the chain with `result`, mirroring
@@ -127,5 +127,38 @@ describe('markPending', () => {
     await expect(
       markPending(client, { messageId: 'row-9', taggedBy: 'sender_manual' }),
     ).rejects.toThrow('markPending: denied');
+  });
+});
+
+describe('unmarkPending', () => {
+  it('clears the tag and its provenance together', async () => {
+    const { client, calls } = fakeClient({});
+    await unmarkPending(client, { messageId: 'row-1' });
+    expect(argsOf(calls, 'update')).toEqual([{ final_tier: null, tagged_by: null }]);
+  });
+
+  /*
+   * The two filters are the whole safety of this call, and they match the
+   * database transition exactly. Without `acknowledged_at is null` a family
+   * member could erase a mark Sarah had already acted on; without
+   * `final_tier = 'action'` an un-mark could race a second un-mark and both
+   * would report success.
+   */
+  it('only touches a message that is still marked and still unconfirmed', async () => {
+    const { client, calls } = fakeClient({});
+    await unmarkPending(client, { messageId: 'row-1' });
+    expect(argsOf(calls, 'eq')).toEqual(['id', 'row-1']);
+    expect(calls.filter(([n]) => n === 'eq').map(([, a]) => a)).toContainEqual([
+      'final_tier',
+      'action',
+    ]);
+    expect(argsOf(calls, 'is')).toEqual(['acknowledged_at', null]);
+  });
+
+  it('throws with the table name when the database refuses', async () => {
+    const { client } = fakeClient({ error: { message: 'permission denied' } });
+    await expect(unmarkPending(client, { messageId: 'row-1' })).rejects.toThrow(
+      'unmarkPending: permission denied',
+    );
   });
 });

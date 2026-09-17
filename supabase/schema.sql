@@ -370,3 +370,115 @@ begin
   raise exception 'family_messages: only marking Pending, confirming, or recording a suggestion is allowed';
 end;
 $$;
+
+-- =============================================================
+-- Pending Confirmations, part 4: let a mark be taken back
+-- Applied by hand in the Supabase SQL editor, AFTER part 3.
+--
+-- A long-press is easy to hit by accident, so marking needed a way out
+-- (design 2026-09-17). Un-marking is allowed only while the message is still
+-- Pending: once Sarah has Confirmed it she has acted on it, and erasing the
+-- mark then would erase that. Confirming stays one-way; there is still no
+-- transition that un-confirms.
+--
+-- This is the whole function again, with transition 4 added, because a
+-- trigger function cannot be patched in pieces. Everything else is byte for
+-- byte what part 3 applied.
+-- Safe to re-run.
+-- =============================================================
+create or replace function` is the whole delta since part 2: it swaps the
+-- body under the existing trigger, which does not need recreating. Part 2's
+-- own text is left exactly as it was, because it has already been applied by
+-- hand to the live database.
+-- Safe to re-run.
+-- =============================================================
+create or replace function family_messages_guard_update() returns trigger
+language plpgsql as $$
+begin
+  -- The whole point of this function is the anon key. Anything else reaching
+  -- this table authenticated as a role the browser cannot assume is trusted.
+  --
+  -- `current_user`, not `session_user`: PostgREST connects as `authenticator`
+  -- and does `set local role anon` per request, so `session_user` here would
+  -- be `authenticator` for browser writes too and exempt every one of them.
+  --
+  -- This only buys a server-side writer anything if it actually presents a
+  -- different role. FastAPI currently reads SUPABASE_KEY, which is the anon
+  -- key in dev (backend/.env.example) — so the timeout follow-up job of
+  -- spec section 5 must use the service-role key, or it will be refused here
+  -- exactly like a browser.
+  if current_user not in ('anon', 'authenticated') then
+    return new;
+  end if;
+
+  -- Nothing but the four writable columns may move, whichever transition this is.
+  if new.id is distinct from old.id
+     or new.thread_id is distinct from old.thread_id
+     or new.sender is distinct from old.sender
+     or new.sender_id is distinct from old.sender_id
+     or new.recipient_id is distinct from old.recipient_id
+     or new.text is distinct from old.text
+     or new.report_id is distinct from old.report_id
+     or new.created_at is distinct from old.created_at
+     or new.followup_sent_at is distinct from old.followup_sent_at then
+    raise exception 'family_messages: that column cannot be changed';
+  end if;
+
+  -- 1. Marking an untagged message Pending. Once only: old.final_tier is null.
+  --    Only 'action' is accepted here, so 'fyi' and 'social' are unreachable
+  --    through the app by design: the Pending list is the only surface a human
+  --    tag drives (spec §1), and the other two tiers exist for the model's
+  --    suggested_tier, handled by transition 3.
+  if old.final_tier is null
+     and new.final_tier = 'action'
+     and new.tagged_by in ('sender_manual', 'sender_confirmed_ai')
+     and new.acknowledged_at is not distinct from old.acknowledged_at
+     and new.acknowledged_by is not distinct from old.acknowledged_by
+     and new.suggested_tier is not distinct from old.suggested_tier
+     and new.suggested_by is not distinct from old.suggested_by then
+    return new;
+  end if;
+
+  -- 2. Confirming a message that is Pending and not yet confirmed. One way.
+  if old.final_tier = 'action'
+     and old.acknowledged_at is null
+     and new.acknowledged_at is not null
+     and new.acknowledged_by is not null
+     and new.final_tier is not distinct from old.final_tier
+     and new.tagged_by is not distinct from old.tagged_by
+     and new.suggested_tier is not distinct from old.suggested_tier
+     and new.suggested_by is not distinct from old.suggested_by then
+    return new;
+  end if;
+
+  -- 3. Recording a model suggestion, which never touches the human tag
+  --    (spec §4.3: write suggested_tier, never final_tier).
+  if old.suggested_tier is null
+     and new.suggested_tier in ('action', 'fyi', 'social')
+     and new.suggested_by = 'model'
+     and new.final_tier is not distinct from old.final_tier
+     and new.tagged_by is not distinct from old.tagged_by
+     and new.acknowledged_at is not distinct from old.acknowledged_at
+     and new.acknowledged_by is not distinct from old.acknowledged_by then
+    return new;
+  end if;
+
+  -- 4. Taking a mark back, for a long-press that was a mistake (design
+  --    2026-09-17). Only while it is still Pending: once Sarah has Confirmed
+  --    it, un-marking would erase something she already acted on, and there
+  --    is no transition that un-confirms. Clears tagged_by too, so the row
+  --    goes back to being genuinely untagged and can be marked again.
+  if old.final_tier = 'action'
+     and old.acknowledged_at is null
+     and new.final_tier is null
+     and new.tagged_by is null
+     and new.acknowledged_at is not distinct from old.acknowledged_at
+     and new.acknowledged_by is not distinct from old.acknowledged_by
+     and new.suggested_tier is not distinct from old.suggested_tier
+     and new.suggested_by is not distinct from old.suggested_by then
+    return new;
+  end if;
+
+  raise exception 'family_messages: only marking Pending, un-marking, confirming, or recording a suggestion is allowed';
+end;
+$$;

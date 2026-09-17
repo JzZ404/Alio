@@ -70,24 +70,33 @@ export function formatMessageTime(iso: string, timeZone?: string): string {
 }
 
 /**
- * The human tag and the confirmation are both one-way in the database — a
- * message is marked once and never un-marked, confirmed once and never
- * un-confirmed — so they have to be one-way here too.
+ * Confirmation is one-way in the database — confirmed once, never
+ * un-confirmed, there is no transition for it — so it is one-way here too.
+ * The initial load runs only after the channel reports SUBSCRIBED, so a
+ * realtime UPDATE can be applied before the snapshot row it supersedes is
+ * read, and a Confirm landing in that window would otherwise be reverted
+ * locally until the next event.
  *
- * They need it because the initial load runs only after the channel reports
- * SUBSCRIBED, so a realtime UPDATE can be applied before the snapshot row it
- * supersedes is read. A mark or a Confirm landing in that window would
- * otherwise be reverted locally until the next event.
+ * **`finalTier` is deliberately not guarded here.** It used to be, when a
+ * mark could never be taken back. Un-marking (design 2026-09-17) made that
+ * guard actively wrong: it would swallow the un-mark on every screen that
+ * did not perform it — most importantly the caregiver's, who would go on
+ * seeing Pending for a message the family had withdrawn.
  *
- * Losing both at once is worse than losing either: `finalTier: null` with
- * `acknowledgedAt` set is rejected by `isPendingFor` *and* by
- * `selectRecentlyConfirmed`, so the row falls out of both lists and the
- * caregiver simply never sees it again.
+ * The stale-snapshot race `finalTier` needed protection from is handled
+ * where it actually lives instead: `useFamilyMessages` lets a live event win
+ * over a snapshot row for the same message, which is correct in *both*
+ * directions rather than only the one a one-way field allows.
+ *
+ * A row that ends up `finalTier: null` with `acknowledgedAt` set is rejected
+ * by `isPendingFor` *and* by `selectRecentlyConfirmed` — it would fall out of
+ * both lists and never be seen again — so that combination stays impossible:
+ * the database has no transition that un-marks a confirmed message, and
+ * `unmarkPending` filters on `acknowledged_at is null`.
  */
 export function keepOneWayFields(prev: ThreadMessage, next: ThreadMessage): ThreadMessage {
   return {
     ...next,
-    finalTier: next.finalTier ?? prev.finalTier,
     acknowledgedAt: next.acknowledgedAt ?? prev.acknowledgedAt,
   };
 }

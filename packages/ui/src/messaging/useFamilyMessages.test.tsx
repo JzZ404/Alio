@@ -40,7 +40,12 @@ function row(overrides: Partial<FamilyMessageRow> = {}): FamilyMessageRow {
  * guards against (a write landing in the gap between snapshot and subscription)
  * is invisible in any test that lets the two happen together.
  */
-function fakeClient(snapshot: { data?: FamilyMessageRow[]; error?: { message: string } }) {
+function fakeClient(snapshot: {
+  data?: FamilyMessageRow[];
+  error?: { message: string };
+  /** Runs just before the select resolves — i.e. while the query is in flight. */
+  duringQuery?: () => void;
+}) {
   const state = {
     selectCount: 0,
     removed: 0,
@@ -54,8 +59,10 @@ function fakeClient(snapshot: { data?: FamilyMessageRow[]; error?: { message: st
     {
       get(_target, prop: string) {
         if (prop === 'then') {
-          return (resolve: (v: unknown) => void) =>
+          return (resolve: (v: unknown) => void) => {
+            snapshot.duringQuery?.();
             resolve({ data: snapshot.data ?? null, error: snapshot.error ?? null });
+          };
         }
         return () => builder;
       },
@@ -149,33 +156,58 @@ describe('useFamilyMessages', () => {
     expect(logged).not.toHaveBeenCalled();
   });
 
-  it('does not let a stale snapshot undo an UPDATE that arrived first', async () => {
-    // The snapshot was read before the mark and the Confirm happened, so it
-    // still says untagged and unconfirmed. It must not win.
-    const { client, state } = fakeClient({ data: [row()] });
-    const { result } = renderHook(() => useFamilyMessages(client, scope));
-
-    await act(async () =>
-      state.handlers.UPDATE?.({
-        new: row({ final_tier: 'action', acknowledged_at: '2026-09-15T10:00:00Z' }),
-      }),
-    );
-    await act(async () => state.status?.('SUBSCRIBED'));
+  /*
+   * The real race: the load is gated on SUBSCRIBED, but events still arrive
+   * while its query is in flight, and those are newer than the rows coming
+   * back. The snapshot here was read before the mark and the Confirm, so it
+   * still says untagged and unconfirmed. It must not win.
+   */
+  it('does not let a snapshot undo an event that arrived while it was in flight', async () => {
+    const state: { handlers: Record<string, (p: { new: FamilyMessageRow }) => void> } = {
+      handlers: {},
+    };
+    const fake = fakeClient({
+      data: [row()],
+      duringQuery: () =>
+        state.handlers.UPDATE?.({
+          new: row({ final_tier: 'action', acknowledged_at: '2026-09-15T10:00:00Z' }),
+        }),
+    });
+    state.handlers = fake.state.handlers;
+    const { result } = renderHook(() => useFamilyMessages(fake.client, scope));
+    await act(async () => fake.state.status?.('SUBSCRIBED'));
 
     expect(result.current.messages).toHaveLength(1);
     expect(result.current.messages[0].finalTier).toBe('action');
     expect(result.current.messages[0].acknowledgedAt).toBe('2026-09-15T10:00:00Z');
   });
 
-  it('holds patch to the same one-way guard, unless it says it is rolling back', async () => {
+  /*
+   * The mirror image, and the reason `finalTier` is no longer a one-way
+   * field: un-marking has to reach the caregiver's screen, which never
+   * performed it. A guard that only let the tag move one way would swallow
+   * this and leave them chasing a request the family had withdrawn.
+   */
+  it('lets an un-mark through to a screen that did not perform it', async () => {
+    const { client, state } = fakeClient({ data: [row({ final_tier: 'action' })] });
+    const { result } = renderHook(() => useFamilyMessages(client, scope));
+    await act(async () => state.status?.('SUBSCRIBED'));
+    expect(result.current.messages[0].finalTier).toBe('action');
+
+    await act(async () =>
+      state.handlers.UPDATE?.({ new: row({ final_tier: null, tagged_by: null }) }),
+    );
+    expect(result.current.messages[0].finalTier).toBeNull();
+  });
+
+  it('holds patch to the confirmation guard, unless it says it is rolling back', async () => {
     const { client, state } = fakeClient({
       data: [row({ final_tier: 'action', acknowledged_at: '2026-09-15T10:00:00Z' })],
     });
     const { result } = renderHook(() => useFamilyMessages(client, scope));
     await act(async () => state.status?.('SUBSCRIBED'));
 
-    await act(async () => result.current.patch('row-1', { finalTier: null, acknowledgedAt: null }));
-    expect(result.current.messages[0].finalTier).toBe('action');
+    await act(async () => result.current.patch('row-1', { acknowledgedAt: null }));
     expect(result.current.messages[0].acknowledgedAt).toBe('2026-09-15T10:00:00Z');
 
     // An optimistic update the database refused does have to move back.
@@ -183,5 +215,16 @@ describe('useFamilyMessages', () => {
       result.current.patch('row-1', { acknowledgedAt: null }, { rollback: true }),
     );
     expect(result.current.messages[0].acknowledgedAt).toBeNull();
+  });
+
+  // Un-marking is an ordinary optimistic update now, so it must not need the
+  // rollback escape hatch to take effect.
+  it('lets patch take a mark back without asking for an exception', async () => {
+    const { client, state } = fakeClient({ data: [row({ final_tier: 'action' })] });
+    const { result } = renderHook(() => useFamilyMessages(client, scope));
+    await act(async () => state.status?.('SUBSCRIBED'));
+
+    await act(async () => result.current.patch('row-1', { finalTier: null }));
+    expect(result.current.messages[0].finalTier).toBeNull();
   });
 });

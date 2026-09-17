@@ -49,6 +49,7 @@ export function MessageActionSheet({
   anchor,
   viewerId,
   onMarkPending,
+  onUnmarkPending,
   onReply,
   onCopy,
   onClose,
@@ -57,6 +58,7 @@ export function MessageActionSheet({
   anchor: { top: number; left: number; width: number } | null;
   viewerId: string;
   onMarkPending: (message: ThreadMessage) => void;
+  onUnmarkPending: (message: ThreadMessage) => void;
   onReply: (message: ThreadMessage) => void;
   onCopy: (message: ThreadMessage) => void;
   onClose: () => void;
@@ -119,6 +121,9 @@ export function MessageActionSheet({
   if (!message || !anchor) return null;
 
   const alreadyMarked = message.finalTier !== null;
+  // Once Sarah has Confirmed, she has acted on it: the mark is hers now, and
+  // the database has no transition that takes it back either.
+  const canUnmark = alreadyMarked && message.acknowledgedAt === null;
 
   const frameWidth = overlayRef.current?.clientWidth ?? 0;
   const blockLeft =
@@ -188,6 +193,20 @@ export function MessageActionSheet({
             >
               <IconPinFilled aria-hidden className="size-[18px]" />
               Mark as Pending
+            </button>
+          )}
+          {/* A long-press is easy to hit by accident, so the menu that marks
+              a message is also where it is taken back. Plain, not the green
+              box: undoing is a correction, and only one action in the card
+              should read as "do this". */}
+          {canUnmark && (
+            <button
+              type="button"
+              onClick={() => onUnmarkPending(message)}
+              className="flex w-full items-center gap-[10px] px-[14px] py-[14px] text-left text-[16px] font-bold text-gray-100"
+            >
+              <IconPinFilled aria-hidden className="size-[18px] text-brand-primary" />
+              Unmark as Pending
             </button>
           )}
           <button

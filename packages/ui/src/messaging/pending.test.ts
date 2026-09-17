@@ -158,25 +158,42 @@ describe('mergeMessage', () => {
     );
   });
 
-  it('never un-tags a message because of a stale event', () => {
+  /*
+   * `finalTier` used to be carried forward here, back when a mark could never
+   * be taken back. Un-marking made that wrong: the guard would have swallowed
+   * it on every screen that did not perform it. The stale-snapshot race it was
+   * protecting against is handled in `useFamilyMessages` instead, where a live
+   * event beats a snapshot in both directions.
+   */
+  it('lets a mark be taken back, because un-marking is a real transition now', () => {
     const tagged = msg({ finalTier: 'action' });
-    const staleUntagged = msg({ finalTier: null });
-    expect(mergeMessage([tagged], staleUntagged)[0].finalTier).toBe('action');
+    const unmarked = msg({ finalTier: null });
+    expect(mergeMessage([tagged], unmarked)[0].finalTier).toBeNull();
   });
 
-  it('keeps a confirmed item in exactly one list when the stale row is also untagged', () => {
-    // The interaction is the dangerous case: carrying acknowledgedAt forward
-    // while letting finalTier revert produces a row that isPendingFor rejects
-    // (no tag) *and* selectRecentlyConfirmed rejects (it requires 'action'),
-    // so the caregiver's evidence that they responded simply vanishes.
+  it('never un-confirms a message because of a stale event', () => {
     const confirmed = msg({ finalTier: 'action', acknowledgedAt: '2026-09-15T10:00:00Z' });
-    const stale = msg({ finalTier: null, acknowledgedAt: null });
+    const stale = msg({ finalTier: 'action', acknowledgedAt: null });
     const [merged] = mergeMessage([confirmed], stale);
 
-    expect(merged.finalTier).toBe('action');
     expect(merged.acknowledgedAt).toBe('2026-09-15T10:00:00Z');
     expect(selectPending([merged], CAREGIVER_ID)).toHaveLength(0);
     expect(selectRecentlyConfirmed([merged], CAREGIVER_ID, NOW)).toHaveLength(1);
+  });
+
+  /*
+   * `finalTier: null` with `acknowledgedAt` set is rejected by `isPendingFor`
+   * (no tag) *and* by `selectRecentlyConfirmed` (it requires 'action'), so
+   * such a row falls out of both lists and the caregiver's evidence that they
+   * responded simply vanishes. Nothing may produce it: the database has no
+   * transition that un-marks a confirmed message, and `unmarkPending` filters
+   * on `acknowledged_at is null`. This pins what the combination would cost,
+   * so the day someone loosens either filter, a test says why not.
+   */
+  it('shows why un-marking has to stop at a confirmed message', () => {
+    const impossible = msg({ finalTier: null, acknowledgedAt: '2026-09-15T10:00:00Z' });
+    expect(selectPending([impossible], CAREGIVER_ID)).toHaveLength(0);
+    expect(selectRecentlyConfirmed([impossible], CAREGIVER_ID, NOW)).toHaveLength(0);
   });
 });
 

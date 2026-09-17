@@ -288,18 +288,29 @@ how it was verified.
 
 ## Outstanding — needs a human
 
-**Run the third SQL block.** Parts 1 and 2 are already applied and working —
-do not re-run them. Part 3 is the delta: it stops the update guard from
-blocking writers it was never aimed at.
+**Run SQL parts 3 and 4.** Parts 1 and 2 are already applied — do not re-run
+them. Parts 3 and 4 have never been applied. Part 4 contains part 3's change
+as well, so running part 4 alone is enough; running both in order is also
+fine.
 
-Why it matters: the guard added in part 2 is a `before update` trigger, and a
-trigger fires for *everyone* — not just the browser. So the timeout follow-up
-job (spec section 5) could never stamp `followup_sent_at`, and nobody could
-repair a row by hand in the SQL editor. Part 3 exempts `service_role` and
-`postgres` and leaves the three browser transitions exactly as narrow as they
-were.
+**Part 3 — stop the guard blocking writers it was never aimed at.** The guard
+added in part 2 is a `before update` trigger, and a trigger fires for
+*everyone*, not just the browser. So the timeout follow-up job (spec section
+5) could never stamp `followup_sent_at`, and nobody could repair a row by hand
+in the SQL editor. Part 3 exempts `service_role` and `postgres`.
 
-1. `cd ~/Documents/aliomodel/Alio && sed -n '/part 3: let trusted writers/,$p' supabase/schema.sql | pbcopy`
+**Part 4 — let a mark be taken back.** A long-press is easy to hit by
+accident, so the menu that marks a message now also un-marks it. The database
+had no transition for that: marking was one-way by design. Part 4 adds the one
+transition, and only while the message is still Pending — once Sarah has
+Confirmed, she has acted on it, and erasing the mark would erase that.
+Confirming stays one-way; there is still nothing that un-confirms.
+
+**Until part 4 is applied, Unmark appears in the menu and fails.** The bubble
+drops back to Sent for a moment, the write is refused, and the error line says
+so. That is the rollback working, not a bug.
+
+1. `cd ~/Documents/aliomodel/Alio && sed -n '/part 4: let a mark be taken back/,$p' supabase/schema.sql | pbcopy`
 2. Paste into Supabase Dashboard → SQL Editor → Run. Expect `Success. No rows returned`.
 3. Confirm it is still narrow — this should *still* fail with `permission denied`:
    ```sql
@@ -308,9 +319,9 @@ were.
    rollback;
    ```
 
-It is one `create or replace function`. The trigger itself already exists and
-is not recreated, so nothing is dropped and no window opens while it runs.
-Safe to re-run.
+Each part is one `create or replace function`. The trigger already exists and
+is not recreated, so nothing is dropped and no gap opens while it runs. Safe
+to re-run.
 
 **One thing to know when the follow-up job gets built:** it must use the
 service-role key. FastAPI currently reads `SUPABASE_KEY`, which is the anon
@@ -320,6 +331,9 @@ from a browser. Noted in `backend/.env.example` too.
 **Closed since this log was written:**
 - Pending list order — newest at the top, per the mockup (2026-09-17).
 - The bell badge now counts real pending messages instead of a fixture.
+- Message state moved out of the bubble into a line underneath it: Sent,
+  Pending, Confirmed. Bursts sent within a minute stack and share one line.
+- Reply and Copy text in the long-press menu both do something now.
 
 **Still open:**
 - The wording pass: `Pending` is doing the work of both the mark and the state.
@@ -327,3 +341,5 @@ from a browser. Noted in `backend/.env.example` too.
   real content to revise the family UI against (decided 2026-09-17). Clear them
   before any demo.
 - The `+` button on the family Care Circle header is inert.
+- Threaded replies are presentational: `family_messages` has no parent-message
+  column, so a reply sends an ordinary message and the quote is gone on reload.

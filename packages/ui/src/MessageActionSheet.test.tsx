@@ -61,6 +61,7 @@ describe('MessageActionSheet', () => {
         anchor={anchor}
         viewerId={viewerId}
         onMarkPending={() => {}}
+        onUnmarkPending={() => {}}
         onReply={() => {}}
         onCopy={() => {}}
         onClose={() => {}}
@@ -76,6 +77,7 @@ describe('MessageActionSheet', () => {
         anchor={null}
         viewerId={viewerId}
         onMarkPending={() => {}}
+        onUnmarkPending={() => {}}
         onReply={() => {}}
         onCopy={() => {}}
         onClose={() => {}}
@@ -91,6 +93,7 @@ describe('MessageActionSheet', () => {
         anchor={anchor}
         viewerId={viewerId}
         onMarkPending={() => {}}
+        onUnmarkPending={() => {}}
         onReply={() => {}}
         onCopy={() => {}}
         onClose={() => {}}
@@ -110,6 +113,7 @@ describe('MessageActionSheet', () => {
         anchor={anchor}
         viewerId={viewerId}
         onMarkPending={() => {}}
+        onUnmarkPending={() => {}}
         onReply={() => {}}
         onCopy={() => {}}
         onClose={() => {}}
@@ -128,6 +132,7 @@ describe('MessageActionSheet', () => {
         anchor={anchor}
         viewerId={viewerId}
         onMarkPending={() => {}}
+        onUnmarkPending={() => {}}
         onReply={() => {}}
         onCopy={() => {}}
         onClose={() => {}}
@@ -154,6 +159,7 @@ describe('MessageActionSheet', () => {
         anchor={anchor}
         viewerId={viewerId}
         onMarkPending={() => {}}
+        onUnmarkPending={() => {}}
         onReply={() => {}}
         onCopy={() => {}}
         onClose={() => {}}
@@ -172,6 +178,7 @@ describe('MessageActionSheet', () => {
         anchor={anchor}
         viewerId={viewerId}
         onMarkPending={onMarkPending}
+        onUnmarkPending={() => {}}
         onReply={() => {}}
         onCopy={onCopy}
         onClose={onClose}
@@ -192,6 +199,7 @@ describe('MessageActionSheet', () => {
         anchor={anchor}
         viewerId={viewerId}
         onMarkPending={() => {}}
+        onUnmarkPending={() => {}}
         onReply={() => {}}
         onCopy={() => {}}
         onClose={() => {}}
@@ -216,6 +224,7 @@ describe('MessageActionSheet', () => {
           anchor={{ top: 300, left: 32, width: 210 }}
           viewerId={viewerId}
           onMarkPending={() => {}}
+          onUnmarkPending={() => {}}
           onReply={() => {}}
           onCopy={() => {}}
           onClose={() => {}}
@@ -244,6 +253,7 @@ describe('MessageActionSheet', () => {
           anchor={{ top: 10, left: 32, width: 210 }}
           viewerId={viewerId}
           onMarkPending={() => {}}
+          onUnmarkPending={() => {}}
           onReply={() => {}}
           onCopy={() => {}}
           onClose={() => {}}
@@ -270,6 +280,7 @@ describe('MessageActionSheet', () => {
         anchor={{ top: 100, left: 40, width: 200 }}
         viewerId={viewerId}
         onMarkPending={() => {}}
+        onUnmarkPending={() => {}}
         onReply={onReply}
         onCopy={() => {}}
         onClose={() => {}}
@@ -277,5 +288,65 @@ describe('MessageActionSheet', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Reply' }));
     expect(onReply).toHaveBeenCalledWith(mine);
+  });
+
+  /*
+   * A long-press is easy to hit by accident, so the menu that marks a message
+   * is where it is taken back. It stops being offered once Sarah has
+   * Confirmed: she has acted on it, and the database has no transition that
+   * un-marks a confirmed message either.
+   */
+  it('offers Unmark on a marked message, and only while it is unconfirmed', () => {
+    const onUnmarkPending = vi.fn();
+    const marked = { ...mine, finalTier: 'action' as const };
+    render(
+      <MessageActionSheet
+        message={marked}
+        anchor={{ top: 100, left: 40, width: 200 }}
+        viewerId={viewerId}
+        onMarkPending={() => {}}
+        onUnmarkPending={onUnmarkPending}
+        onReply={() => {}}
+        onCopy={() => {}}
+        onClose={() => {}}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: 'Mark as Pending' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Unmark as Pending' }));
+    expect(onUnmarkPending).toHaveBeenCalledWith(marked);
+    cleanup();
+
+    render(
+      <MessageActionSheet
+        message={{ ...marked, acknowledgedAt: '2026-09-15T10:00:00Z' }}
+        anchor={{ top: 100, left: 40, width: 200 }}
+        viewerId={viewerId}
+        onMarkPending={() => {}}
+        onUnmarkPending={() => {}}
+        onReply={() => {}}
+        onCopy={() => {}}
+        onClose={() => {}}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: 'Unmark as Pending' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Mark as Pending' })).toBeNull();
+  });
+
+  // An untagged message has nothing to take back.
+  it('does not offer Unmark on a message that was never marked', () => {
+    render(
+      <MessageActionSheet
+        message={mine}
+        anchor={{ top: 100, left: 40, width: 200 }}
+        viewerId={viewerId}
+        onMarkPending={() => {}}
+        onUnmarkPending={() => {}}
+        onReply={() => {}}
+        onCopy={() => {}}
+        onClose={() => {}}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Mark as Pending' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Unmark as Pending' })).toBeNull();
   });
 });
