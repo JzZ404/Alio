@@ -66,6 +66,48 @@ export const tailwindPreset: Partial<Config> = {
           from: { opacity: '0' },
           to: { opacity: '1' },
         },
+        // Closing the long-press menu: it leaves the way it arrived, back
+        // towards the message it belongs to.
+        'sheet-out': {
+          from: { opacity: '1', transform: 'translateY(0) scale(1)' },
+          to: { opacity: '0', transform: 'translateY(-6px) scale(0.96)' },
+        },
+        'backdrop-out': {
+          from: { opacity: '1' },
+          to: { opacity: '0' },
+        },
+        // The held message lifts off the thread rather than simply being
+        // covered by a blur — the gesture should feel like picking it up.
+        'message-lift': {
+          from: { transform: 'scale(1)' },
+          to: { transform: 'scale(1.03)' },
+        },
+        'message-drop': {
+          from: { transform: 'scale(1.03)' },
+          to: { transform: 'scale(1)' },
+        },
+        // A message arriving in the thread, and the ALIO SUGGESTS card
+        // appearing under one.
+        'message-in': {
+          from: { opacity: '0', transform: 'translateY(10px) scale(0.98)' },
+          to: { opacity: '1', transform: 'translateY(0) scale(1)' },
+        },
+        'card-in': {
+          from: { opacity: '0', transform: 'translateY(10px) scale(0.97)' },
+          to: { opacity: '1', transform: 'translateY(0) scale(1)' },
+        },
+        // Answering the card — "Mark it" or "No need" — takes it away rather
+        // than blinking it out of existence.
+        'card-out': {
+          from: { opacity: '1', transform: 'translateY(0) scale(1)' },
+          to: { opacity: '0', transform: 'translateY(-4px) scale(0.97)' },
+        },
+        // The status line under a bubble when the state changes under it:
+        // Sent becoming Pending, Pending becoming Confirmed.
+        'status-in': {
+          from: { opacity: '0', transform: 'translateY(-4px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
       },
       animation: {
         'tab-in': 'tab-in 260ms cubic-bezier(0.22, 1, 0.36, 1)',
@@ -74,6 +116,16 @@ export const tailwindPreset: Partial<Config> = {
         'screen-fade': 'screen-fade 220ms cubic-bezier(0.22, 1, 0.36, 1)',
         'sheet-in': 'sheet-in 200ms cubic-bezier(0.22, 1, 0.36, 1)',
         'backdrop-in': 'backdrop-in 160ms ease-out',
+        // `forwards` on every exit: the element has to hold its final frame
+        // until the state change unmounts it, or it snaps back first.
+        'sheet-out': 'sheet-out 160ms cubic-bezier(0.4, 0, 1, 1) forwards',
+        'backdrop-out': 'backdrop-out 160ms ease-in forwards',
+        'message-lift': 'message-lift 200ms cubic-bezier(0.22, 1, 0.36, 1) forwards',
+        'message-drop': 'message-drop 160ms cubic-bezier(0.4, 0, 1, 1) forwards',
+        'message-in': 'message-in 260ms cubic-bezier(0.22, 1, 0.36, 1)',
+        'card-in': 'card-in 300ms cubic-bezier(0.22, 1, 0.36, 1)',
+        'card-out': 'card-out 200ms cubic-bezier(0.4, 0, 1, 1) forwards',
+        'status-in': 'status-in 240ms cubic-bezier(0.22, 1, 0.36, 1)',
       },
       fontSize: fontSize as never,
       borderRadius: borderRadius as never,

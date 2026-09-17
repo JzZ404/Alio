@@ -15,6 +15,7 @@ import {
   IconProfile,
   MessageBubble,
   endsStack,
+  useArrivedIds,
   SUPABASE_THREAD_FOR_CAREGIVER,
   acknowledgeMessage,
   sendMessage,
@@ -71,6 +72,8 @@ export default function ChatConversationPage({
   // once per target id, not on every subsequent message update.
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const focusedRef = useRef<string | undefined>(undefined);
+  // The thread's scroller, so an arriving message can bring itself into view.
+  const threadRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!focusMessageId || focusedRef.current === focusMessageId) return;
     const el = document.querySelector(`[data-message-id="${focusMessageId}"]`);
@@ -79,6 +82,21 @@ export default function ChatConversationPage({
     el.scrollIntoView({ block: 'center' });
     setHighlightedId(focusMessageId);
   }, [focusMessageId, live]);
+
+  // Messages that turned up after the thread loaded: those animate in, the
+  // history does not.
+  const arrived = useArrivedIds(live);
+
+  // Follow the conversation down as it grows — except while a jumped-to
+  // message is highlighted, when scrolling to the bottom would drag the
+  // caregiver away from the thing they asked to see.
+  useEffect(() => {
+    const el = threadRef.current;
+    if (!el || highlightedId) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    // `highlightedId` is read, not followed: this fires on new messages.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live.length, mockMessages.length]);
 
   // Clears the highlight on its own clock, independent of the effect above,
   // so a realtime message arriving mid-highlight can't cancel the fade-out.
@@ -180,7 +198,10 @@ export default function ChatConversationPage({
       </header>
 
       {/* Messages — start below header (60+42+27=129), end above quick actions */}
-      <div className="absolute bottom-[120px] left-0 right-0 top-[129px] overflow-y-auto px-[16px] py-[12px]">
+      <div
+        ref={threadRef}
+        className="absolute bottom-[120px] left-0 right-0 top-[129px] scroll-smooth overflow-y-auto px-[16px] py-[12px]"
+      >
         {/* An unreachable backend must not read as an empty thread. This sits
             above whatever did load rather than replacing it. */}
         {error && (
@@ -204,7 +225,9 @@ export default function ChatConversationPage({
             {live.map((m, i) => (
               <div
                 key={m.id}
-                className={endsStack(m, live[i + 1]) ? 'mb-[10px] last:mb-0' : 'mb-[2px]'}
+                className={`${endsStack(m, live[i + 1]) ? 'mb-[10px] last:mb-0' : 'mb-[2px]'} ${
+                  arrived.has(m.id) ? 'animate-message-in' : ''
+                }`}
               >
                 <MessageBubble
                   message={m}

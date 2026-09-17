@@ -1,3 +1,6 @@
+'use client';
+
+import { useEffect, useRef } from 'react';
 import clsx from 'clsx';
 import { IconCheck, IconPinFilled } from './icons';
 import { formatMessageTime } from './messaging/pending';
@@ -20,6 +23,10 @@ import type { ThreadMessage } from './messaging/types';
  *   sender's claim to make and the other two have their own icons.
  *
  * Only the last message of a stack renders one; see `endsStack`.
+ *
+ * The line animates when the state changes *under* it — Sent becoming
+ * Pending, Pending becoming Confirmed — and not on first render, so opening
+ * a thread does not set every line in it moving at once.
  */
 export function MessageStatusLine({
   message,
@@ -32,11 +39,20 @@ export function MessageStatusLine({
   const isMine = message.senderId === viewerId;
   const time = formatMessageTime(message.createdAt);
 
+  // Compared during render, recorded after it: the render that first sees a
+  // new status is the one that has to carry the animation class.
+  const lastStatus = useRef(status);
+  const changed = lastStatus.current !== status;
+  useEffect(() => {
+    lastStatus.current = status;
+  }, [status]);
+
   return (
     <div
       className={clsx(
         'flex items-center gap-[6px] px-[4px] pt-[5px] text-[12px]',
         isMine ? 'self-end' : 'self-start',
+        changed && 'animate-status-in',
       )}
     >
       {status === 'confirmed' && (

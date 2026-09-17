@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MessageActionSheet } from './MessageActionSheet';
 import type { ThreadMessage } from './messaging/types';
 
@@ -51,6 +51,18 @@ function mockLayoutSizes(sizes: Record<string, number>) {
     return () => Object.defineProperty(owner as object, prop, original);
   });
   return () => restore.forEach((fn) => fn());
+}
+
+/**
+ * Both of these play an exit animation before reporting the answer, so a test
+ * that asserts immediately after the click sees nothing. Advancing real
+ * timers rather than faking them keeps the component's own matchMedia check
+ * honest.
+ */
+async function settle() {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  });
 }
 
 describe('MessageActionSheet', () => {
@@ -168,28 +180,62 @@ describe('MessageActionSheet', () => {
     expect(screen.getByTestId('lifted-message').textContent).not.toContain('Pending');
   });
 
-  it('reports the action taken and closes on the backdrop', () => {
-    const onMarkPending = vi.fn();
-    const onCopy = vi.fn();
-    const onClose = vi.fn();
-    render(
+  /*
+   * One action per render: the sheet plays itself out when anything dismisses
+   * it, and a sheet that is leaving stops accepting taps — so a second action
+   * on the same instance is correctly ignored (see the test below).
+   */
+  function renderSheet(props: Partial<Parameters<typeof MessageActionSheet>[0]> = {}) {
+    return render(
       <MessageActionSheet
         message={mine}
         anchor={anchor}
         viewerId={viewerId}
-        onMarkPending={onMarkPending}
+        onMarkPending={() => {}}
         onUnmarkPending={() => {}}
         onReply={() => {}}
-        onCopy={onCopy}
-        onClose={onClose}
+        onCopy={() => {}}
+        onClose={() => {}}
+        {...props}
       />,
     );
+  }
+
+  it('reports Mark as Pending once the menu has played out', async () => {
+    const onMarkPending = vi.fn();
+    renderSheet({ onMarkPending });
     fireEvent.click(screen.getByRole('button', { name: 'Mark as Pending' }));
+    await settle();
     expect(onMarkPending).toHaveBeenCalledWith(mine);
+  });
+
+  it('reports Copy text once the menu has played out', async () => {
+    const onCopy = vi.fn();
+    renderSheet({ onCopy });
     fireEvent.click(screen.getByRole('button', { name: 'Copy text' }));
+    await settle();
     expect(onCopy).toHaveBeenCalledWith(mine);
+  });
+
+  it('closes on the backdrop', async () => {
+    const onClose = vi.fn();
+    renderSheet({ onClose });
     fireEvent.click(screen.getByLabelText('Close'));
+    await settle();
     expect(onClose).toHaveBeenCalled();
+  });
+
+  // The exit is short, but a double-tap inside it must not fire two actions —
+  // marking and then copying, say, from one gesture.
+  it('takes one action per opening, not one per tap', async () => {
+    const onMarkPending = vi.fn();
+    const onCopy = vi.fn();
+    renderSheet({ onMarkPending, onCopy });
+    fireEvent.click(screen.getByRole('button', { name: 'Mark as Pending' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Copy text' }));
+    await settle();
+    expect(onMarkPending).toHaveBeenCalledTimes(1);
+    expect(onCopy).not.toHaveBeenCalled();
   });
 
   it('hides Mark as Pending once the message is already marked', () => {
@@ -272,7 +318,7 @@ describe('MessageActionSheet', () => {
     }
   });
 
-  it('reports the message when Reply is tapped, so the composer can quote it', () => {
+  it('reports the message when Reply is tapped, so the composer can quote it', async () => {
     const onReply = vi.fn();
     render(
       <MessageActionSheet
@@ -287,6 +333,7 @@ describe('MessageActionSheet', () => {
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Reply' }));
+    await settle();
     expect(onReply).toHaveBeenCalledWith(mine);
   });
 
@@ -296,7 +343,7 @@ describe('MessageActionSheet', () => {
    * Confirmed: she has acted on it, and the database has no transition that
    * un-marks a confirmed message either.
    */
-  it('offers Unmark on a marked message, and only while it is unconfirmed', () => {
+  it('offers Unmark on a marked message, and only while it is unconfirmed', async () => {
     const onUnmarkPending = vi.fn();
     const marked = { ...mine, finalTier: 'action' as const };
     render(
@@ -313,6 +360,7 @@ describe('MessageActionSheet', () => {
     );
     expect(screen.queryByRole('button', { name: 'Mark as Pending' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Unmark as Pending' }));
+    await settle();
     expect(onUnmarkPending).toHaveBeenCalledWith(marked);
     cleanup();
 

@@ -15,6 +15,7 @@ import {
   ReplyComposer,
   SUPABASE_THREAD_FOR_FAMILY,
   endsStack,
+  useArrivedIds,
   SuggestionCard,
   Toast,
   findOldest,
@@ -67,6 +68,8 @@ export default function FamilyChatConversationPage() {
   // the same positioned ancestor the overlay's `absolute inset-0` resolves
   // against.
   const frameRef = useRef<HTMLDivElement>(null);
+  // The thread's scroller, so an arriving message can bring itself into view.
+  const threadRef = useRef<HTMLDivElement>(null);
   const [sheetFor, setSheetFor] = useState<{ message: ThreadMessage; rect: DOMRect } | null>(null);
   // Suggestions waved off with "No need". That answer writes nothing to the
   // database by design (spec §4.3), so this is the only place it lives, and
@@ -91,6 +94,23 @@ export default function FamilyChatConversationPage() {
     const timer = setTimeout(() => setHighlightedId(null), HIGHLIGHT_MS);
     return () => clearTimeout(timer);
   }, [highlightedId]);
+
+  // Messages that turned up after the thread loaded: those animate in, the
+  // history does not.
+  const arrived = useArrivedIds(live);
+
+  // Follow the conversation down as it grows. `scroll-smooth` on the element
+  // makes this a glide rather than a jump; a message arriving off-screen is
+  // the one moment a thread should move on its own.
+  useEffect(() => {
+    const el = threadRef.current;
+    // Not while a jumped-to message is highlighted: "See all" put the reader
+    // somewhere on purpose, and the bottom is not it.
+    if (!el || highlightedId) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    // `highlightedId` is read, not followed: this fires on new messages.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live.length, mockMessages.length]);
 
   useEffect(() => {
     if (!toast) return;
@@ -285,7 +305,8 @@ export default function FamilyChatConversationPage() {
       {/* Messages — start below the card; the card's own height (pinned row
           shown or not) sets where this region begins. */}
       <div
-        className={`absolute bottom-[120px] left-0 right-0 overflow-y-auto px-[16px] py-[12px] ${
+        ref={threadRef}
+        className={`absolute bottom-[120px] left-0 right-0 scroll-smooth overflow-y-auto px-[16px] py-[12px] ${
           markedMessages.length > 0 ? 'top-[196px]' : 'top-[150px]'
         }`}
       >
@@ -317,7 +338,9 @@ export default function FamilyChatConversationPage() {
                 // status line under the last of them; a new turn gets air.
                 <div
                   key={m.id}
-                  className={`flex flex-col ${endsStack(m, live[i + 1]) ? 'mb-[10px] last:mb-0' : 'mb-[2px]'}`}
+                  className={`flex flex-col ${
+                    endsStack(m, live[i + 1]) ? 'mb-[10px] last:mb-0' : 'mb-[2px]'
+                  } ${arrived.has(m.id) ? 'animate-message-in' : ''}`}
                 >
                   <MessageBubble
                     message={m}

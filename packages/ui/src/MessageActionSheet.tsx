@@ -21,6 +21,18 @@ const MENU_WIDTH = 240;
  * the thread behind the blur.
  */
 const COPY_MAX_HEIGHT_RATIO = 0.4;
+/** Matches `sheet-out`/`backdrop-out` in the theme preset. */
+const EXIT_MS = 160;
+
+/**
+ * Closing should be felt, not waited for. When the system asks for less
+ * motion the exit is instant, so the delay that lets it play goes too —
+ * otherwise the menu just sits there for a beat doing nothing.
+ */
+function exitDuration(): number {
+  if (typeof window === 'undefined' || !window.matchMedia) return EXIT_MS;
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : EXIT_MS;
+}
 
 /**
  * Long-press action sheet (spec §2.4). Opened by pressing a message; the
@@ -67,16 +79,40 @@ export function MessageActionSheet({
   const copyRef = useRef<HTMLDivElement>(null);
   const blockRef = useRef<HTMLDivElement>(null);
   const [copyMaxHeight, setCopyMaxHeight] = useState<number | null>(null);
+  // Set the instant something dismisses the sheet, so the exit can play
+  // before the parent unmounts it. Every way out goes through `dismiss`.
+  const [closing, setClosing] = useState(false);
+  const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [block, setBlock] = useState<{ top: number; placement: 'below' | 'above' } | null>(null);
+
+  // A fresh message means a fresh sheet, even if the last one was mid-exit.
+  useEffect(() => {
+    setClosing(false);
+    return () => {
+      if (exitTimer.current !== null) clearTimeout(exitTimer.current);
+    };
+  }, [message?.id]);
+
+  /**
+   * Play the exit, then do the thing. Actions run *after* the animation, not
+   * beside it: tapping Mark and watching the menu leave before the bubble
+   * changes reads as one movement rather than two things happening at once.
+   */
+  const dismiss = (then: () => void) => {
+    if (closing) return;
+    setClosing(true);
+    exitTimer.current = setTimeout(then, exitDuration());
+  };
 
   useEffect(() => {
     if (!message) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') dismiss(onClose);
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [message, onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [message, onClose, closing]);
 
   // Where the menu block (menu card + reassurance line) lands depends on how
   // tall the lifted copy and the block itself actually render — both vary
@@ -139,9 +175,17 @@ export function MessageActionSheet({
     <div
       ref={overlayRef}
       data-testid="action-sheet-overlay"
-      className="absolute inset-0 z-50 animate-backdrop-in bg-gray-100/20 backdrop-blur-md"
+      className={clsx(
+        'absolute inset-0 z-50 bg-gray-100/20 backdrop-blur-md',
+        closing ? 'animate-backdrop-out' : 'animate-backdrop-in',
+      )}
     >
-      <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 cursor-default" />
+      <button
+        type="button"
+        aria-label="Close"
+        onClick={() => dismiss(onClose)}
+        className="absolute inset-0 cursor-default"
+      />
 
       {/* The pressed message's own bubble, lifted in place — not centred,
           and not a hand-rolled copy, so an already-marked message's tinted
@@ -156,7 +200,13 @@ export function MessageActionSheet({
           width: anchor.width,
           maxHeight: copyMaxHeight ?? undefined,
         }}
-        className="absolute overflow-hidden"
+        className={clsx(
+          'absolute overflow-hidden',
+          // The held message lifts towards you and settles back on release,
+          // so the gesture feels like picking it up rather than a blur
+          // appearing around it.
+          closing ? 'animate-message-drop' : 'animate-message-lift',
+        )}
       >
         {/* No status line in the lift: the wrapper is the bubble's own
             width, so the line would wrap, and the menu below already says
@@ -181,15 +231,16 @@ export function MessageActionSheet({
             green box is what separates it from the plain actions. */}
         <div
           className={clsx(
-            'animate-sheet-in rounded-[24px] bg-white p-[8px]',
+            'rounded-[24px] bg-white p-[8px]',
+            closing ? 'animate-sheet-out' : 'animate-sheet-in',
             block?.placement === 'above' ? 'origin-bottom' : 'origin-top',
           )}
         >
           {!alreadyMarked && (
             <button
               type="button"
-              onClick={() => onMarkPending(message)}
-              className="flex w-full items-center gap-[10px] rounded-[16px] bg-brand-accent px-[14px] py-[14px] text-left text-[16px] font-bold text-gray-100"
+              onClick={() => dismiss(() => onMarkPending(message))}
+              className="flex w-full items-center gap-[10px] rounded-[16px] bg-brand-accent px-[14px] py-[14px] text-left text-[16px] transition-transform active:scale-[0.97] font-bold text-gray-100"
             >
               <IconPinFilled aria-hidden className="size-[18px]" />
               Mark as Pending
@@ -202,8 +253,8 @@ export function MessageActionSheet({
           {canUnmark && (
             <button
               type="button"
-              onClick={() => onUnmarkPending(message)}
-              className="flex w-full items-center gap-[10px] px-[14px] py-[14px] text-left text-[16px] font-bold text-gray-100"
+              onClick={() => dismiss(() => onUnmarkPending(message))}
+              className="flex w-full items-center gap-[10px] px-[14px] py-[14px] text-left text-[16px] transition-transform active:scale-[0.97] font-bold text-gray-100"
             >
               <IconPinFilled aria-hidden className="size-[18px] text-brand-primary" />
               Unmark as Pending
@@ -211,15 +262,15 @@ export function MessageActionSheet({
           )}
           <button
             type="button"
-            onClick={() => onReply(message)}
-            className="flex w-full items-center px-[14px] py-[14px] text-left text-[16px] text-gray-100"
+            onClick={() => dismiss(() => onReply(message))}
+            className="flex w-full items-center px-[14px] py-[14px] text-left text-[16px] transition-transform active:scale-[0.97] text-gray-100"
           >
             Reply
           </button>
           <button
             type="button"
-            onClick={() => onCopy(message)}
-            className="flex w-full items-center px-[14px] py-[14px] text-left text-[16px] text-gray-100"
+            onClick={() => dismiss(() => onCopy(message))}
+            className="flex w-full items-center px-[14px] py-[14px] text-left text-[16px] transition-transform active:scale-[0.97] text-gray-100"
           >
             Copy text
           </button>
