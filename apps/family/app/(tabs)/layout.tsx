@@ -8,14 +8,17 @@ import { IconHome, IconMicrophone, IconChat, IconMedicalRecord } from '@alio/ui'
 
 const HomeTab        = dynamic(() => import('./home/page'),              { ssr: false });
 const AICheckTab     = dynamic(() => import('./ai-check/page'),          { ssr: false });
+// The Chat tab renders the Care Circle conversation directly — a family
+// deals with one circle, not a list of threads, so there is no chat list
+// and no chat sub-page to drill into. It takes no id, so it lives at the
+// plain `chat` route rather than under a `[id]` segment.
 const ChatTab        = dynamic(() => import('./chat/page'),              { ssr: false });
 const RecordsTab     = dynamic(() => import('./records/page'),           { ssr: false });
-const ChatDetail     = dynamic(() => import('./chat/[id]/page'),         { ssr: false });
 const RecordDetail   = dynamic(() => import('./records/visit/[id]/page'),{ ssr: false });
 
 const TABS = ['home', 'ai-check', 'chat', 'records'] as const;
 type Tab = typeof TABS[number];
-type SubPage = { type: 'chat'; id: string } | { type: 'record'; id: string } | null;
+type SubPage = { type: 'record'; id: string } | null;
 
 const NAV_W = 365;
 const NAV_H = 69;
@@ -51,11 +54,10 @@ export default function TabsLayout({ children }: { children: ReactNode }) {
     <MobileFrame>
       <div className="relative h-full overflow-hidden">
         <div className="absolute inset-0 bottom-[85px] overflow-y-auto">
-          {subPage?.type === 'chat'   && <ChatDetail   id={subPage.id} onBack={() => setSubPage(null)} />}
           {subPage?.type === 'record' && <RecordDetail id={subPage.id} onBack={() => setSubPage(null)} />}
           {!subPage && active === 'home'     && <HomeTab />}
           {!subPage && active === 'ai-check' && <AICheckTab />}
-          {!subPage && active === 'chat'     && <ChatTab    onOpenThread={(id) => setSubPage({ type: 'chat',   id })} />}
+          {!subPage && active === 'chat'     && <ChatTab />}
           {!subPage && active === 'records'  && <RecordsTab onOpenVisit ={(id) => setSubPage({ type: 'record', id })} />}
         </div>
 

@@ -26,6 +26,8 @@ export { PendingCard } from './PendingCard';
 export { ConfirmedRow } from './ConfirmedRow';
 export { InboxSummaryCard } from './InboxSummaryCard';
 export { SuggestionCard } from './SuggestionCard';
+export { CircleAvatars } from './CircleAvatars';
+export { CircleHeaderCard } from './CircleHeaderCard';
 
 // Patient (caregiver Home + patient switcher)
 export { PatientCard } from './PatientCard';

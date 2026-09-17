@@ -85,8 +85,13 @@ export function mergeMessage(list: ThreadMessage[], next: ThreadMessage): Thread
   );
 }
 
-/** The item that has been waiting longest, independent of list order. */
-function findOldest(pending: ThreadMessage[]): ThreadMessage | null {
+/**
+ * The item that has been waiting longest, independent of list order. Used
+ * anywhere a "waiting since" label or a "jump to the oldest" action needs
+ * the true oldest member of a list that may not be sorted that way — e.g.
+ * the Pending list (newest-first) and the family Care Circle's "See all".
+ */
+export function findOldest(pending: ThreadMessage[]): ThreadMessage | null {
   return pending.reduce<ThreadMessage | null>(
     (oldest, m) => (oldest === null || instant(m.createdAt) < instant(oldest.createdAt) ? m : oldest),
     null,
