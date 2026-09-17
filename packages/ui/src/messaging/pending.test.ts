@@ -7,7 +7,6 @@ import {
   formatMessageTime,
   isPendingFor,
   mergeMessage,
-  pinnedBarLabel,
   selectPending,
   selectRecentlyConfirmed,
   waitingLabel,
@@ -53,20 +52,45 @@ describe('isPendingFor', () => {
 });
 
 describe('selectPending', () => {
-  it('returns the longest-waiting item first', () => {
+  it('returns the newest item first (revised 2026-09-17)', () => {
     const newer = msg({ id: 'newer', createdAt: '2026-09-15T11:00:00Z' });
     const older = msg({ id: 'older', createdAt: '2026-09-15T08:00:00Z' });
     const confirmed = msg({ id: 'done', acknowledgedAt: '2026-09-15T11:30:00Z' });
-    expect(selectPending([newer, confirmed, older], CAREGIVER_ID).map((m) => m.id)).toEqual([
-      'older',
+    expect(selectPending([older, confirmed, newer], CAREGIVER_ID).map((m) => m.id)).toEqual([
       'newer',
+      'older',
     ]);
   });
 
   it('orders by instant, not by string, when offsets are written differently', () => {
-    const a = msg({ id: 'a', createdAt: '2026-09-15T10:00:00.000Z' });
-    const b = msg({ id: 'b', createdAt: '2026-09-15T09:30:00+00:00' });
-    expect(selectPending([a, b], CAREGIVER_ID).map((m) => m.id)).toEqual(['b', 'a']);
+    // 2026-09-14T20:00:00+12:00 is 2026-09-14T08:00:00Z (earlier).
+    // 2026-09-14T09:00:00-11:00 is 2026-09-14T20:00:00Z (later).
+    // Lexicographically '20' > '09' so the older item's string sorts after
+    // the newer item's — a naive descending string sort would put the older
+    // item first. Instant comparison must get this right.
+    const older = msg({ id: 'older', createdAt: '2026-09-14T20:00:00+12:00' });
+    const newer = msg({ id: 'newer', createdAt: '2026-09-14T09:00:00-11:00' });
+    expect(selectPending([older, newer], CAREGIVER_ID).map((m) => m.id)).toEqual([
+      'newer',
+      'older',
+    ]);
+  });
+
+  it('finds the oldest item for the waiting labels regardless of the newest-first order (the ordering trap)', () => {
+    const oldest = msg({ id: 'oldest', createdAt: '2026-09-15T09:14:00Z' });
+    const middle = msg({ id: 'middle', createdAt: '2026-09-15T10:30:00Z' });
+    const newest = msg({ id: 'newest', createdAt: '2026-09-15T11:50:00Z' });
+    const pending = selectPending([middle, newest, oldest], CAREGIVER_ID);
+
+    // selectPending is newest first...
+    expect(pending.map((m) => m.id)).toEqual(['newest', 'middle', 'oldest']);
+
+    // ...but the header and the "waiting since" label must still describe
+    // the OLDEST item, not pending[0]. If either helper started indexing
+    // into the list instead of searching it, this would report a ~10 minute
+    // wait and a ~11:50 AM start time instead of the ~2h45m / 9:14 AM truth.
+    expect(oldestWaitingLabel(pending, NOW)).toBe('Oldest: 2h');
+    expect(waitingSinceLabel(pending, 'UTC')).toBe('Waiting since 9:14 AM');
   });
 });
 
@@ -101,20 +125,6 @@ describe('waitingLabel', () => {
 
   it('never shows less than a minute', () => {
     expect(waitingLabel('2026-09-15T11:59:50Z', NOW)).toBe('Waiting 1m');
-  });
-});
-
-describe('pinnedBarLabel', () => {
-  it('shows the count and the longest-waiting item', () => {
-    const newer = msg({ id: 'n', text: 'Call me after lunch', createdAt: '2026-09-15T11:00:00Z' });
-    const older = msg({ id: 'o', createdAt: '2026-09-15T08:00:00Z' });
-    expect(pinnedBarLabel([newer, older], CAREGIVER_ID)).toBe(
-      '2 pending · Pick up prescription, order 4471',
-    );
-  });
-
-  it('is null when nothing is pending, which hides the bar', () => {
-    expect(pinnedBarLabel([msg({ finalTier: null })], CAREGIVER_ID)).toBeNull();
   });
 });
 

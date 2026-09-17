@@ -160,11 +160,17 @@ tabs' states. Under the control, the Pending tab shows a section header
 Confirmed tab groups its rows by day under `TODAY`, `YESTERDAY` and `EARLIER`,
 each row a single line with a check mark plus `sender · relationship · time`.
 
-Oldest first. Longest-waiting at the top.
+**Newest first, decided 2026-09-17.** This reverses the original rule, which is
+kept here because its argument still holds:
 
-This is counterintuitive for a chat product and it is the point. The surface
-exists so things don't sink. Newest-first would recreate the problem it was
-built to solve.
+> Oldest first. Longest-waiting at the top. This is counterintuitive for a chat
+> product and it is the point. The surface exists so things don't sink.
+> Newest-first would recreate the problem it was built to solve.
+
+The risk is real and now rests on two things instead of ordering: `Oldest: 5h`
+sits in the section header, so the longest wait is always visible without
+scrolling, and every card carries its own waiting pill. If items start sinking
+in the pilot, ordering is the first thing to change back.
 
 ### After confirming
 

@@ -11,11 +11,11 @@ export function isPendingFor(m: ThreadMessage, userId: string): boolean {
   return m.recipientId === userId && m.finalTier === 'action' && m.acknowledgedAt === null;
 }
 
-/** The Pending view (spec §1): longest-waiting first. */
+/** The Pending view (spec §1, revised 2026-09-17): newest first. */
 export function selectPending(messages: ThreadMessage[], userId: string): ThreadMessage[] {
   return messages
     .filter((m) => isPendingFor(m, userId))
-    .sort((a, b) => instant(a.createdAt) - instant(b.createdAt));
+    .sort((a, b) => instant(b.createdAt) - instant(a.createdAt));
 }
 
 /** The collapsed Confirmed section (spec §3): last `days` days, most recently confirmed first. */
@@ -56,13 +56,6 @@ export function waitingLabel(createdAt: string, now: Date): string {
   return minutes < 60 ? `Waiting ${minutes}m` : `Waiting ${Math.floor(minutes / 60)}h`;
 }
 
-/** Chat pinned bar (spec §2.2): count plus the longest-waiting item. Null hides the bar. */
-export function pinnedBarLabel(messages: ThreadMessage[], userId: string): string | null {
-  const pending = selectPending(messages, userId);
-  if (pending.length === 0) return null;
-  return `${pending.length} pending · ${pending[0].text}`;
-}
-
 /** "Sep 15" — shown on confirmed rows outside today, where the time alone is ambiguous. */
 export function formatMessageDate(iso: string, timeZone?: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone });
@@ -92,16 +85,32 @@ export function mergeMessage(list: ThreadMessage[], next: ThreadMessage): Thread
   );
 }
 
-/** "Oldest: 5h" for the section header. Null when nothing is pending. */
+/** The item that has been waiting longest, independent of list order. */
+function findOldest(pending: ThreadMessage[]): ThreadMessage | null {
+  return pending.reduce<ThreadMessage | null>(
+    (oldest, m) => (oldest === null || instant(m.createdAt) < instant(oldest.createdAt) ? m : oldest),
+    null,
+  );
+}
+
+/**
+ * "Oldest: 5h" for the section header. Reads the oldest item regardless of
+ * list order — `selectPending` is newest-first, so this must not index [0].
+ * Null when nothing is pending.
+ */
 export function oldestWaitingLabel(pending: ThreadMessage[], now: Date): string | null {
-  const oldest = pending[0];
+  const oldest = findOldest(pending);
   if (!oldest) return null;
   return `Oldest: ${waitingLabel(oldest.createdAt, now).replace('Waiting ', '')}`;
 }
 
-/** "Waiting since 9:14 AM" for the Inbox card. Null when nothing is pending. */
+/**
+ * "Waiting since 9:14 AM" for the Inbox card. Reads the oldest item
+ * regardless of list order, for the same reason as `oldestWaitingLabel`.
+ * Null when nothing is pending.
+ */
 export function waitingSinceLabel(pending: ThreadMessage[], timeZone?: string): string | null {
-  const oldest = pending[0];
+  const oldest = findOldest(pending);
   if (!oldest) return null;
   return `Waiting since ${formatMessageTime(oldest.createdAt, timeZone)}`;
 }
