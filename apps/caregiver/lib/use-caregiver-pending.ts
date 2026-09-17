@@ -28,9 +28,13 @@ const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
  *
  * Live Supabase rows first, then the demo fixtures, everything re-sorted
  * through the same two selectors, so ordering and membership are identical
- * wherever they are read. `error` comes straight from the hook: a surface
- * that cannot reach the backend has to say so rather than render a confident
- * zero.
+ * wherever they are read.
+ *
+ * `error` comes straight from the hook, for the surfaces that have room to
+ * say so — the Inbox cards and the Pending screen both render a line instead
+ * of a confident zero. The Home bell deliberately does not: a badge can only
+ * show a number, and a number cannot express "I don't know". It keeps
+ * counting what it has, and the screen it opens tells the truth.
  */
 export function useCaregiverPending(now: Date) {
   const since = useMemo(() => new Date(Date.now() - SEVEN_DAYS_MS), []);

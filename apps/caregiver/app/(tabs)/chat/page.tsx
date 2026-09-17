@@ -36,7 +36,7 @@ export default function CaregiverChatPage({
 } = {}) {
   // This screen only reads counts, so one clock reading at mount is enough.
   const now = useMemo(() => new Date(), []);
-  const { pending, confirmed } = useCaregiverPending(now);
+  const { pending, confirmed, error } = useCaregiverPending(now);
 
   return (
     <div
@@ -76,6 +76,15 @@ export default function CaregiverChatPage({
           onOpen={() => onOpenPending?.('confirmed')}
         />
       </div>
+
+      {/* The cards can only ever show a number, and a number cannot say "I
+          don't know". Without this line an unreachable backend reads as a
+          calm "0 Pending" — the one thing this feature exists to prevent. */}
+      {error && (
+        <p className="absolute left-[25px] right-[25px] top-[214px] text-[13px] text-gray-60">
+          {"Couldn't load — check your connection"}
+        </p>
+      )}
 
       {/* Thread list — unchanged appearance, just starts lower to clear the cards */}
       <ul className="absolute bottom-[16px] left-[22px] right-[22px] top-[248px] flex flex-col gap-[12px] overflow-y-auto">

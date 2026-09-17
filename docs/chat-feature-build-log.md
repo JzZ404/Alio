@@ -288,25 +288,40 @@ how it was verified.
 
 ## Outstanding — needs a human
 
-**Run the second SQL block** — the one that lets a message be marked after it is
-sent. Without it the long-press menu appears but the mark is refused.
+**Run the third SQL block.** Parts 1 and 2 are already applied and working —
+do not re-run them. Part 3 is the delta: it stops the update guard from
+blocking writers it was never aimed at.
 
-1. `cd ~/Documents/aliomodel/Alio && sed -n '/part 2: marking a message after it is sent/,$p' supabase/schema.sql | pbcopy`
+Why it matters: the guard added in part 2 is a `before update` trigger, and a
+trigger fires for *everyone* — not just the browser. So the timeout follow-up
+job (spec section 5) could never stamp `followup_sent_at`, and nobody could
+repair a row by hand in the SQL editor. Part 3 exempts `service_role` and
+`postgres` and leaves the three browser transitions exactly as narrow as they
+were.
+
+1. `cd ~/Documents/aliomodel/Alio && sed -n '/part 3: let trusted writers/,$p' supabase/schema.sql | pbcopy`
 2. Paste into Supabase Dashboard → SQL Editor → Run. Expect `Success. No rows returned`.
-3. Confirm it stayed narrow — this should still fail with `permission denied`:
+3. Confirm it is still narrow — this should *still* fail with `permission denied`:
    ```sql
    begin; set local role anon;
    update family_messages set text = 'tampered' where thread_id = '__verify__';
    rollback;
    ```
 
-The first block is already applied and working.
+It is one `create or replace function`. The trigger itself already exists and
+is not recreated, so nothing is dropped and no window opens while it runs.
+Safe to re-run.
 
-**Two open decisions:**
-- Pending list order: oldest at the top (built, per the spec) or newest at the
-  top (as the original mockup drew it).
-- The wording pass the user flagged: `Pending` is doing the work of both the
-  mark and the state.
+**One thing to know when the follow-up job gets built:** it must use the
+service-role key. FastAPI currently reads `SUPABASE_KEY`, which is the anon
+key in dev — under that role the guard refuses the write exactly as it would
+from a browser. Noted in `backend/.env.example` too.
 
-**Test rows:** a few `ALIO-TEST` messages were written into the live thread while
-proving the write path. They can be deleted whenever.
+**Closed since this log was written:**
+- Pending list order — newest at the top, per the mockup (2026-09-17).
+- The bell badge now counts real pending messages instead of a fixture.
+
+**Still open:**
+- The wording pass: `Pending` is doing the work of both the mark and the state.
+- The `ALIO-TEST` messages are still in the live thread from end-to-end testing.
+- The `+` button on the family Care Circle header is inert.

@@ -172,7 +172,8 @@ create index if not exists family_messages_pending_idx
   where final_tier = 'action' and acknowledged_at is null;
 
 -- Confirm is the only update the browser may make: two columns, only on an
--- unconfirmed "Needs response" message, and never back to unconfirmed.
+-- unconfirmed Pending message, and never back to unconfirmed.
+-- (Superseded by part 2 below, which widens this and adds the trigger.)
 revoke update on family_messages from anon, authenticated;
 grant update (acknowledged_at, acknowledged_by) on family_messages to anon, authenticated;
 
@@ -300,6 +301,16 @@ language plpgsql as $$
 begin
   -- The whole point of this function is the anon key. Anything else reaching
   -- this table authenticated as a role the browser cannot assume is trusted.
+  --
+  -- `current_user`, not `session_user`: PostgREST connects as `authenticator`
+  -- and does `set local role anon` per request, so `session_user` here would
+  -- be `authenticator` for browser writes too and exempt every one of them.
+  --
+  -- This only buys a server-side writer anything if it actually presents a
+  -- different role. FastAPI currently reads SUPABASE_KEY, which is the anon
+  -- key in dev (backend/.env.example) — so the timeout follow-up job of
+  -- spec section 5 must use the service-role key, or it will be refused here
+  -- exactly like a browser.
   if current_user not in ('anon', 'authenticated') then
     return new;
   end if;

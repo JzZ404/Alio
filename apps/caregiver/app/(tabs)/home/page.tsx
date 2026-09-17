@@ -70,7 +70,10 @@ export default function CaregiverHomePage({ onOpenPending }: { onOpenPending?: (
         </IconBox>
         <button
           type="button"
-          aria-label="Notifications"
+          // The badge is the whole point of this button now, and an
+          // aria-label overrides the text inside it — so the count has to be
+          // said here or a screen reader never hears it at all.
+          aria-label={badge ? `Notifications, ${badge} pending` : 'Notifications'}
           onClick={onOpenPending}
           className="relative flex size-[42px] items-center justify-center rounded-lg bg-brand-tint-1 transition-colors active:bg-brand-border"
         >

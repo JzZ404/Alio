@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 const SRC_ROOT = dirname(fileURLToPath(import.meta.url));
 
 const HOOK_PATTERN =
-  /\b(useState|useEffect|useCallback|useRef|useMemo|useLayoutEffect|useReducer)\b/;
+  /\b(useState|useEffect|useCallback|useRef|useMemo|useLayoutEffect|useReducer|useSyncExternalStore|useTransition|useDeferredValue|useImperativeHandle)\b/;
 
 const DIRECTIVE_PATTERN = /^(['"])use client\1;?$/;
 
