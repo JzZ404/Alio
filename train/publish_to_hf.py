@@ -6,15 +6,24 @@ teammates, and new machines can pull it with one command.
 
 Usage
 -----
-    # Set your HF Write token (https://huggingface.co/settings/tokens):
-    $env:HF_TOKEN = "hf_..."
+Both paths are required: the GGUF and the Modelfile are build outputs that
+live wherever you exported them, and there is no sensible default that is
+right on more than one machine.
 
-    # Optional: override the local file paths or the repo name
-    $env:GGUF_PATH = "C:\Users\aaron\Downloads\gemma-4-e2b-it.Q4_K_M.gguf"
-    $env:MODELFILE_PATH = "C:\Users\aaron\Downloads\Modelfile"
-    $env:REPO_NAME = "alio-medical"
+    macOS / Linux:
+        export HF_TOKEN=hf_...                      # HF *Write* token
+        export GGUF_PATH=~/Downloads/gemma-4-e2b-it.Q4_K_M.gguf
+        export MODELFILE_PATH=~/Downloads/Modelfile
+        export REPO_NAME=alio-medical               # optional
+        python train/publish_to_hf.py
 
-    python scripts/publish_to_hf.py
+    Windows PowerShell:
+        $env:HF_TOKEN = "hf_..."
+        $env:GGUF_PATH = "$HOME\Downloads\gemma-4-e2b-it.Q4_K_M.gguf"
+        $env:MODELFILE_PATH = "$HOME\Downloads\Modelfile"
+        python train\publish_to_hf.py
+
+Get a token at https://huggingface.co/settings/tokens
 
 What it does
 ------------
@@ -42,14 +51,20 @@ def main() -> int:
         return 1
 
     repo_name = os.environ.get("REPO_NAME", "alio-medical-gemma4-e2b")
-    gguf_path = Path(os.environ.get(
-        "GGUF_PATH",
-        r"C:\Users\aaron\Downloads\gemma-4-e2b-it.Q4_K_M.gguf",
-    ))
-    modelfile_path = Path(os.environ.get(
-        "MODELFILE_PATH",
-        r"C:\Users\aaron\Downloads\Modelfile",
-    ))
+
+    # No defaults for these. They used to fall back to one teammate's Downloads
+    # folder, which meant the error on every other machine was "file not found
+    # at C:\Users\<someone else>\..." — confusing, and it read as though the
+    # repo expected that person's laptop.
+    raw_gguf = os.environ.get("GGUF_PATH")
+    raw_modelfile = os.environ.get("MODELFILE_PATH")
+    if not raw_gguf or not raw_modelfile:
+        print("ERROR: set GGUF_PATH and MODELFILE_PATH to your exported files.")
+        print("       Both are build outputs; see the module docstring above.")
+        return 1
+
+    gguf_path = Path(raw_gguf).expanduser()
+    modelfile_path = Path(raw_modelfile).expanduser()
 
     if not gguf_path.is_file():
         print(f"ERROR: GGUF file not found at {gguf_path}")

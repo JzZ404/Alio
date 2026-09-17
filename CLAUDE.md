@@ -114,6 +114,11 @@ The look and feel of "alive" matters. The data underneath doesn't.
 ## Active references
 
 - **PLAN.md** — current build plan, phase status, open decisions. Read when user asks "where are we" or scope shifts.
+- **backend/README.md** — how the FastAPI service runs, and **which model it
+  talks to**. By default every AI call goes to Google's hosted Gemma; our own
+  fine-tuned model is opt-in behind `USE_LOCAL_OLLAMA=1` and needs Ollama plus
+  a 3.4 GB pull. Read this before saying anything about where AI runs or what
+  leaves the machine.
 - **docs/restructure-2026-09-02.md** — the Sept 2 branch cleanup and root restructure: where every file moved, which branches were deleted and how to recover them, what changed in the icon generator and .gitignore. **Read this first if a path, script, or branch you expected is missing.**
 - **Memory** at `~/.claude/projects/-Users-jz-Documents-aliooo/memory/` — cross-session context.
 

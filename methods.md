@@ -184,8 +184,10 @@ PyTorch 2.6 / CUDA 12.4.
 After training, the LoRA adapter is exported to GGUF (`q4_k_m` quantization)
 and packaged as an Ollama model:
 
-```powershell
-ollama create alio-medical -f Modelfile
+```bash
+# From the repo root. The Modelfile pulls the published GGUF from HuggingFace,
+# so this works on a fresh machine with nothing exported locally.
+ollama create alio-medical -f backend/Modelfile.alio-medical
 ollama run alio-medical
 ```
 
@@ -197,9 +199,10 @@ ollama run alio-medical
 # Default: hosted Gemma 4 31B (high quality, requires internet)
 cd backend && uvicorn api:app --port 8000 --env-file .env
 
-# Local fine-tuned mode (demo / production)
-$env:USE_LOCAL_OLLAMA=1
-$env:OLLAMA_MODEL=alio-medical
+# Local fine-tuned mode (demo / production) — add to backend/.env:
+#   USE_LOCAL_OLLAMA=1
+# `ollama serve` must be running. Full setup and how to confirm which model
+# answered: backend/README.md → "Running on the fine-tuned model".
 cd backend && uvicorn api:app --port 8000 --env-file .env
 ```
 
