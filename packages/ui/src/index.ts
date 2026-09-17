@@ -25,6 +25,7 @@ export { SegmentedTabs } from './SegmentedTabs';
 export { PendingCard } from './PendingCard';
 export { ConfirmedRow } from './ConfirmedRow';
 export { InboxSummaryCard } from './InboxSummaryCard';
+export { SuggestionCard } from './SuggestionCard';
 
 // Patient (caregiver Home + patient switcher)
 export { PatientCard } from './PatientCard';
@@ -43,6 +44,7 @@ export * from './messaging/participants';
 export * from './messaging/pending';
 export * from './messaging/client';
 export * from './messaging/useFamilyMessages';
+export * from './messaging/suggest';
 
 // Caesarzkn icons — 288 generated icon components + custom
 export * from './icons';

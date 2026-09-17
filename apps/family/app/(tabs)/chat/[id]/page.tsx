@@ -16,8 +16,10 @@ import {
   MessageActionSheet,
   MessageBubble,
   SUPABASE_THREAD_FOR_FAMILY,
+  SuggestionCard,
   markPending,
   sendMessage,
+  suggestsPending,
   useFamilyMessages,
   type ThreadMessage,
 } from '@alio/ui';
@@ -51,6 +53,10 @@ export default function FamilyChatConversationPage({ id: propId, onBack }: { id?
   );
   const [draft, setDraft] = useState('');
   const [sheetFor, setSheetFor] = useState<ThreadMessage | null>(null);
+  // The message the ALIO SUGGESTS card is currently attached to (spec §4).
+  // The stub only ever proposes a message this device just sent, so there is
+  // at most one candidate at a time.
+  const [suggestedFor, setSuggestedFor] = useState<string | null>(null);
   // Shared banner for both the send path and the Mark-as-Pending path below.
   // Every attempt clears it up front, so a retry never shows a stale message
   // left over from a different, now-resolved failure.
@@ -66,14 +72,14 @@ export default function FamilyChatConversationPage({ id: propId, onBack }: { id?
       return;
     }
     try {
-      upsert(
-        await sendMessage(supabase, {
-          threadId: supabaseThreadId,
-          senderId: FAMILY_MEMBER_ID,
-          text,
-          needsResponse: false,
-        }),
-      );
+      const row = await sendMessage(supabase, {
+        threadId: supabaseThreadId,
+        senderId: FAMILY_MEMBER_ID,
+        text,
+        needsResponse: false,
+      });
+      upsert(row);
+      if (row.final_tier === null && suggestsPending(text)) setSuggestedFor(row.id);
       setSendError('');
     } catch (e) {
       console.error(e);
@@ -95,6 +101,26 @@ export default function FamilyChatConversationPage({ id: propId, onBack }: { id?
       setSendError("Couldn't mark that as Pending. Check your connection and try again.");
     }
   };
+
+  // Accepting the ALIO SUGGESTS card. Same optimistic patch and rollback as
+  // the long-press path, but tagged sender_confirmed_ai — never
+  // sender_manual — so the two entry points stay distinguishable later.
+  const handleMarkSuggested = async (message: ThreadMessage) => {
+    setSendError('');
+    patch(message.id, { finalTier: 'action' });
+    setSuggestedFor(null);
+    try {
+      await markPending(supabase, { messageId: message.id, taggedBy: 'sender_confirmed_ai' });
+      setSendError('');
+    } catch (e) {
+      console.error(e);
+      patch(message.id, { finalTier: null });
+      setSendError("Couldn't mark that as Pending. Check your connection and try again.");
+    }
+  };
+
+  // "No need" writes nothing — the suggestion is just dismissed from view.
+  const handleDismissSuggestion = () => setSuggestedFor(null);
 
   const handleCopy = async (message: ThreadMessage) => {
     setSendError('');
@@ -174,12 +200,25 @@ export default function FamilyChatConversationPage({ id: propId, onBack }: { id?
                   <ReportCard reportId={m.reportId} />
                 </div>
               ) : (
-                <MessageBubble
-                  key={m.id}
-                  message={m}
-                  viewerId={FAMILY_MEMBER_ID}
-                  onLongPress={m.senderId === FAMILY_MEMBER_ID ? setSheetFor : undefined}
-                />
+                <div key={m.id} className="flex flex-col">
+                  <MessageBubble
+                    message={m}
+                    viewerId={FAMILY_MEMBER_ID}
+                    onLongPress={m.senderId === FAMILY_MEMBER_ID ? setSheetFor : undefined}
+                  />
+                  {/*
+                   * ALIO SUGGESTS (spec §4): only on the family member's own
+                   * message, only while it is still untagged — the moment
+                   * finalTier is set, by this card or by the long-press path,
+                   * the card stops rendering rather than lingering.
+                   */}
+                  {suggestedFor === m.id && m.senderId === FAMILY_MEMBER_ID && m.finalTier === null && (
+                    <SuggestionCard
+                      onMark={() => handleMarkSuggested(m)}
+                      onDismiss={handleDismissSuggestion}
+                    />
+                  )}
+                </div>
               ),
             )}
           </div>
