@@ -12,8 +12,10 @@ import {
   IconProfile,
   MessageActionSheet,
   MessageBubble,
+  ReplyComposer,
   SUPABASE_THREAD_FOR_FAMILY,
   SuggestionCard,
+  Toast,
   findOldest,
   markPending,
   sendMessage,
@@ -31,6 +33,8 @@ import { ReportCard } from '@/components/ReportCard';
 
 /** How long a bubble jumped to via "See all" stays highlighted. */
 const HIGHLIGHT_MS = 1600;
+/** How long "Text Copied." stays up. Long enough to read, short enough not to nag. */
+const TOAST_MS = 1800;
 
 /**
  * A family deals with one circle, not a list of threads: this screen *is*
@@ -72,6 +76,11 @@ export default function FamilyChatConversationPage() {
   // Every attempt clears it up front, so a retry never shows a stale message
   // left over from a different, now-resolved failure.
   const [sendError, setSendError] = useState('');
+  // The message being replied to, if any. Presentational only: there is no
+  // parent-message column, so this shapes the composer and nothing else.
+  const [replyingTo, setReplyingTo] = useState<ThreadMessage | null>(null);
+  // "Text Copied." — the screen owns the timer, the Toast just renders.
+  const [toast, setToast] = useState('');
   // Set by "See all" to ring the jumped-to bubble; cleared on its own timer.
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
 
@@ -80,6 +89,12 @@ export default function FamilyChatConversationPage() {
     const timer = setTimeout(() => setHighlightedId(null), HIGHLIGHT_MS);
     return () => clearTimeout(timer);
   }, [highlightedId]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(''), TOAST_MS);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   // The message the ALIO SUGGESTS card is attached to (spec §4).
   //
@@ -144,6 +159,7 @@ export default function FamilyChatConversationPage() {
     setSendError('');
     if (!supabaseThreadId) {
       setMockMessages((prev) => [...prev, { id: `m-${Date.now()}`, sender: 'me', text }]);
+      setReplyingTo(null);
       return;
     }
     try {
@@ -155,6 +171,9 @@ export default function FamilyChatConversationPage() {
       });
       upsert(row);
       setSendError('');
+      // Only once it is away: a failed send keeps the quote, so the retry
+      // still reads as the reply it was meant to be.
+      setReplyingTo(null);
     } catch (e) {
       console.error(e);
       setDraft(text);
@@ -199,14 +218,26 @@ export default function FamilyChatConversationPage() {
   const handleDismissSuggestion = (messageId: string) =>
     setDismissedSuggestions((prev) => new Set(prev).add(messageId));
 
+  // Reply shapes the composer and nothing else — see `ReplyComposer` for why
+  // there is no stored relationship behind it.
+  const handleReply = (message: ThreadMessage) => {
+    setSendError('');
+    setReplyingTo(message);
+    setSheetFor(null);
+  };
+
   const handleCopy = async (message: ThreadMessage) => {
     setSendError('');
+    setSheetFor(null);
     try {
       await navigator.clipboard.writeText(message.text);
+      setToast('Text Copied.');
     } catch (e) {
+      // Only ever a permissions or insecure-context refusal. Saying nothing
+      // is wrong — the menu closed, so silence reads as success.
       console.error(e);
+      setSendError("Couldn't copy that. Your browser blocked clipboard access.");
     }
-    setSheetFor(null);
   };
 
   return (
@@ -287,15 +318,24 @@ export default function FamilyChatConversationPage() {
         )}
       </div>
 
-      {/* Quick actions row */}
-      <div className="absolute bottom-[72px] left-0 right-0 flex items-center justify-center gap-[10px] px-[16px]">
+      {/* Quick actions row — stands down while a reply is being written:
+          quoting takes over the bottom of the screen (design 2026-09-17). */}
+      <div
+        className={`absolute bottom-[72px] left-0 right-0 items-center justify-center gap-[10px] px-[16px] ${
+          replyingTo ? 'hidden' : 'flex'
+        }`}
+      >
         <QuickAction icon={IconReminder} label="Send Notes" />
         <QuickAction icon={IconRefresh} label="Status Update" />
         <QuickAction icon={IconProfile} label="Contact" />
       </div>
 
       {/* Input row */}
-      <div className="absolute bottom-[16px] left-0 right-0 flex flex-col gap-[6px] px-[16px]">
+      <div
+        className={`absolute bottom-[16px] left-0 right-0 flex-col gap-[6px] px-[16px] ${
+          replyingTo ? 'hidden' : 'flex'
+        }`}
+      >
         {sendError && (
           <p role="alert" className="text-center text-[12px] font-bold text-alert">
             {sendError}
@@ -342,11 +382,25 @@ export default function FamilyChatConversationPage() {
         </div>
       </div>
 
+      {replyingTo && (
+        <ReplyComposer
+          replyingTo={replyingTo}
+          viewerId={FAMILY_MEMBER_ID}
+          value={draft}
+          onChange={setDraft}
+          onSend={handleSend}
+          onCancel={() => setReplyingTo(null)}
+        />
+      )}
+
+      {toast && <Toast message={toast} />}
+
       <MessageActionSheet
         message={sheetFor?.message ?? null}
         anchor={anchor}
         viewerId={FAMILY_MEMBER_ID}
         onMarkPending={handleMarkPending}
+        onReply={handleReply}
         onCopy={handleCopy}
         onClose={() => setSheetFor(null)}
       />

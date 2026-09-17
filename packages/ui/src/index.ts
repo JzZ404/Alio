@@ -25,7 +25,9 @@ export { SegmentedTabs } from './SegmentedTabs';
 export { PendingCard } from './PendingCard';
 export { ConfirmedRow } from './ConfirmedRow';
 export { InboxSummaryCard } from './InboxSummaryCard';
+export { ReplyComposer } from './ReplyComposer';
 export { SuggestionCard } from './SuggestionCard';
+export { Toast } from './Toast';
 export { CircleAvatars } from './CircleAvatars';
 export { CircleHeaderCard } from './CircleHeaderCard';
 

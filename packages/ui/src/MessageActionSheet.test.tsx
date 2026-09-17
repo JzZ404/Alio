@@ -61,6 +61,7 @@ describe('MessageActionSheet', () => {
         anchor={anchor}
         viewerId={viewerId}
         onMarkPending={() => {}}
+        onReply={() => {}}
         onCopy={() => {}}
         onClose={() => {}}
       />,
@@ -75,6 +76,7 @@ describe('MessageActionSheet', () => {
         anchor={null}
         viewerId={viewerId}
         onMarkPending={() => {}}
+        onReply={() => {}}
         onCopy={() => {}}
         onClose={() => {}}
       />,
@@ -89,6 +91,7 @@ describe('MessageActionSheet', () => {
         anchor={anchor}
         viewerId={viewerId}
         onMarkPending={() => {}}
+        onReply={() => {}}
         onCopy={() => {}}
         onClose={() => {}}
       />,
@@ -107,6 +110,7 @@ describe('MessageActionSheet', () => {
         anchor={anchor}
         viewerId={viewerId}
         onMarkPending={() => {}}
+        onReply={() => {}}
         onCopy={() => {}}
         onClose={() => {}}
       />,
@@ -124,6 +128,7 @@ describe('MessageActionSheet', () => {
         anchor={anchor}
         viewerId={viewerId}
         onMarkPending={() => {}}
+        onReply={() => {}}
         onCopy={() => {}}
         onClose={() => {}}
       />,
@@ -145,6 +150,7 @@ describe('MessageActionSheet', () => {
         anchor={anchor}
         viewerId={viewerId}
         onMarkPending={onMarkPending}
+        onReply={() => {}}
         onCopy={onCopy}
         onClose={onClose}
       />,
@@ -164,6 +170,7 @@ describe('MessageActionSheet', () => {
         anchor={anchor}
         viewerId={viewerId}
         onMarkPending={() => {}}
+        onReply={() => {}}
         onCopy={() => {}}
         onClose={() => {}}
       />,
@@ -187,6 +194,7 @@ describe('MessageActionSheet', () => {
           anchor={{ top: 300, left: 32, width: 210 }}
           viewerId={viewerId}
           onMarkPending={() => {}}
+          onReply={() => {}}
           onCopy={() => {}}
           onClose={() => {}}
         />,
@@ -214,6 +222,7 @@ describe('MessageActionSheet', () => {
           anchor={{ top: 10, left: 32, width: 210 }}
           viewerId={viewerId}
           onMarkPending={() => {}}
+          onReply={() => {}}
           onCopy={() => {}}
           onClose={() => {}}
         />,
@@ -229,5 +238,22 @@ describe('MessageActionSheet', () => {
     } finally {
       restore();
     }
+  });
+
+  it('reports the message when Reply is tapped, so the composer can quote it', () => {
+    const onReply = vi.fn();
+    render(
+      <MessageActionSheet
+        message={mine}
+        anchor={{ top: 100, left: 40, width: 200 }}
+        viewerId={viewerId}
+        onMarkPending={() => {}}
+        onReply={onReply}
+        onCopy={() => {}}
+        onClose={() => {}}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Reply' }));
+    expect(onReply).toHaveBeenCalledWith(mine);
   });
 });

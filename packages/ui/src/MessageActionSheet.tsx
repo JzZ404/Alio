@@ -49,6 +49,7 @@ export function MessageActionSheet({
   anchor,
   viewerId,
   onMarkPending,
+  onReply,
   onCopy,
   onClose,
 }: {
@@ -56,6 +57,7 @@ export function MessageActionSheet({
   anchor: { top: number; left: number; width: number } | null;
   viewerId: string;
   onMarkPending: (message: ThreadMessage) => void;
+  onReply: (message: ThreadMessage) => void;
   onCopy: (message: ThreadMessage) => void;
   onClose: () => void;
 }) {
@@ -185,13 +187,9 @@ export function MessageActionSheet({
               Mark as Pending
             </button>
           )}
-          {/*
-           * Reply is deliberately inert: threaded replies are unspecified
-           * everywhere in the design, and the user asked to keep the item
-           * visible in the menu rather than remove it. It calls nothing.
-           */}
           <button
             type="button"
+            onClick={() => onReply(message)}
             className="flex w-full items-center px-[14px] py-[14px] text-left text-[16px] text-gray-100"
           >
             Reply
