@@ -2806,6 +2806,353 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ```
 
 
+---
+
+### Task 12: The family Care Circle screen
+
+Built from the family design supplied 2026-09-17. The family's Chat tab stops
+being a list of threads and becomes the conversation itself.
+
+**Files:**
+- Create: `packages/ui/src/CircleAvatars.tsx`
+- Test: `packages/ui/src/CircleAvatars.test.tsx`
+- Create: `packages/ui/src/CircleHeaderCard.tsx`
+- Test: `packages/ui/src/CircleHeaderCard.test.tsx`
+- Modify: `packages/ui/src/index.ts`
+- Modify: `apps/family/app/(tabs)/layout.tsx`
+- Modify: `apps/family/app/(tabs)/chat/[id]/page.tsx`
+- Delete: `apps/family/app/(tabs)/chat/page.tsx`
+
+**Interfaces:**
+- Produces:
+  - `CircleAvatars({ srcs, size = 52 })` — overlapping circles of differing sizes
+  - `CircleHeaderCard({ name, subtitle, avatars, markedCount, onSeeAll, onAdd })`
+  - The family chat screen becomes the Chat tab itself, taking no `id`
+
+**Decisions already made — do not relitigate:**
+- One circle only. The family's other mock threads (`dr-rowan`, `robert-chen`, `erin-circle`, and the separate `sarah-caregiver` row) disappear from the family app. Leave `packages/mock-data` untouched; simply stop reading those threads.
+- `See all` jumps to the longest-waiting marked message and highlights it — the same jump the caregiver's Pending list performs. No new screen.
+- Names come from the app, not the mockup: `Sarah Lee`, and the subtitle reads `Caregiver · Erin's circle`.
+- The `+` button renders and does nothing, like `Reply` in the action sheet. Adding someone to a circle is unspecified. Comment it as a placeholder.
+
+- [ ] **Step 1: Write the failing tests**
+
+Create `packages/ui/src/CircleAvatars.test.tsx`:
+
+```tsx
+import { afterEach, describe, expect, it } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import { CircleAvatars } from './CircleAvatars';
+
+afterEach(cleanup);
+
+describe('CircleAvatars', () => {
+  it('renders one image per member', () => {
+    render(<CircleAvatars srcs={['/avatars/nurse.png', '/avatars/janet.jpg', '/avatars/elder1.png']} />);
+    expect(screen.getAllByRole('presentation')).toHaveLength(3);
+  });
+
+  it('caps at three so the cluster stays legible', () => {
+    render(
+      <CircleAvatars
+        srcs={['/a.png', '/b.png', '/c.png', '/d.png', '/e.png']}
+      />,
+    );
+    expect(screen.getAllByRole('presentation')).toHaveLength(3);
+  });
+
+  it('renders nothing when the circle is empty', () => {
+    const { container } = render(<CircleAvatars srcs={[]} />);
+    expect(container.firstChild).toBeNull();
+  });
+});
+```
+
+Create `packages/ui/src/CircleHeaderCard.test.tsx`:
+
+```tsx
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { CircleHeaderCard } from './CircleHeaderCard';
+
+afterEach(cleanup);
+
+const avatars = ['/avatars/nurse.png', '/avatars/janet.jpg'];
+
+describe('CircleHeaderCard', () => {
+  it('names the circle and its primary member', () => {
+    render(
+      <CircleHeaderCard
+        name="Sarah Lee"
+        subtitle="Caregiver · Erin's circle"
+        avatars={avatars}
+        markedCount={0}
+        onSeeAll={() => {}}
+        onAdd={() => {}}
+      />,
+    );
+    expect(screen.getByText('Sarah Lee')).toBeTruthy();
+    expect(screen.getByText("Caregiver · Erin's circle")).toBeTruthy();
+  });
+
+  it('stays quiet when nothing is marked', () => {
+    render(
+      <CircleHeaderCard
+        name="Sarah Lee"
+        subtitle="Caregiver · Erin's circle"
+        avatars={avatars}
+        markedCount={0}
+        onSeeAll={() => {}}
+        onAdd={() => {}}
+      />,
+    );
+    expect(screen.queryByText(/waiting on Sarah/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'See all' })).toBeNull();
+  });
+
+  it('counts what is waiting, singular and plural, and reports See all', () => {
+    const onSeeAll = vi.fn();
+    const { rerender } = render(
+      <CircleHeaderCard
+        name="Sarah Lee"
+        subtitle="Caregiver · Erin's circle"
+        avatars={avatars}
+        markedCount={1}
+        onSeeAll={onSeeAll}
+        onAdd={() => {}}
+      />,
+    );
+    expect(screen.getByText('1 marked, waiting on Sarah')).toBeTruthy();
+    rerender(
+      <CircleHeaderCard
+        name="Sarah Lee"
+        subtitle="Caregiver · Erin's circle"
+        avatars={avatars}
+        markedCount={2}
+        onSeeAll={onSeeAll}
+        onAdd={() => {}}
+      />,
+    );
+    expect(screen.getByText('2 marked, waiting on Sarah')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'See all' }));
+    expect(onSeeAll).toHaveBeenCalled();
+  });
+});
+```
+
+- [ ] **Step 2: Run them, watch them fail**
+
+Run: `pnpm --filter @alio/ui test` → FAIL, both components missing.
+
+- [ ] **Step 3: Build `CircleAvatars`**
+
+Overlapping circles of differing sizes, reading as a group rather than a single
+face. Take up to three `srcs`; render nothing for an empty array. Each image is
+`role="presentation"` with `alt=""` — the header's text already names the
+circle, so the cluster is decoration.
+
+- Wrapper: `relative flex size-[52px] shrink-0 items-center`.
+- First image: `absolute left-0 top-0 size-[34px] rounded-full border-2 border-white object-cover`.
+- Second: `absolute bottom-0 right-0 size-[28px] rounded-full border-2 border-white object-cover`.
+- Third: `absolute bottom-[2px] left-[6px] size-[20px] rounded-full border-2 border-white object-cover`.
+- Use plain `<img>` with the `// eslint-disable-next-line @next/next/no-img-element` comment the other components in this package already use.
+
+- [ ] **Step 4: Build `CircleHeaderCard`**
+
+A white card holding the circle's identity and, when something is waiting, one
+pinned row. Visual spec:
+
+- Card: `rounded-[20px] bg-white px-[16px] py-[14px]`.
+- Top row: `flex items-center gap-[12px]` — `CircleAvatars`, then a column with
+  the name (`text-[18px] font-bold leading-tight text-gray-100`) and the
+  subtitle (`mt-[2px] text-[13px] leading-none text-gray-60`), then the add
+  button pushed right: `ml-auto flex size-[40px] shrink-0 items-center
+  justify-center rounded-full bg-brand-tint-1`, `aria-label="Add to circle"`,
+  holding `IconPlus` at `size-[20px] text-gray-100`.
+- The add button is inert. Comment it: adding someone to a circle is
+  unspecified, and this is a placeholder the design asks to show.
+- Pinned row, rendered only when `markedCount > 0`:
+  `mt-[12px] flex items-center gap-[10px] rounded-[14px] bg-brand-tint-1 px-[12px] py-[10px]`.
+  - `IconPinFilled` at `size-[18px] shrink-0 text-brand-primary`.
+  - Text: `flex-1 text-[14px] font-bold text-gray-100`, reading
+    `${markedCount} marked, waiting on Sarah`.
+  - `See all`: a button, `text-[14px] font-bold text-brand-primary`.
+
+- [ ] **Step 5: Run the tests, watch them pass**
+
+- [ ] **Step 6: Make the Chat tab the conversation**
+
+In `apps/family/app/(tabs)/chat/[id]/page.tsx`:
+- Drop the `id` and `onBack` props and the `useParams` lookup. The screen is now
+  the Care Circle and nothing else: hardcode the thread as
+  `SUPABASE_THREAD_FOR_FAMILY['sarah-caregiver']` via the existing constant, and
+  take its mock history from `SAMPLE_FM_CONVERSATIONS['sarah-caregiver']`.
+- Replace the old header (back button, single avatar, name/status, search) with
+  `CircleHeaderCard`, positioned `absolute left-[16px] right-[16px] top-[60px] z-10`.
+  - `name="Sarah Lee"`, `subtitle="Caregiver · Erin's circle"`.
+  - `avatars`: pull three paths from `SAMPLE_FM_CHAT_THREADS.find(t => t.id === 'erin-circle')?.groupAvatars` so the fixtures stay the source, falling back to an empty array.
+  - `markedCount`: the number of live messages this family member sent that are
+    marked and not yet confirmed — `finalTier === 'action' && acknowledgedAt === null && senderId === FAMILY_MEMBER_ID`.
+  - `onSeeAll`: scroll to the longest-waiting such message and highlight it for
+    about 1.6 seconds, reusing `MessageBubble`'s `highlighted` prop and the
+    `[data-message-id]` lookup the caregiver thread already uses. Take the
+    oldest by `createdAt` — do not assume list order.
+  - `onAdd`: a no-op.
+- The messages region starts below the card. Give the card a stable height by
+  measuring nothing: set the messages container to `top-[196px]` when
+  `markedCount > 0` and `top-[150px]` when it is zero.
+- Composer placeholder becomes `Message Sarah`.
+- Everything else in the thread stays: mock history then live messages, the
+  action sheet, the suggestion card, the send path, the error line.
+
+In `apps/family/app/(tabs)/layout.tsx`:
+- The `chat` tab renders the conversation directly. Remove the chat sub-page
+  type and its rendering, and the `onOpenThread` wiring.
+- Keep the `records` sub-pages exactly as they are.
+
+Delete `apps/family/app/(tabs)/chat/page.tsx`.
+
+- [ ] **Step 7: Verify**
+
+`pnpm --filter @alio/ui test` (report the count), `pnpm --filter @alio/ui typecheck`,
+`pnpm --filter @alio/family typecheck`.
+
+Live, on the family app at :3002 with the browse tool: the Chat tab opens
+straight into the circle, the header shows the clustered avatars, the pinned row
+counts what is waiting, `See all` jumps to the oldest marked message and
+highlights it, and no chat list appears anywhere. Screenshot the screen.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add packages/ui apps/family
+git commit -m "feat(family): make Chat the care circle itself
+
+A family deals with one circle; a caregiver juggles many clients. So the
+family's Chat tab stops being a list of threads and becomes the conversation,
+headed by a card naming the circle, its members, and what is still waiting on
+Sarah.
+
+See all jumps to the longest-waiting marked message rather than opening a
+second screen — the same jump the caregiver's Pending list makes.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+```
+
+---
+
+### Task 13: Long-press in place, with motion
+
+Built from user feedback on the shipped long-press: the message jumps out of
+position, there is no selection treatment, and the menu appears with no motion.
+
+**Files:**
+- Modify: `packages/ui/src/MessageActionSheet.tsx`
+- Modify: `packages/ui/src/MessageBubble.tsx`
+- Modify: `packages/ui/src/SuggestionCard.tsx`
+- Modify: `packages/theme/src/tailwind-preset.ts`
+- Modify: `apps/family/app/(tabs)/chat/[id]/page.tsx`
+- Test: `packages/ui/src/MessageActionSheet.test.tsx`
+
+**Interfaces:**
+- `MessageActionSheet` gains `anchor: { top: number; left: number; width: number } | null` — the pressed bubble's position in the scroll container, measured by the caller
+- `MessageBubble`'s `onLongPress` signature becomes `(message: ThreadMessage, rect: DOMRect) => void`
+- `MessageBubble` gains `selected?: boolean`
+
+- [ ] **Step 1: The message stays where it is**
+
+Today the overlay centres the pressed message and the menu, so the message
+appears to jump down the screen. Instead:
+
+- `MessageBubble`'s long-press handler measures its own bubble element with
+  `getBoundingClientRect()` and passes that rect alongside the message.
+- The family page stores `{ message, rect }` and passes the rect to the sheet.
+- `MessageActionSheet` renders the blurred backdrop as it does now, but
+  positions the lifted copy of the message at the rect's own coordinates,
+  converted to the overlay's coordinate space, and puts the menu directly below
+  it. If the menu would fall past the bottom of the frame, place it above the
+  message instead; clamp so neither leaves the frame.
+- The message under the overlay keeps its place in the thread, so nothing moves.
+
+- [ ] **Step 2: Selection treatment**
+
+While a message is held open in the sheet, the bubble reads as selected:
+`MessageBubble` takes `selected?: boolean` and, when true, adds
+`ring-2 ring-brand-primary ring-offset-2` to the bubble. The family page passes
+`selected={sheetFor?.message.id === m.id}`. The lifted copy inside the sheet
+carries the same treatment, so the two read as the same object.
+
+- [ ] **Step 3: Motion**
+
+Add to `packages/theme/src/tailwind-preset.ts`, beside the existing keyframes:
+
+```ts
+        // Long-press menu: rises from the message it belongs to.
+        'sheet-in': {
+          from: { opacity: '0', transform: 'translateY(-6px) scale(0.96)' },
+          to: { opacity: '1', transform: 'translateY(0) scale(1)' },
+        },
+        // The blur behind it fades rather than snapping on.
+        'backdrop-in': {
+          from: { opacity: '0' },
+          to: { opacity: '1' },
+        },
+```
+
+and the animations:
+
+```ts
+        'sheet-in': 'sheet-in 200ms cubic-bezier(0.22, 1, 0.36, 1)',
+        'backdrop-in': 'backdrop-in 160ms ease-out',
+```
+
+Apply `animate-backdrop-in` to the blurred backdrop and `animate-sheet-in` to
+the menu card, with `origin-top` so it grows from the message. **A Tailwind
+preset change does not hot-reload — the dev server must be restarted before
+these classes exist.** Say so in your report.
+
+- [ ] **Step 4: Restyle the suggestion card to the design**
+
+The supplied screen shows the card differently from what shipped:
+- Card: `rounded-[18px] bg-gray-30/60 px-[16px] py-[14px]` — a light grey panel, not white.
+- Header: unchanged copy `ALIO SUGGESTS`, `text-[12px] font-bold uppercase tracking-[0.08em] text-gray-60`, with the waveform icon at `size-[14px]` to its left.
+- Sentence: `mt-[8px] text-[15px] leading-snug text-gray-100`.
+- Buttons row: `mt-[14px] flex gap-[10px]`.
+  - `Mark it`: `flex-1 rounded-[12px] bg-brand-accent px-[16px] py-[11px] text-[15px] font-bold text-brand-primary` — accent green with brand-purple text, as drawn.
+  - `No need`: `flex-1 rounded-[12px] bg-white px-[16px] py-[11px] text-[15px] font-bold text-gray-100`.
+- `Only you can see this` stays beneath, unchanged.
+
+- [ ] **Step 5: Tests**
+
+Extend `MessageActionSheet.test.tsx`:
+- The sheet positions itself from the anchor: render with a known rect and
+  assert the lifted message's inline `top`/`left` reflect it rather than being
+  centred.
+- Passing `anchor={null}` still renders nothing when `message` is null.
+
+- [ ] **Step 6: Verify and commit**
+
+Restart the family dev server (the preset change requires it), then check live:
+long-press a message, confirm it does not move, the menu rises beneath it with
+motion, the bubble reads as selected, and the suggestion card matches the design.
+Screenshot both.
+
+```bash
+git add packages/theme packages/ui apps/family
+git commit -m "fix(family): open the long-press menu in place, with motion
+
+The pressed message used to jump to the middle of the screen: the overlay
+centred a copy of it. The copy now sits at the message's own coordinates, the
+menu rises from it, and the bubble reads as selected while it is held, so the
+thing you pressed is the thing you are looking at.
+
+The menu and its backdrop animate in rather than appearing. The suggestion card
+picks up the grey panel and accent-on-purple buttons from the design.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+```
+
+
 ## After this plan
 
 - **Open a pull request** from `feat/pending-confirmations` into `main` for review, rather than pushing to `main`.
