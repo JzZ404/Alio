@@ -29,7 +29,7 @@ export const colors = {
 } as const;
 
 /**
- * "Needs response" styling — semantic names over the existing brand palette,
+ * Pending styling — semantic names over the existing brand palette,
  * not a new color family. The mockup drew these amber; the brand is purple, so
  * they resolve to brand values instead.
  *

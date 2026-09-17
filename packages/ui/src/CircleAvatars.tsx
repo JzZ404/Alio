@@ -7,12 +7,12 @@
  * identifies the circle, so these carry `role="presentation"` and `alt=""`
  * rather than announcing redundant names to assistive tech.
  */
-export function CircleAvatars({ srcs, size = 52 }: { srcs: string[]; size?: number }) {
+export function CircleAvatars({ srcs }: { srcs: string[] }) {
   const shown = srcs.slice(0, 3);
   if (shown.length === 0) return null;
 
   return (
-    <span className="relative flex size-[52px] shrink-0 items-center" style={{ width: size, height: size }}>
+    <span className="relative flex size-[52px] shrink-0 items-center">
       {shown[0] && (
         // eslint-disable-next-line @next/next/no-img-element
         <img

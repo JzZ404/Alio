@@ -54,7 +54,7 @@ describe('sendMessage', () => {
     ]);
   });
 
-  it('tags Needs response as a manual sender tag', async () => {
+  it('tags a Pending message as a manual sender tag', async () => {
     const { client, calls } = fakeClient({ data: { id: 'row-2' } });
     await sendMessage(client, {
       threadId: 'caregiver-001__erin-yeung',

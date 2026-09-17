@@ -186,9 +186,12 @@ export function MessageActionSheet({
            * everywhere in the design, and the user asked to keep the item
            * visible in the menu rather than remove it. It calls nothing.
            */}
+          {/* `first:border-t-0`: on an already-marked message Mark as Pending
+              is gone, so Reply is the first row and its divider had nothing
+              above it to divide. */}
           <button
             type="button"
-            className="flex w-full items-center border-t border-gray-30 px-[16px] py-[14px] text-left text-[16px] text-gray-100"
+            className="flex w-full items-center border-t border-gray-30 px-[16px] py-[14px] text-left text-[16px] text-gray-100 first:border-t-0"
           >
             Reply
           </button>

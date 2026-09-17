@@ -53,7 +53,7 @@ export default function ChatConversationPage({
   const supabaseThreadId = SUPABASE_THREAD_FOR_CAREGIVER[id];
 
   const [mockMessages, setMockMessages] = useState<ChatMessage[]>(SAMPLE_CONVERSATIONS[id] ?? []);
-  const { messages: live, patch, upsert } = useFamilyMessages(
+  const { messages: live, error, patch, upsert } = useFamilyMessages(
     supabase,
     supabaseThreadId ? { by: 'thread', threadId: supabaseThreadId } : null,
   );
@@ -180,7 +180,14 @@ export default function ChatConversationPage({
 
       {/* Messages — start below header (60+42+27=129), end above quick actions */}
       <div className="absolute bottom-[120px] left-0 right-0 top-[129px] overflow-y-auto px-[16px] py-[12px]">
-        {mockMessages.length === 0 && live.length === 0 ? (
+        {/* An unreachable backend must not read as an empty thread. This sits
+            above whatever did load rather than replacing it. */}
+        {error && (
+          <p className="mb-[12px] text-center text-[13px] text-gray-60">
+            {"Couldn't load — check your connection"}
+          </p>
+        )}
+        {!error && mockMessages.length === 0 && live.length === 0 ? (
           <p className="mt-12 text-center text-sm text-gray-60">
             No messages yet — say hi 👋
           </p>
@@ -250,7 +257,7 @@ export default function ChatConversationPage({
 
         <button
           type="button"
-          aria-label="More actions"
+          aria-label="Send"
           onClick={handleSend}
           className="flex size-[44px] items-center justify-center rounded-[12px] bg-white/70 transition-colors active:bg-white"
         >
