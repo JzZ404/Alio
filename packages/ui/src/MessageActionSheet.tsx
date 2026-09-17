@@ -151,7 +151,7 @@ export function MessageActionSheet({
         }}
         className="absolute overflow-hidden"
       >
-        <MessageBubble message={message} viewerId={viewerId} selected lifted />
+        <MessageBubble message={message} viewerId={viewerId} lifted />
       </div>
 
       <div

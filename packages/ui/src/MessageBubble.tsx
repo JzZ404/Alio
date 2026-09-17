@@ -24,8 +24,11 @@ const LONG_PRESS_MS = 450;
  * position instead of centring it. A bubble without `onLongPress` behaves
  * exactly as it does today.
  *
- * `selected` rings the bubble while it is held open in the action sheet, so
- * the bubble and the lifted copy above the sheet read as the same object.
+ * There is deliberately no "held" treatment while the sheet is open. A ring
+ * with an offset paints a white gap around the bubble, and because the lifted
+ * copy sits exactly over the original, the original's ring leaked out around
+ * its edges as a white outline. The lift and the blur already say which
+ * message is held; the bubble itself should just look like the bubble.
  *
  * `lifted` is for that copy. In the thread this component fills the row and
  * the bubble takes at most 75% of it; the action sheet instead renders it
@@ -40,7 +43,6 @@ export function MessageBubble({
   onConfirm,
   onLongPress,
   highlighted = false,
-  selected = false,
   lifted = false,
 }: {
   message: ThreadMessage;
@@ -48,7 +50,6 @@ export function MessageBubble({
   onConfirm?: (messageId: string) => void;
   onLongPress?: (message: ThreadMessage, rect: DOMRect) => void;
   highlighted?: boolean;
-  selected?: boolean;
   lifted?: boolean;
 }) {
   const isMine = message.senderId === viewerId;
@@ -109,8 +110,6 @@ export function MessageBubble({
           // Jumped-to from the Pending list: brand accent, thick enough to
           // register — the accent green is only 1.3:1 against these surfaces.
           highlighted && 'ring-[3px] ring-brand-accent ring-offset-2',
-          // Held open in the long-press action sheet.
-          selected && 'ring-2 ring-brand-primary ring-offset-2',
         )}
       >
         {/*

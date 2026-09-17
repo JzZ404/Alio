@@ -267,7 +267,6 @@ export default function FamilyChatConversationPage() {
                     viewerId={FAMILY_MEMBER_ID}
                     onLongPress={m.senderId === FAMILY_MEMBER_ID ? handleLongPress : undefined}
                     highlighted={m.id === highlightedId}
-                    selected={sheetFor?.message.id === m.id}
                   />
                   {/*
                    * ALIO SUGGESTS (spec §4): only on the family member's own
