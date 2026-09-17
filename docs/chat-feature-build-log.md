@@ -323,5 +323,7 @@ from a browser. Noted in `backend/.env.example` too.
 
 **Still open:**
 - The wording pass: `Pending` is doing the work of both the mark and the state.
-- The `ALIO-TEST` messages are still in the live thread from end-to-end testing.
+- The `ALIO-TEST` messages are deliberately still in the live thread: they are
+  real content to revise the family UI against (decided 2026-09-17). Clear them
+  before any demo.
 - The `+` button on the family Care Circle header is inert.
