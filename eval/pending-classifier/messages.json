@@ -1,0 +1,325 @@
+[
+  {
+    "text": "Can you pick up her prescription today? Order 4471.",
+    "label": "action",
+    "medication": true
+  },
+  {
+    "text": "Could you bring the walker in from the porch before you leave?",
+    "label": "action",
+    "medication": false
+  },
+  {
+    "text": "Please remind her to take the blue pill with food.",
+    "label": "action",
+    "medication": true
+  },
+  {
+    "text": "Would you mind checking the back door is locked?",
+    "label": "action",
+    "medication": false
+  },
+  {
+    "text": "Can you call me after the doctor's appointment?",
+    "label": "action",
+    "medication": false
+  },
+  {
+    "text": "Please don't let her go up the stairs on her own today.",
+    "label": "action",
+    "medication": false
+  },
+  {
+    "text": "Could you write down what she eats today?",
+    "label": "action",
+    "medication": false
+  },
+  {
+    "text": "Can you take her blood pressure this afternoon?",
+    "label": "action",
+    "medication": false
+  },
+  {
+    "text": "Please pick up more of the thickened water while you're at the pharmacy.",
+    "label": "action",
+    "medication": true
+  },
+  {
+    "text": "Could you move her appointment to Friday if they have room?",
+    "label": "action",
+    "medication": false
+  },
+  {
+    "text": "Can you send me a photo of the pill organiser once you've filled it?",
+    "label": "action",
+    "medication": true
+  },
+  {
+    "text": "Please leave the hall light on tonight.",
+    "label": "action",
+    "medication": false
+  },
+  {
+    "text": "Her pills run out Thursday.",
+    "label": "action",
+    "medication": true,
+    "note": "No question, no verb aimed at anyone. The regex misses every message like this."
+  },
+  {
+    "text": "She's completely out of the blue ones.",
+    "label": "action",
+    "medication": true
+  },
+  {
+    "text": "I think she's nearly out of the heart tablets.",
+    "label": "action",
+    "medication": true
+  },
+  {
+    "text": "The prescription should be ready at Grove by two.",
+    "label": "action",
+    "medication": true,
+    "note": "Arguable: information, or 'so go and get it'. I read it as a request."
+  },
+  {
+    "text": "Nobody has changed the bed since Sunday.",
+    "label": "action",
+    "medication": false
+  },
+  {
+    "text": "Her walker is still in the car.",
+    "label": "action",
+    "medication": false
+  },
+  {
+    "text": "The bins go out tonight.",
+    "label": "action",
+    "medication": false
+  },
+  {
+    "text": "She hasn't had anything to drink since I called.",
+    "label": "action",
+    "medication": false
+  },
+  {
+    "text": "Dr Patel's office wants a callback.",
+    "label": "action",
+    "medication": false
+  },
+  {
+    "text": "The smoke alarm has been chirping since yesterday.",
+    "label": "action",
+    "medication": false
+  },
+  {
+    "text": "She's been saying her knee hurts on the stairs.",
+    "label": "action",
+    "medication": false,
+    "note": "Arguable: could be FYI. I read it as needing attention."
+  },
+  {
+    "text": "There's a form from the insurance company on the counter.",
+    "label": "action",
+    "medication": false
+  },
+  {
+    "text": "The fridge light is out and she won't say anything about it.",
+    "label": "action",
+    "medication": false
+  },
+  {
+    "text": "She keeps taking her cardigan off, I think the heating is up too high.",
+    "label": "action",
+    "medication": false
+  },
+  {
+    "text": "How was she today?",
+    "label": "fyi",
+    "medication": false
+  },
+  {
+    "text": "Did she eat lunch?",
+    "label": "fyi",
+    "medication": false
+  },
+  {
+    "text": "Was she in a good mood this morning?",
+    "label": "fyi",
+    "medication": false
+  },
+  {
+    "text": "Has she been sleeping any better?",
+    "label": "fyi",
+    "medication": false
+  },
+  {
+    "text": "What time did you get there?",
+    "label": "fyi",
+    "medication": false
+  },
+  {
+    "text": "Did the physio come?",
+    "label": "fyi",
+    "medication": false
+  },
+  {
+    "text": "How did she seem after the appointment?",
+    "label": "fyi",
+    "medication": false
+  },
+  {
+    "text": "Would you say she's getting worse?",
+    "label": "fyi",
+    "medication": false,
+    "note": "Asks for an opinion, not an action. A model keying on 'would you' will call this a request."
+  },
+  {
+    "text": "I'll be there around six.",
+    "label": "fyi",
+    "medication": false
+  },
+  {
+    "text": "My brother is visiting on Saturday.",
+    "label": "fyi",
+    "medication": false
+  },
+  {
+    "text": "She likes the soup from the place on Grove.",
+    "label": "fyi",
+    "medication": false
+  },
+  {
+    "text": "The heating is on a timer, it comes on at five.",
+    "label": "fyi",
+    "medication": false
+  },
+  {
+    "text": "Her hearing aid takes the small brown batteries.",
+    "label": "fyi",
+    "medication": false
+  },
+  {
+    "text": "She gets confused about the day of the week sometimes.",
+    "label": "fyi",
+    "medication": false
+  },
+  {
+    "text": "The spare key is with the neighbour.",
+    "label": "fyi",
+    "medication": false
+  },
+  {
+    "text": "The pharmacy on Grove closes at six.",
+    "label": "fyi",
+    "medication": false,
+    "note": "Arguable: on its own it is a fact. Next to a prescription message it is a deadline."
+  },
+  {
+    "text": "Dad used to do the crossword with her every morning.",
+    "label": "fyi",
+    "medication": false
+  },
+  {
+    "text": "I won't be able to reach her this afternoon, I'm in meetings.",
+    "label": "fyi",
+    "medication": false
+  },
+  {
+    "text": "I already picked up the prescription.",
+    "label": "fyi",
+    "medication": true
+  },
+  {
+    "text": "I called the doctor this morning.",
+    "label": "fyi",
+    "medication": false
+  },
+  {
+    "text": "I've refilled the organiser for the week.",
+    "label": "fyi",
+    "medication": true
+  },
+  {
+    "text": "I moved the appointment to Friday.",
+    "label": "fyi",
+    "medication": false
+  },
+  {
+    "text": "I brought the walker in last night.",
+    "label": "fyi",
+    "medication": false
+  },
+  {
+    "text": "I already spoke to the pharmacy about the refill.",
+    "label": "fyi",
+    "medication": true
+  },
+  {
+    "text": "Thanks Sarah, that is a relief.",
+    "label": "social",
+    "medication": false
+  },
+  {
+    "text": "Morning!",
+    "label": "social",
+    "medication": false
+  },
+  {
+    "text": "You're a star, thank you.",
+    "label": "social",
+    "medication": false
+  },
+  {
+    "text": "Hope you had a good weekend.",
+    "label": "social",
+    "medication": false
+  },
+  {
+    "text": "That made me laugh, thank you for telling me.",
+    "label": "social",
+    "medication": false
+  },
+  {
+    "text": "No rush at all.",
+    "label": "social",
+    "medication": false
+  },
+  {
+    "text": "Have a good evening.",
+    "label": "social",
+    "medication": false
+  },
+  {
+    "text": "Thank you so much for today.",
+    "label": "social",
+    "medication": false
+  },
+  {
+    "text": "Sorry for all the messages!",
+    "label": "social",
+    "medication": false
+  },
+  {
+    "text": "Glad she's in such good hands.",
+    "label": "social",
+    "medication": false
+  },
+  {
+    "text": "Can you believe she's still doing the crossword?",
+    "label": "social",
+    "medication": false,
+    "note": "Starts with 'can you' and asks nothing. A keyword matcher calls this a request."
+  },
+  {
+    "text": "Please don't worry about the dishes.",
+    "label": "social",
+    "medication": false,
+    "note": "Arguable: it is an instruction, but it asks for nothing to be done."
+  },
+  {
+    "text": "Please tell her I love her.",
+    "label": "action",
+    "medication": false,
+    "note": "Arguable: genuinely asks Sarah to do something, but nobody is waiting on it. I labelled it action."
+  }
+]
