@@ -227,4 +227,45 @@ describe('useFamilyMessages', () => {
     await act(async () => result.current.patch('row-1', { finalTier: null }));
     expect(result.current.messages[0].finalTier).toBeNull();
   });
+
+  /*
+   * Spec section 9: "No model suggestions in the Pending list." The guarantee
+   * is structural — `fromRow` never copies suggested_tier onto a
+   * ThreadMessage, so `isPendingFor` and friends have nothing to read even if
+   * someone wired them carelessly. These two tests pin both halves: the
+   * suggestion does arrive, and it arrives somewhere the Pending surfaces
+   * cannot see.
+   */
+  it('reports what the model suggested, keyed by message id', async () => {
+    const { client, state } = fakeClient({ data: [row({ suggested_tier: 'action' })] });
+    const { result } = renderHook(() => useFamilyMessages(client, scope));
+    await act(async () => state.status?.('SUBSCRIBED'));
+
+    expect(result.current.suggestions['row-1']).toBe('action');
+  });
+
+  it('keeps the suggestion off the message itself', async () => {
+    const { client, state } = fakeClient({ data: [row({ suggested_tier: 'action' })] });
+    const { result } = renderHook(() => useFamilyMessages(client, scope));
+    await act(async () => state.status?.('SUBSCRIBED'));
+
+    const message = result.current.messages[0];
+    expect('suggestedTier' in message).toBe(false);
+    // The message is still untagged, so nothing about it is Pending.
+    expect(message.finalTier).toBeNull();
+  });
+
+  // A suggestion arriving later, once the classifier has answered, has to
+  // reach the card the same way the snapshot's would.
+  it('picks up a suggestion that arrives after the message did', async () => {
+    const { client, state } = fakeClient({ data: [row()] });
+    const { result } = renderHook(() => useFamilyMessages(client, scope));
+    await act(async () => state.status?.('SUBSCRIBED'));
+    expect(result.current.suggestions['row-1']).toBeUndefined();
+
+    await act(async () =>
+      state.handlers.UPDATE?.({ new: row({ suggested_tier: 'action', suggested_by: 'model' }) }),
+    );
+    expect(result.current.suggestions['row-1']).toBe('action');
+  });
 });

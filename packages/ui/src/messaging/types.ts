@@ -21,7 +21,12 @@ export interface FamilyMessageRow {
 
 /**
  * The shape screens work with. Deliberately omits suggested_tier: a model
- * suggestion must never reach a Pending surface (spec §9).
+ * suggestion must never reach a Pending surface (spec §9), and the surest way
+ * to guarantee that is for the Pending selectors to have no way of reading it.
+ *
+ * The suggestion still has to reach *one* place — the ALIO SUGGESTS card — so
+ * `useFamilyMessages` returns it on a separate channel, keyed by message id.
+ * A screen has to go out of its way to get it, which is the point.
  */
 export interface ThreadMessage {
   id: string;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ThreadMessage } from './types';
+import { fromRow, type ThreadMessage } from './types';
 import { CAREGIVER_ID, FAMILY_MEMBER_ID, otherParticipant, personLabel } from './participants';
 import {
   formatBadge,
@@ -266,5 +266,39 @@ describe('groupConfirmedByDay', () => {
 
   it('returns nothing when there is nothing confirmed', () => {
     expect(groupConfirmedByDay([], NOW)).toEqual([]);
+  });
+});
+
+describe('spec section 9 — model suggestions stay out of the Pending list', () => {
+  /*
+   * Enforced by the type, not by a filter: `fromRow` simply does not copy
+   * suggested_tier across, so there is no field for a Pending surface to read.
+   * If someone ever adds one to ThreadMessage, this test fails and points at
+   * the decision rather than letting a gray hint quietly become a request.
+   */
+  it('does not carry the model suggestion onto a message', () => {
+    const converted = fromRow({
+      id: 'row-1',
+      thread_id: 't1',
+      sender: 'Janet Chen',
+      sender_id: 'janet-chen',
+      recipient_id: CAREGIVER_ID,
+      text: 'Her pills run out Thursday',
+      report_id: null,
+      final_tier: null,
+      tagged_by: null,
+      suggested_tier: 'action',
+      suggested_by: 'model',
+      acknowledged_at: null,
+      acknowledged_by: null,
+      followup_sent_at: null,
+      created_at: '2026-09-22T09:00:00Z',
+    });
+
+    expect('suggestedTier' in converted).toBe(false);
+    expect(converted.finalTier).toBeNull();
+    // The whole point: the model thinks this needs Sarah, and it still does
+    // not appear anywhere the caregiver is asked to act.
+    expect(selectPending([converted], CAREGIVER_ID)).toHaveLength(0);
   });
 });

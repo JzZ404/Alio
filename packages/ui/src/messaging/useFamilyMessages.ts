@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { fromRow, type FamilyMessageRow, type ThreadMessage } from './types';
+import { fromRow, type FamilyMessageRow, type ThreadMessage, type Tier } from './types';
 import { keepOneWayFields, mergeMessage } from './pending';
 
 export type MessageScope =
@@ -29,11 +29,18 @@ export type MessageScope =
  * making `finalTier` one-way in the merge, which only protected changes in
  * one direction and so could not survive un-marking.
  *
+ * `suggestions` is what the model thinks, keyed by message id — deliberately
+ * *beside* the messages rather than on them. Spec §9 says a model suggestion
+ * never reaches the Pending list; keeping it off `ThreadMessage` means the
+ * Pending selectors cannot read it even by mistake. Only the ALIO SUGGESTS
+ * card asks for it.
+ *
  * `patch` is for optimistic updates — a Confirm tap should not wait on the
  * network. `upsert` takes the row a write returned.
  */
 export function useFamilyMessages(client: SupabaseClient, scope: MessageScope | null) {
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
+  const [suggestions, setSuggestions] = useState<Record<string, Tier>>({});
   const [error, setError] = useState(false);
   // Messages this client has newer knowledge of than any snapshot in flight.
   // Cleared when a load starts, so a rejoin still heals everything it missed.
@@ -51,10 +58,18 @@ export function useFamilyMessages(client: SupabaseClient, scope: MessageScope | 
     if (scope === null || filter === null) return;
     let cancelled = false;
     setMessages([]);
+    setSuggestions({});
     setError(false);
 
     const apply = (row: FamilyMessageRow) => {
-      if (!cancelled) setMessages((prev) => mergeMessage(prev, fromRow(row)));
+      if (cancelled) return;
+      setMessages((prev) => mergeMessage(prev, fromRow(row)));
+      // Suggestions are one-way in the database too (transition 3 fires only
+      // while suggested_tier is null), so a row that has one always carries
+      // it and there is nothing to clear.
+      if (row.suggested_tier) {
+        setSuggestions((prev) => ({ ...prev, [row.id]: row.suggested_tier as Tier }));
+      }
     };
 
     /** A realtime event, or a row a write just returned: authoritative. */
@@ -155,7 +170,10 @@ export function useFamilyMessages(client: SupabaseClient, scope: MessageScope | 
   const upsert = useCallback((row: FamilyMessageRow) => {
     liveIds.current.add(row.id);
     setMessages((prev) => mergeMessage(prev, fromRow(row)));
+    if (row.suggested_tier) {
+      setSuggestions((prev) => ({ ...prev, [row.id]: row.suggested_tier as Tier }));
+    }
   }, []);
 
-  return { messages, error, patch, upsert };
+  return { messages, suggestions, error, patch, upsert };
 }
