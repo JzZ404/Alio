@@ -29,6 +29,13 @@ export { MessageStatusLine } from './MessageStatusLine';
 export { ReplyComposer } from './ReplyComposer';
 export { SuggestionCard } from './SuggestionCard';
 export { STACK_WINDOW_MS, endsStack, messageStatus } from './messaging/stacking';
+export {
+  ACTION_THRESHOLD,
+  buildPrompt,
+  parseClassification,
+  suggestionToWrite,
+  type Classification,
+} from './messaging/classify';
 export { useArrivedIds } from './messaging/useArrivedIds';
 export { Toast } from './Toast';
 export { CircleAvatars } from './CircleAvatars';
