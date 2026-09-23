@@ -1,6 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import {
+  STOP_SEQUENCES,
   buildPrompt,
+  extractAnswerText,
   parseClassification,
   suggestionToWrite,
   type Classification,
@@ -29,11 +31,17 @@ import {
  */
 
 /**
- * Small and fast: ~4B parameters active per call. Classifying one short
- * message does not need the 31B model the report pipeline uses, and this is
- * called once per sent message rather than once per report.
+ * Not a Gemma model, unlike the report pipeline — and that was measured, not
+ * assumed. Both Gemma models on this key think before answering and the
+ * thinking cannot be disabled (`thinkingConfig` is rejected outright), so one
+ * classification burned 637 scratchpad tokens, ran past a 640-token budget
+ * without producing an answer, and timed out. Flash-Lite answers immediately:
+ * zero thinking tokens, 49 total, for the same question.
+ *
+ * Roughly twenty times cheaper per message, on a key that belongs to a
+ * teammate. The reports stay on Gemma.
  */
-const MODEL = 'models/gemma-4-26b-a4b-it';
+const MODEL = 'models/gemini-3.5-flash-lite';
 const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta';
 /** Past this, the suggestion is not worth waiting for. The message is long gone. */
 const TIMEOUT_MS = 10_000;
@@ -121,9 +129,14 @@ async function classify(text: string, apiKey: string): Promise<Classification | 
           // Low, not zero: this is a judgement, and a little spread is
           // healthier than a model locked onto its first instinct.
           temperature: 0.2,
-          // Enough for the JSON object and nothing more.
-          maxOutputTokens: 64,
+          // Room for the JSON object without room to ramble. `responseMimeType`
+          // is deliberately absent: this model ignores it, and asking for it
+          // bought nothing but a false sense of a guarantee.
+          // Small on purpose: this model does not think first, so the budget
+          // only has to cover the JSON object itself.
+          maxOutputTokens: 120,
           responseMimeType: 'application/json',
+          stopSequences: STOP_SEQUENCES,
         },
       }),
     });
@@ -133,10 +146,9 @@ async function classify(text: string, apiKey: string): Promise<Classification | 
       return null;
     }
 
-    const body = await response.json();
-    const raw = body?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (typeof raw !== 'string') {
-      console.error('classify: unexpected response shape');
+    const raw = extractAnswerText(await response.json());
+    if (raw === null) {
+      console.error('classify: no answer in response (ran out of tokens thinking?)');
       return null;
     }
     return parseClassification(raw);

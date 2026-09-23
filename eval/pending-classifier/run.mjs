@@ -27,7 +27,20 @@ const limitArg = args.indexOf('--limit');
 const limit = limitArg === -1 ? Infinity : Number(args[limitArg + 1]);
 
 const all = JSON.parse(readFileSync(join(HERE, 'messages.json'), 'utf8'));
-const set = Number.isFinite(limit) ? all.slice(0, limit) : all;
+
+/**
+ * A partial run has to span the set, not take the front of it. The file is
+ * grouped by category, so `--limit 10` originally meant "the ten easiest
+ * messages" — ten obvious requests, no hard cases, and a false-alarm rate
+ * computed from zero non-requests. It scored 100% and meant nothing.
+ *
+ * Evenly spaced instead, so a small run is a small version of the real one.
+ */
+const set = Number.isFinite(limit)
+  ? Array.from({ length: Math.min(limit, all.length) }, (_, i) =>
+      all[Math.round((i * (all.length - 1)) / Math.max(Math.min(limit, all.length) - 1, 1))],
+    )
+  : all;
 
 const dim = (s) => `\x1b[2m${s}\x1b[0m`;
 const red = (s) => `\x1b[31m${s}\x1b[0m`;

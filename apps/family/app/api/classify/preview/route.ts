@@ -1,4 +1,10 @@
-import { buildPrompt, parseClassification, type Classification } from '@alio/ui';
+import {
+  STOP_SEQUENCES,
+  buildPrompt,
+  extractAnswerText,
+  parseClassification,
+  type Classification,
+} from '@alio/ui';
 
 /**
  * Classify arbitrary text and return the answer without writing anything.
@@ -13,7 +19,7 @@ import { buildPrompt, parseClassification, type Classification } from '@alio/ui'
  * reason it is tolerable here is that it never leaves a laptop.
  */
 
-const MODEL = 'models/gemma-4-26b-a4b-it';
+const MODEL = 'models/gemini-3.5-flash-lite';
 const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta';
 const TIMEOUT_MS = 20_000;
 
@@ -51,8 +57,14 @@ export async function POST(request: Request) {
         contents: [{ parts: [{ text: buildPrompt(text) }] }],
         generationConfig: {
           temperature: 0.2,
-          maxOutputTokens: 64,
+          // Room for the JSON object without room to ramble. `responseMimeType`
+          // is deliberately absent: this model ignores it, and asking for it
+          // bought nothing but a false sense of a guarantee.
+          // Small on purpose: this model does not think first, so the budget
+          // only has to cover the JSON object itself.
+          maxOutputTokens: 120,
           responseMimeType: 'application/json',
+          stopSequences: STOP_SEQUENCES,
         },
       }),
     });
@@ -65,9 +77,16 @@ export async function POST(request: Request) {
     }
 
     const body = await response.json();
-    const raw = body?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (typeof raw !== 'string') {
-      return Response.json({ error: 'unexpected response shape', body }, { status: 502 });
+    const raw = extractAnswerText(body);
+    if (raw === null) {
+      return Response.json(
+        {
+          error: 'no answer part',
+          finishReason: body?.candidates?.[0]?.finishReason,
+          usage: body?.usageMetadata,
+        },
+        { status: 502 },
+      );
     }
 
     const result: Classification | null = parseClassification(raw);

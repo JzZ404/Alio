@@ -31,7 +31,9 @@ export { SuggestionCard } from './SuggestionCard';
 export { STACK_WINDOW_MS, endsStack, messageStatus } from './messaging/stacking';
 export {
   ACTION_THRESHOLD,
+  STOP_SEQUENCES,
   buildPrompt,
+  extractAnswerText,
   parseClassification,
   suggestionToWrite,
   type Classification,

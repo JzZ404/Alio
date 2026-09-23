@@ -17,9 +17,28 @@ describe('buildPrompt', () => {
   it('shows the model the requests that do not look like requests', () => {
     const prompt = buildPrompt('anything');
     // The failure that matters is a miss, so the hard cases are demonstrated
-    // rather than described.
-    expect(prompt).toContain('Her pills run out Thursday.');
-    expect(prompt).toContain('I already picked up the prescription.');
+    // rather than described: a supply running out, and a past-tense task that
+    // must not be flagged.
+    expect(prompt).toContain('Her inhaler is nearly empty.');
+    expect(prompt).toContain('I picked up her glasses yesterday.');
+  });
+
+  /*
+   * An earlier prompt reused eight sentences from the evaluation set, which
+   * would have scored the model on messages it had been shown the answers to.
+   * This fails if any example is ever copied back in.
+   */
+  it('teaches on messages the evaluation set does not contain', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    // Resolved from the package root (vitest's cwd) rather than import.meta.url,
+    // which vitest hands over with a cache-busting query that `new URL` rejects.
+    const set = JSON.parse(
+      readFileSync(resolve(process.cwd(), '../../eval/pending-classifier/messages.json'), 'utf8'),
+    ) as { text: string }[];
+    const prompt = buildPrompt('anything');
+    const leaked = set.filter((m) => prompt.includes(m.text));
+    expect(leaked.map((m) => m.text)).toEqual([]);
   });
 });
 

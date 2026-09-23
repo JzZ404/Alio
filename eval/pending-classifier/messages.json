@@ -113,9 +113,9 @@
   },
   {
     "text": "She's been saying her knee hurts on the stairs.",
-    "label": "action",
+    "label": "fyi",
     "medication": false,
-    "note": "Arguable: could be FYI. I read it as needing attention."
+    "note": "Context about how she is, not a task. Becomes action only if a request follows it (JZ, 2026-09-22)."
   },
   {
     "text": "There's a form from the insurance company on the counter.",
@@ -318,8 +318,8 @@
   },
   {
     "text": "Please tell her I love her.",
-    "label": "action",
+    "label": "social",
     "medication": false,
-    "note": "Arguable: genuinely asks Sarah to do something, but nobody is waiting on it. I labelled it action."
+    "note": "Phrased as a request, but it is warmth being passed on — not a separate job for Sarah's list (JZ, 2026-09-22)."
   }
 ]
