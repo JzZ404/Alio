@@ -22,7 +22,6 @@ import {
   markPending,
   unmarkPending,
   sendMessage,
-  suggestsPending,
   useFamilyMessages,
   type ThreadMessage,
 } from '@alio/ui';
@@ -58,7 +57,7 @@ export default function FamilyChatConversationPage() {
   const [mockMessages, setMockMessages] = useState<ChatMessage[]>(
     SAMPLE_FM_CONVERSATIONS[THREAD_ID] ?? [],
   );
-  const { messages: live, error, patch, upsert } = useFamilyMessages(
+  const { messages: live, suggestions, error, patch, upsert } = useFamilyMessages(
     supabase,
     supabaseThreadId ? { by: 'thread', threadId: supabaseThreadId } : null,
   );
@@ -99,18 +98,6 @@ export default function FamilyChatConversationPage() {
   // history does not.
   const arrived = useArrivedIds(live);
 
-  // Follow the conversation down as it grows. `scroll-smooth` on the element
-  // makes this a glide rather than a jump; a message arriving off-screen is
-  // the one moment a thread should move on its own.
-  useEffect(() => {
-    const el = threadRef.current;
-    // Not while a jumped-to message is highlighted: "See all" put the reader
-    // somewhere on purpose, and the bottom is not it.
-    if (!el || highlightedId) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-    // `highlightedId` is read, not followed: this fires on new messages.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [live.length, mockMessages.length]);
 
   useEffect(() => {
     if (!toast) return;
@@ -120,25 +107,48 @@ export default function FamilyChatConversationPage() {
 
   // The message the ALIO SUGGESTS card is attached to (spec §4).
   //
-  // This reads the loaded thread rather than firing on the INSERT this device
-  // just made. That is both closer to what the classifier will actually do —
-  // it scores messages, not send events — and the only way to look at the
-  // card twice: the old version vanished on reload, so revising its design
-  // meant sending a fresh matching message every time.
+  // The model's answer now, not a regex over the text: `suggestions` comes
+  // from `suggested_tier`, written by /api/classify after the message sent.
+  // It arrives a second or two late, over the same realtime channel as
+  // everything else, so the card appears on its own rather than with the
+  // message.
   //
-  // Newest match wins (the hook orders by `created_at` ascending), and
-  // only one card is ever on screen, so an old message cannot quietly sprout
-  // a suggestion above the one you are reading.
+  // Reading the loaded thread rather than the send event means a suggestion
+  // survives a reload, which is both truer to what the classifier does — it
+  // scores messages, not send events — and the only way to look at the card
+  // twice while designing it.
+  //
+  // Newest match wins (the hook orders by `created_at` ascending), and only
+  // one card is ever on screen, so an old message cannot quietly sprout a
+  // suggestion above the one you are reading.
   const suggestedFor = useMemo(() => {
     const matches = live.filter(
       (m) =>
         m.senderId === FAMILY_MEMBER_ID &&
         m.finalTier === null &&
         !dismissedSuggestions.has(m.id) &&
-        suggestsPending(m.text),
+        suggestions[m.id] === 'action',
     );
     return matches.length > 0 ? matches[matches.length - 1].id : null;
-  }, [live, dismissedSuggestions]);
+  }, [live, suggestions, dismissedSuggestions]);
+
+  // Follow the conversation down as it grows. `scroll-smooth` on the element
+  // makes this a glide rather than a jump; a message arriving off-screen is
+  // the one moment a thread should move on its own.
+  useEffect(() => {
+    const el = threadRef.current;
+    // Not while a jumped-to message is highlighted: "See all" put the reader
+    // somewhere on purpose, and the bottom is not it.
+    if (!el || highlightedId) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    // `suggestedFor` is in here because the card arrives a second or two after
+    // the message it belongs to, once the classifier has answered. Without it
+    // the thread scrolls when the message lands and the card then appears
+    // below the fold, which is where it sat the first time this ran live.
+    //
+    // `highlightedId` is read, not followed: this fires on new messages.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live.length, mockMessages.length, suggestedFor]);
 
   // What Sarah is waiting on: this family member's own messages, marked and
   // not yet confirmed.
@@ -196,11 +206,33 @@ export default function FamilyChatConversationPage() {
       // Only once it is away: a failed send keeps the quote, so the retry
       // still reads as the reply it was meant to be.
       setReplyingTo(null);
+      classify(row.id);
     } catch (e) {
       console.error(e);
       setDraft(text);
       setSendError("Message didn't send. Check your connection and try again.");
     }
+  };
+
+  /**
+   * Ask the model about a message we just sent, and forget about it.
+   *
+   * Deliberately not awaited: the message is already delivered and on screen,
+   * and spec §4.1 puts classification off the send path entirely. If this is
+   * slow, refused, or the key is missing on this deployment, nothing happens —
+   * no error, no spinner, no card. The suggestion arrives later over realtime
+   * or not at all.
+   *
+   * Only messages this device sent, because the card only ever renders under
+   * the family member's own message. Classifying Sarah's would cost money to
+   * show nothing.
+   */
+  const classify = (messageId: string) => {
+    void fetch('/api/classify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messageId }),
+    }).catch((e) => console.error('classify request failed', e));
   };
 
   const handleMarkPending = async (message: ThreadMessage) => {
