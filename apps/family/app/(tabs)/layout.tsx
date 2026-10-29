@@ -9,25 +9,27 @@ import { RecordsProvider } from '@/lib/records-store';
 
 const HomeTab        = dynamic(() => import('./home/page'),              { ssr: false });
 const AICheckTab     = dynamic(() => import('./ai-check/page'),          { ssr: false });
+// The Chat tab renders the Care Circle conversation directly — a family
+// deals with one circle, not a list of threads, so there is no chat list
+// and no chat sub-page to drill into. It takes no id, so it lives at the
+// plain `chat` route rather than under a `[id]` segment.
 const ChatTab        = dynamic(() => import('./chat/page'),              { ssr: false });
 const RecordsTab     = dynamic(() => import('./records/page'),           { ssr: false });
-const ChatDetail     = dynamic(() => import('./chat/[id]/page'),         { ssr: false });
 const RecordDetail   = dynamic(() => import('./records/visit/[id]/page'),{ ssr: false });
-const AIChatHistory  = dynamic(() => import('./ai-check/history/page'),   { ssr: false });
+const AIChatHistory  = dynamic(() => import('./ai-check/history/page'),  { ssr: false });
 
 const TABS = ['home', 'ai-check', 'chat', 'records'] as const;
 type Tab = typeof TABS[number];
 type SubPage =
-  | { type: 'chat'; id: string }
   | { type: 'record'; id: string }
   | { type: 'ai-history' }
   | null;
 
 const tabs = [
-  { id: 'home' as Tab, label: 'Home', Icon: IconHome },
-  { id: 'ai-check' as Tab, label: 'AI', Icon: IconMicrophone },
-  { id: 'chat' as Tab, label: 'Chat', Icon: IconChat },
-  { id: 'records' as Tab, label: 'Records', Icon: IconMedicalRecord },
+  { id: 'home'     as Tab, label: 'Home',    Icon: IconHome },
+  { id: 'ai-check' as Tab, label: 'AI',      Icon: IconMicrophone },
+  { id: 'chat'     as Tab, label: 'Chat',    Icon: IconChat },
+  { id: 'records'  as Tab, label: 'Records', Icon: IconMedicalRecord },
 ];
 
 export default function TabsLayout({ children }: { children: ReactNode }) {
@@ -50,12 +52,11 @@ export default function TabsLayout({ children }: { children: ReactNode }) {
         * same surface as the content instead of a flat band below it. */}
       <div className="relative h-full overflow-hidden bg-app">
         <div className="absolute inset-0 bottom-[85px] overflow-y-auto">
-          {subPage?.type === 'chat'   && <ChatDetail   id={subPage.id} onBack={() => setSubPage(null)} />}
-          {subPage?.type === 'record' && <RecordDetail id={subPage.id} onBack={() => setSubPage(null)} />}
-          {!subPage && active === 'home'     && <HomeTab />}
+          {subPage?.type === 'record'     && <RecordDetail id={subPage.id} onBack={() => setSubPage(null)} />}
           {subPage?.type === 'ai-history' && <AIChatHistory onBack={() => setSubPage(null)} />}
+          {!subPage && active === 'home'     && <HomeTab />}
           {!subPage && active === 'ai-check' && <AICheckTab onOpenHistory={() => setSubPage({ type: 'ai-history' })} />}
-          {!subPage && active === 'chat'     && <ChatTab    onOpenThread={(id) => setSubPage({ type: 'chat',   id })} />}
+          {!subPage && active === 'chat'     && <ChatTab />}
           {!subPage && active === 'records'  && <RecordsTab onOpenVisit ={(id) => setSubPage({ type: 'record', id })} />}
         </div>
 

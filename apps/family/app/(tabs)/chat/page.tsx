@@ -1,39 +1,510 @@
-import { scrollFade, ChatListItem, IconBox, IconSearch, IconChat } from '@alio/ui';
-import { SAMPLE_FM_CHAT_THREADS } from '@alio/mock-data';
+'use client';
+
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ChatBubble,
+  CircleHeaderCard,
+  FAMILY_MEMBER_ID,
+  IconMicrophone,
+  IconPlus,
+  IconReminder,
+  IconRefresh,
+  IconProfile,
+  MessageActionSheet,
+  MessageBubble,
+  ReplyComposer,
+  SUPABASE_THREAD_FOR_FAMILY,
+  endsStack,
+  useArrivedIds,
+  SuggestionCard,
+  Toast,
+  findOldest,
+  scrollFade,
+  markPending,
+  unmarkPending,
+  sendMessage,
+  useFamilyMessages,
+  type ThreadMessage,
+} from '@alio/ui';
+import {
+  SAMPLE_FM_CHAT_THREADS,
+  SAMPLE_FM_CONVERSATIONS,
+  type ChatMessage,
+} from '@alio/mock-data';
+import { supabase } from '@/lib/supabase';
+import { ReportCard } from '@/components/ReportCard';
+
+/** How long a bubble jumped to via "See all" stays highlighted. */
+const HIGHLIGHT_MS = 1600;
+/** How long "Text Copied." stays up. Long enough to read, short enough not to nag. */
+const TOAST_MS = 1800;
 
 /**
- * Family Chat tab — list of conversation threads.
- * Same UI/layout as Caregiver Chat; only the data fixture differs
- * (different contacts: caregiver, family members, doctor).
+ * A family deals with one circle, not a list of threads: this screen *is*
+ * the Chat tab now, always Sarah's thread about Erin.
  */
-export default function FamilyChatPage({ onOpenThread }: { onOpenThread?: (id: string) => void } = {}) {
+const THREAD_ID = 'sarah-caregiver';
+
+/**
+ * Family Chat tab — the Care Circle itself (spec 2026-09-17). Headed by
+ * `CircleHeaderCard` naming the circle, its members, and what is still
+ * marked and waiting on Sarah. Below it, the conversation is unchanged:
+ * mock history then live messages, the long-press action sheet, the ALIO
+ * SUGGESTS card, the send path with its error line.
+ */
+export default function FamilyChatConversationPage() {
+  const supabaseThreadId = SUPABASE_THREAD_FOR_FAMILY[THREAD_ID];
+
+  const [mockMessages, setMockMessages] = useState<ChatMessage[]>(
+    SAMPLE_FM_CONVERSATIONS[THREAD_ID] ?? [],
+  );
+  const { messages: live, suggestions, error, patch, upsert } = useFamilyMessages(
+    supabase,
+    supabaseThreadId ? { by: 'thread', threadId: supabaseThreadId } : null,
+  );
+  const [draft, setDraft] = useState('');
+  // The screen's own root, so a long-press's viewport-space rect can be
+  // converted into the action sheet's overlay coordinate space (Step 1) —
+  // the same positioned ancestor the overlay's `absolute inset-0` resolves
+  // against.
+  const frameRef = useRef<HTMLDivElement>(null);
+  // The thread's scroller, so an arriving message can bring itself into view.
+  const threadRef = useRef<HTMLDivElement>(null);
+  const [sheetFor, setSheetFor] = useState<{ message: ThreadMessage; rect: DOMRect } | null>(null);
+  // Suggestions waved off with "No need". That answer writes nothing to the
+  // database by design (spec §4.3), so this is the only place it lives, and
+  // it lasts as long as the screen does.
+  const [dismissedSuggestions, setDismissedSuggestions] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  // Shared banner for both the send path and the Mark-as-Pending path below.
+  // Every attempt clears it up front, so a retry never shows a stale message
+  // left over from a different, now-resolved failure.
+  const [sendError, setSendError] = useState('');
+  // The message being replied to, if any. Presentational only: there is no
+  // parent-message column, so this shapes the composer and nothing else.
+  const [replyingTo, setReplyingTo] = useState<ThreadMessage | null>(null);
+  // "Text Copied." — the screen owns the timer, the Toast just renders.
+  const [toast, setToast] = useState('');
+  // Set by "See all" to ring the jumped-to bubble; cleared on its own timer.
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!highlightedId) return;
+    const timer = setTimeout(() => setHighlightedId(null), HIGHLIGHT_MS);
+    return () => clearTimeout(timer);
+  }, [highlightedId]);
+
+  // Messages that turned up after the thread loaded: those animate in, the
+  // history does not.
+  const arrived = useArrivedIds(live);
+
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(''), TOAST_MS);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
+  // The message the ALIO SUGGESTS card is attached to (spec §4).
+  //
+  // The model's answer now, not a regex over the text: `suggestions` comes
+  // from `suggested_tier`, written by /api/classify after the message sent.
+  // It arrives a second or two late, over the same realtime channel as
+  // everything else, so the card appears on its own rather than with the
+  // message.
+  //
+  // Reading the loaded thread rather than the send event means a suggestion
+  // survives a reload, which is both truer to what the classifier does — it
+  // scores messages, not send events — and the only way to look at the card
+  // twice while designing it.
+  //
+  // Newest match wins (the hook orders by `created_at` ascending), and only
+  // one card is ever on screen, so an old message cannot quietly sprout a
+  // suggestion above the one you are reading.
+  const suggestedFor = useMemo(() => {
+    const matches = live.filter(
+      (m) =>
+        m.senderId === FAMILY_MEMBER_ID &&
+        m.finalTier === null &&
+        !dismissedSuggestions.has(m.id) &&
+        suggestions[m.id] === 'action',
+    );
+    return matches.length > 0 ? matches[matches.length - 1].id : null;
+  }, [live, suggestions, dismissedSuggestions]);
+
+  // Follow the conversation down as it grows. `scroll-smooth` on the element
+  // makes this a glide rather than a jump; a message arriving off-screen is
+  // the one moment a thread should move on its own.
+  useEffect(() => {
+    const el = threadRef.current;
+    // Not while a jumped-to message is highlighted: "See all" put the reader
+    // somewhere on purpose, and the bottom is not it.
+    if (!el || highlightedId) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    // `suggestedFor` is in here because the card arrives a second or two after
+    // the message it belongs to, once the classifier has answered. Without it
+    // the thread scrolls when the message lands and the card then appears
+    // below the fold, which is where it sat the first time this ran live.
+    //
+    // `highlightedId` is read, not followed: this fires on new messages.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live.length, mockMessages.length, suggestedFor]);
+
+  // What Sarah is waiting on: this family member's own messages, marked and
+  // not yet confirmed.
+  const markedMessages = live.filter(
+    (m) => m.finalTier === 'action' && m.acknowledgedAt === null && m.senderId === FAMILY_MEMBER_ID,
+  );
+
+  // The fixtures stay the source of truth for who's in the circle.
+  const circleAvatars = SAMPLE_FM_CHAT_THREADS.find((t) => t.id === 'erin-circle')?.groupAvatars ?? [];
+
+  // The pressed bubble's rect arrives in viewport coordinates; the sheet's
+  // overlay is `absolute inset-0` inside `frameRef`, so its own coordinate
+  // space is relative to that element's box, not the viewport. Recomputed
+  // whenever the held message changes, using the frame's current rect.
+  const anchor = useMemo(() => {
+    if (!sheetFor || !frameRef.current) return null;
+    const frameRect = frameRef.current.getBoundingClientRect();
+    return {
+      top: sheetFor.rect.top - frameRect.top,
+      left: sheetFor.rect.left - frameRect.left,
+      width: sheetFor.rect.width,
+    };
+  }, [sheetFor]);
+
+  const handleLongPress = (message: ThreadMessage, rect: DOMRect) => setSheetFor({ message, rect });
+
+  const handleSeeAll = () => {
+    // Oldest by createdAt, never list order — `live` isn't sorted that way,
+    // and assuming otherwise is exactly the bug that hit the Pending list.
+    const target = findOldest(markedMessages);
+    if (!target) return;
+    document.querySelector(`[data-message-id="${target.id}"]`)?.scrollIntoView({ block: 'center' });
+    setHighlightedId(target.id);
+  };
+
+  const handleSend = async () => {
+    const text = draft.trim();
+    if (!text) return;
+    setDraft('');
+    setSendError('');
+    if (!supabaseThreadId) {
+      setMockMessages((prev) => [...prev, { id: `m-${Date.now()}`, sender: 'me', text }]);
+      setReplyingTo(null);
+      return;
+    }
+    try {
+      const row = await sendMessage(supabase, {
+        threadId: supabaseThreadId,
+        senderId: FAMILY_MEMBER_ID,
+        text,
+        needsResponse: false,
+      });
+      upsert(row);
+      setSendError('');
+      // Only once it is away: a failed send keeps the quote, so the retry
+      // still reads as the reply it was meant to be.
+      setReplyingTo(null);
+      classify(row.id);
+    } catch (e) {
+      console.error(e);
+      setDraft(text);
+      setSendError("Message didn't send. Check your connection and try again.");
+    }
+  };
+
+  /**
+   * Ask the model about a message we just sent, and forget about it.
+   *
+   * Deliberately not awaited: the message is already delivered and on screen,
+   * and spec §4.1 puts classification off the send path entirely. If this is
+   * slow, refused, or the key is missing on this deployment, nothing happens —
+   * no error, no spinner, no card. The suggestion arrives later over realtime
+   * or not at all.
+   *
+   * Only messages this device sent, because the card only ever renders under
+   * the family member's own message. Classifying Sarah's would cost money to
+   * show nothing.
+   */
+  const classify = (messageId: string) => {
+    void fetch('/api/classify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messageId }),
+    }).catch((e) => console.error('classify request failed', e));
+  };
+
+  const handleMarkPending = async (message: ThreadMessage) => {
+    setSendError('');
+    patch(message.id, { finalTier: 'action' });
+    setSheetFor(null);
+    try {
+      await markPending(supabase, { messageId: message.id, taggedBy: 'sender_manual' });
+      setSendError('');
+    } catch (e) {
+      console.error(e);
+      patch(message.id, { finalTier: null }, { rollback: true });
+      setSendError("Couldn't mark that as Pending. Check your connection and try again.");
+    }
+  };
+
+  // Taking a mark back (design 2026-09-17). Same optimistic shape as marking,
+  // reversed: the bubble drops back to Sent immediately, and a refusal from
+  // the database puts the mark back rather than leaving the screen lying.
+  const handleUnmarkPending = async (message: ThreadMessage) => {
+    setSendError('');
+    patch(message.id, { finalTier: null });
+    setSheetFor(null);
+    try {
+      await unmarkPending(supabase, { messageId: message.id });
+      setSendError('');
+    } catch (e) {
+      console.error(e);
+      patch(message.id, { finalTier: 'action' }, { rollback: true });
+      setSendError("Couldn't unmark that. Check your connection and try again.");
+    }
+  };
+
+  // Accepting the ALIO SUGGESTS card. Same optimistic patch and rollback as
+  // the long-press path, but tagged sender_confirmed_ai — never
+  // sender_manual — so the two entry points stay distinguishable later.
+  const handleMarkSuggested = async (message: ThreadMessage) => {
+    setSendError('');
+    // No dismissal needed: the card's own condition is `finalTier === null`,
+    // so tagging the message is what removes it. A rollback brings it back,
+    // which is right — the suggestion was never answered.
+    patch(message.id, { finalTier: 'action' });
+    try {
+      await markPending(supabase, { messageId: message.id, taggedBy: 'sender_confirmed_ai' });
+      setSendError('');
+    } catch (e) {
+      console.error(e);
+      patch(message.id, { finalTier: null }, { rollback: true });
+      setSendError("Couldn't mark that as Pending. Check your connection and try again.");
+    }
+  };
+
+  // "No need" writes nothing — the suggestion is just dismissed from view.
+  const handleDismissSuggestion = (messageId: string) =>
+    setDismissedSuggestions((prev) => new Set(prev).add(messageId));
+
+  // Reply shapes the composer and nothing else — see `ReplyComposer` for why
+  // there is no stored relationship behind it.
+  const handleReply = (message: ThreadMessage) => {
+    setSendError('');
+    setReplyingTo(message);
+    setSheetFor(null);
+  };
+
+  const handleCopy = async (message: ThreadMessage) => {
+    setSendError('');
+    setSheetFor(null);
+    try {
+      await navigator.clipboard.writeText(message.text);
+      setToast('Text Copied.');
+    } catch (e) {
+      // Only ever a permissions or insecure-context refusal. Saying nothing
+      // is wrong — the menu closed, so silence reads as success.
+      console.error(e);
+      setSendError("Couldn't copy that. Your browser blocked clipboard access.");
+    }
+  };
+
   return (
     <div
+      ref={frameRef}
       className="relative h-full overflow-hidden"
     >
-      {/* Top header — "Chat" pill + Search + new-chat icons (top-60 to match other screens) */}
-      <header className="absolute left-[25px] right-[25px] top-[60px] z-10 flex items-center justify-between">
-        <span className="flex h-[42px] items-center rounded-[10px] bg-brand-tint-1 shadow-lift px-[12px] text-[20px] font-bold text-black">
-          Chat
-        </span>
-        <div className="flex items-center gap-[12px]">
-          <IconBox size={42} aria-label="Search chats">
-            <IconSearch className="size-[24px] text-gray-100" />
-          </IconBox>
-          <IconBox size={42} aria-label="New chat">
-            <IconChat className="size-[24px] text-gray-100" />
-          </IconBox>
-        </div>
-      </header>
+      {/* Care Circle header — name, members, and what's still waiting on Sarah */}
+      <div className="absolute left-[16px] right-[16px] top-[60px] z-10">
+        <CircleHeaderCard
+          name="Sarah Lee"
+          subtitle="Caregiver · Erin's circle"
+          avatars={circleAvatars}
+          markedCount={markedMessages.length}
+          onSeeAll={handleSeeAll}
+          // Adding someone to a circle is unspecified — an inert placeholder,
+          // the same way Reply sits inert in the message action sheet.
+          onAdd={() => {}}
+        />
+      </div>
 
-      {/* Thread list */}
-      <ul style={scrollFade(129)} className="absolute bottom-[110px] left-[22px] right-[22px] top-0 pt-[129px] flex flex-col gap-[12px] overflow-y-auto">
-        {SAMPLE_FM_CHAT_THREADS.map((thread) => (
-          <li key={thread.id}>
-            <ChatListItem thread={thread} onOpen={onOpenThread} />
-          </li>
-        ))}
-      </ul>
+      {/* Messages — start below the card; the card's own height (pinned row
+          shown or not) sets where this region begins. */}
+      <div
+        ref={threadRef}
+        // Full height with the card's space padded, so messages fade out under
+        // the card instead of stopping at its bottom edge.
+        style={scrollFade(markedMessages.length > 0 ? 196 : 150)}
+        className={`absolute bottom-[120px] left-0 right-0 top-0 scroll-smooth overflow-y-auto px-[16px] pb-[12px] ${
+          markedMessages.length > 0 ? 'pt-[208px]' : 'pt-[162px]'
+        }`}
+      >
+        {/* An unreachable backend must not read as an empty thread. This sits
+            above whatever did load rather than replacing it. */}
+        {error && (
+          <p className="mb-[12px] text-center text-[13px] text-gray-60">
+            {"Couldn't load — check your connection"}
+          </p>
+        )}
+        {!error && mockMessages.length === 0 && live.length === 0 ? (
+          <p className="mt-12 text-center text-sm text-gray-60">
+            No messages yet — say hi 👋
+          </p>
+        ) : (
+          <div className="flex flex-col">
+            {mockMessages.map((m) => (
+              <div key={m.id} className="mb-[12px]">
+                <ChatBubble message={m} />
+              </div>
+            ))}
+            {live.map((m, i) =>
+              m.reportId ? (
+                <div key={m.id} className="mb-[12px] flex" data-message-id={m.id}>
+                  <ReportCard reportId={m.reportId} />
+                </div>
+              ) : (
+                // A burst of messages sits tight together and shares the one
+                // status line under the last of them; a new turn gets air.
+                <div
+                  key={m.id}
+                  className={`flex flex-col ${
+                    endsStack(m, live[i + 1]) ? 'mb-[10px] last:mb-0' : 'mb-[2px]'
+                  } ${arrived.has(m.id) ? 'animate-message-in' : ''}`}
+                >
+                  <MessageBubble
+                    message={m}
+                    viewerId={FAMILY_MEMBER_ID}
+                    onLongPress={m.senderId === FAMILY_MEMBER_ID ? handleLongPress : undefined}
+                    highlighted={m.id === highlightedId}
+                    showStatus={endsStack(m, live[i + 1])}
+                  />
+                  {/*
+                   * ALIO SUGGESTS (spec §4): only on the family member's own
+                   * message, only while it is still untagged — the moment
+                   * finalTier is set, by this card or by the long-press path,
+                   * the card stops rendering rather than lingering.
+                   */}
+                  {suggestedFor === m.id && m.senderId === FAMILY_MEMBER_ID && m.finalTier === null && (
+                    <SuggestionCard
+                      onMark={() => handleMarkSuggested(m)}
+                      onDismiss={() => handleDismissSuggestion(m.id)}
+                    />
+                  )}
+                </div>
+              ),
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Quick actions row — stands down while a reply is being written:
+          quoting takes over the bottom of the screen (design 2026-09-17). */}
+      <div
+        className={`absolute bottom-[72px] left-0 right-0 items-center justify-center gap-[10px] px-[16px] ${
+          replyingTo ? 'hidden' : 'flex'
+        }`}
+      >
+        <QuickAction icon={IconReminder} label="Send Notes" />
+        <QuickAction icon={IconRefresh} label="Status Update" />
+        <QuickAction icon={IconProfile} label="Contact" />
+      </div>
+
+      {/* Input row */}
+      <div
+        className={`absolute bottom-[16px] left-0 right-0 flex-col gap-[6px] px-[16px] ${
+          replyingTo ? 'hidden' : 'flex'
+        }`}
+      >
+        {sendError && (
+          <p role="alert" className="text-center text-[12px] font-bold text-alert">
+            {sendError}
+          </p>
+        )}
+        <div className="flex items-center gap-[10px]">
+          <button
+            type="button"
+            aria-label="Record voice message"
+            className="flex size-[44px] items-center justify-center rounded-full bg-white/70 transition-colors active:bg-white"
+          >
+            <IconMicrophone className="size-[22px] text-gray-100" />
+          </button>
+
+          <div className="flex h-[44px] flex-1 items-center gap-2 rounded-full bg-white/70 px-[14px]">
+            <input
+              type="text"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                // isComposing: Enter that commits an IME candidate must not send.
+                if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleSend();
+              }}
+              placeholder="Message Sarah"
+              className="flex-1 bg-transparent text-[14px] text-gray-100 placeholder:text-gray-60 outline-none"
+            />
+            <button
+              type="button"
+              aria-label="Insert emoji"
+              className="flex size-[24px] items-center justify-center text-gray-60"
+            >
+              <span className="text-[18px]">☺</span>
+            </button>
+          </div>
+
+          <button
+            type="button"
+            aria-label="Send"
+            onClick={handleSend}
+            className="flex size-[44px] items-center justify-center rounded-[12px] bg-white/70 transition-colors active:bg-white"
+          >
+            <IconPlus className="size-[22px] text-gray-100" />
+          </button>
+        </div>
+      </div>
+
+      {replyingTo && (
+        <ReplyComposer
+          replyingTo={replyingTo}
+          viewerId={FAMILY_MEMBER_ID}
+          value={draft}
+          onChange={setDraft}
+          onSend={handleSend}
+          onCancel={() => setReplyingTo(null)}
+        />
+      )}
+
+      {toast && <Toast message={toast} />}
+
+      <MessageActionSheet
+        message={sheetFor?.message ?? null}
+        anchor={anchor}
+        viewerId={FAMILY_MEMBER_ID}
+        onMarkPending={handleMarkPending}
+        onUnmarkPending={handleUnmarkPending}
+        onReply={handleReply}
+        onCopy={handleCopy}
+        onClose={() => setSheetFor(null)}
+      />
     </div>
+  );
+}
+
+function QuickAction({
+  icon: Icon,
+  label,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      className="flex h-[34px] items-center gap-[6px] rounded-full border border-brand-border bg-white/40 px-[12px] transition-colors active:bg-white/70"
+    >
+      <Icon className="size-[16px] text-gray-100" />
+      <span className="text-[12px] font-bold text-gray-100">{label}</span>
+    </button>
   );
 }

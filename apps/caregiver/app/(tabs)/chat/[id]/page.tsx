@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
+  CAREGIVER_ID,
   scrollFade,
   ChatBubble,
   IconBox,
@@ -13,38 +14,137 @@ import {
   IconReminder,
   IconRefresh,
   IconProfile,
+  MessageBubble,
+  endsStack,
+  useArrivedIds,
+  SUPABASE_THREAD_FOR_CAREGIVER,
+  acknowledgeMessage,
+  sendMessage,
+  useFamilyMessages,
 } from '@alio/ui';
 import {
   SAMPLE_CHAT_THREADS,
   SAMPLE_CONVERSATIONS,
   type ChatMessage,
 } from '@alio/mock-data';
+import { supabase } from '@/lib/supabase';
+
+const HIGHLIGHT_MS = 1600;
 
 /**
  * Caregiver Chat conversation — Figma: `GC - Chat - conversation` (388:3940).
  * Header with back + avatar + name + online + search, message bubbles
- * (right=me, left=them), quick actions row, input bar.
+ * (right=me, left=them), quick actions row, input bar. Threads with a Supabase
+ * mapping show mock history, then the live thread, where Pending messages
+ * carry Confirm in the bubble.
  */
-export default function ChatConversationPage({ id: propId, onBack }: { id?: string; onBack?: () => void } = {}) {
+export default function ChatConversationPage({
+  id: propId,
+  onBack,
+  focusMessageId,
+}: {
+  id?: string;
+  onBack?: () => void;
+  focusMessageId?: string;
+} = {}) {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const id = propId ?? params?.id ?? '';
   const handleBack = onBack ?? (() => router.back());
 
   const thread = SAMPLE_CHAT_THREADS.find((t) => t.id === id);
-  const initial = SAMPLE_CONVERSATIONS[id] ?? [];
+  const supabaseThreadId = SUPABASE_THREAD_FOR_CAREGIVER[id];
 
-  const [messages, setMessages] = useState<ChatMessage[]>(initial);
+  const [mockMessages, setMockMessages] = useState<ChatMessage[]>(SAMPLE_CONVERSATIONS[id] ?? []);
+  const { messages: live, error, patch, upsert } = useFamilyMessages(
+    supabase,
+    supabaseThreadId ? { by: 'thread', threadId: supabaseThreadId } : null,
+  );
   const [draft, setDraft] = useState('');
+  // Shared banner for both the send path and Confirm below. Every attempt
+  // clears it up front, so a retry never shows a stale message left over
+  // from a different, now-resolved failure.
+  const [sendError, setSendError] = useState('');
 
-  const handleSend = () => {
+  // Jump-to-message from the Pending list: scroll the target bubble into
+  // view once it exists, then highlight it briefly. `live` is a dependency
+  // only so this retries once the realtime load populates the DOM node;
+  // `focusedRef` guards it so the scroll+highlight itself only ever fires
+  // once per target id, not on every subsequent message update.
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const focusedRef = useRef<string | undefined>(undefined);
+  // The thread's scroller, so an arriving message can bring itself into view.
+  const threadRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!focusMessageId || focusedRef.current === focusMessageId) return;
+    const el = document.querySelector(`[data-message-id="${focusMessageId}"]`);
+    if (!el) return;
+    focusedRef.current = focusMessageId;
+    el.scrollIntoView({ block: 'center' });
+    setHighlightedId(focusMessageId);
+  }, [focusMessageId, live]);
+
+  // Messages that turned up after the thread loaded: those animate in, the
+  // history does not.
+  const arrived = useArrivedIds(live);
+
+  // Follow the conversation down as it grows — except while a jumped-to
+  // message is highlighted, when scrolling to the bottom would drag the
+  // caregiver away from the thing they asked to see.
+  useEffect(() => {
+    const el = threadRef.current;
+    if (!el || highlightedId) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    // `highlightedId` is read, not followed: this fires on new messages.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live.length, mockMessages.length]);
+
+  // Clears the highlight on its own clock, independent of the effect above,
+  // so a realtime message arriving mid-highlight can't cancel the fade-out.
+  useEffect(() => {
+    if (!highlightedId) return;
+    const timer = setTimeout(() => setHighlightedId(null), HIGHLIGHT_MS);
+    return () => clearTimeout(timer);
+  }, [highlightedId]);
+
+  const handleSend = async () => {
     const text = draft.trim();
     if (!text) return;
-    setMessages((prev) => [
-      ...prev,
-      { id: `m-${Date.now()}`, sender: 'me', text },
-    ]);
     setDraft('');
+    setSendError('');
+    if (!supabaseThreadId) {
+      setMockMessages((prev) => [...prev, { id: `m-${Date.now()}`, sender: 'me', text }]);
+      return;
+    }
+    try {
+      upsert(
+        await sendMessage(supabase, {
+          threadId: supabaseThreadId,
+          senderId: CAREGIVER_ID,
+          text,
+          needsResponse: false,
+        }),
+      );
+      setSendError('');
+    } catch (e) {
+      console.error(e);
+      setDraft(text);
+      setSendError("Message didn't send. Check your connection and try again.");
+    }
+  };
+
+  const handleConfirm = async (messageId: string) => {
+    setSendError('');
+    const at = new Date();
+    patch(messageId, { acknowledgedAt: at.toISOString() });
+    try {
+      await acknowledgeMessage(supabase, { messageId, userId: CAREGIVER_ID, at });
+      setSendError('');
+    } catch (e) {
+      console.error(e);
+      patch(messageId, { acknowledgedAt: null }, { rollback: true });
+      setSendError("Couldn't confirm. Check your connection and tap Confirm again.");
+    }
   };
 
   return (
@@ -95,15 +195,46 @@ export default function ChatConversationPage({ id: propId, onBack }: { id?: stri
       </header>
 
       {/* Messages — start below header (60+42+27=129), end above quick actions */}
-      <div style={scrollFade(129)} className="absolute bottom-[120px] left-0 right-0 top-0 pt-[129px] overflow-y-auto px-[16px] py-[12px]">
-        {messages.length === 0 ? (
+      <div
+        ref={threadRef}
+        style={scrollFade(129)}
+        className="absolute bottom-[120px] left-0 right-0 top-0 scroll-smooth overflow-y-auto px-[16px] pb-[12px] pt-[141px]"
+      >
+        {/* An unreachable backend must not read as an empty thread. This sits
+            above whatever did load rather than replacing it. */}
+        {error && (
+          <p className="mb-[12px] text-center text-[13px] text-gray-60">
+            {"Couldn't load — check your connection"}
+          </p>
+        )}
+        {!error && mockMessages.length === 0 && live.length === 0 ? (
           <p className="mt-12 text-center text-sm text-gray-60">
             No messages yet — say hi 👋
           </p>
         ) : (
-          <div className="flex flex-col gap-[12px]">
-            {messages.map((m) => (
-              <ChatBubble key={m.id} message={m} />
+          // No container gap: a stack sits tighter than the space between
+          // turns, so every child states its own spacing.
+          <div className="flex flex-col">
+            {mockMessages.map((m) => (
+              <div key={m.id} className="mb-[12px]">
+                <ChatBubble message={m} />
+              </div>
+            ))}
+            {live.map((m, i) => (
+              <div
+                key={m.id}
+                className={`${endsStack(m, live[i + 1]) ? 'mb-[10px] last:mb-0' : 'mb-[2px]'} ${
+                  arrived.has(m.id) ? 'animate-message-in' : ''
+                }`}
+              >
+                <MessageBubble
+                  message={m}
+                  viewerId={CAREGIVER_ID}
+                  onConfirm={handleConfirm}
+                  highlighted={m.id === highlightedId}
+                  showStatus={endsStack(m, live[i + 1])}
+                />
+              </div>
             ))}
           </div>
         )}
@@ -115,6 +246,15 @@ export default function ChatConversationPage({ id: propId, onBack }: { id?: stri
         <QuickAction icon={IconRefresh} label="Status Update" />
         <QuickAction icon={IconProfile} label="Contact" />
       </div>
+
+      {sendError && (
+        <p
+          role="alert"
+          className="absolute bottom-[112px] left-0 right-0 px-[16px] text-center text-[12px] font-bold text-alert"
+        >
+          {sendError}
+        </p>
+      )}
 
       {/* Input row — anchored above tab bar */}
       <div className="absolute bottom-[16px] left-0 right-0 flex items-center gap-[10px] px-[16px]">
@@ -132,7 +272,7 @@ export default function ChatConversationPage({ id: propId, onBack }: { id?: stri
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') handleSend();
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleSend();
             }}
             placeholder=""
             className="flex-1 bg-transparent text-[14px] text-gray-100 placeholder:text-gray-60 outline-none"
@@ -148,7 +288,7 @@ export default function ChatConversationPage({ id: propId, onBack }: { id?: stri
 
         <button
           type="button"
-          aria-label="More actions"
+          aria-label="Send"
           onClick={handleSend}
           className="flex size-[44px] items-center justify-center rounded-[12px] bg-white/70 transition-colors active:bg-white"
         >

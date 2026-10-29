@@ -86,3 +86,20 @@ body::-webkit-scrollbar,
     filter: blur(28px) hue-rotate(0deg);
   }
 }
+
+/* Someone who has asked their system for less motion should get the states
+ * without the movement — every animation here is feedback about something
+ * that happened, never the only way to know it happened. Timings are cut to
+ * near-zero rather than removed, so `forwards` exits still land on their
+ * final frame instead of snapping back mid-unmount.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

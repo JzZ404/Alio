@@ -5,15 +5,6 @@ const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 export const supabase = createClient(url, key);
 
-export interface FamilyMessageRow {
-  id: string;
-  thread_id: string;
-  sender: string;
-  text: string;
-  report_id: string | null;
-  created_at: string;
-}
-
 export type Severity = 'critical' | 'warning' | 'good' | 'none';
 
 export interface ReportFlag {

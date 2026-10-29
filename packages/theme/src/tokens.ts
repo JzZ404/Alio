@@ -53,6 +53,21 @@ export const boxShadow = {
   dock: '0 1px 6px rgba(10, 10, 10, 0.05)',
 } as const;
 
+/**
+ * Pending styling — semantic names over the existing brand palette,
+ * not a new color family. The mockup drew these amber; the brand is purple, so
+ * they resolve to brand values instead.
+ *
+ * Contrast, measured against `surface`: `text` 17.1:1 (AA), the `border` as a
+ * graphic 3.75:1 (above the 3:1 non-text floor). Body copy uses `text`, never
+ * `border` — brand-primary on this surface is only 3.75:1 and fails AA.
+ */
+export const attention = {
+  surface: colors.brand.tint1,
+  border: colors.brand.primary,
+  text: colors.gray[100],
+} as const;
+
 export const fontFamily = {
   sans: ['var(--font-century-gothic)', 'system-ui', 'sans-serif'],
 } as const;

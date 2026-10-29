@@ -66,13 +66,13 @@ policies in `supabase/schema.sql` before any non-prototype use.
      Meds with severity flags)
    - inserts the row into `compiled_reports`
    - returns `{id, report, ...}`
-7. Caregiver chat appends a tappable **"Dorothy's Report"** card. Tap →
+7. Caregiver chat appends a tappable **"Erin's Report"** card. Tap →
    navigates to `/logs/report/[id]`, which fetches the row via
    `/caregiver-logs/report/{id}` and renders the structured cards.
 8. Sarah taps **Send to family**:
    - frontend calls `/format-for-family` (Gemma → plain text)
    - frontend inserts a row into `family_messages` with `report_id` set
-9. The family app's `/chat/[id]` page (Sarah Mitchell thread) is subscribed
+9. The family app's `/chat/[id]` page (Sarah Lee thread) is subscribed
    to `family_messages` via Supabase realtime. The new row arrives, the page
    sees `report_id` is set, fetches `/caregiver-logs/report/{id}`, renders
    the same structured cards inline in the chat thread.
@@ -139,7 +139,7 @@ Raw transcript + per-log Gemma summary, one row per Save tap.
 |---|---|---|
 | `id` | uuid | pk |
 | `caregiver_id` | text | hardcoded `'caregiver-001'` for prototype |
-| `patient_id` | text | hardcoded `'dorothy-chen'` for prototype |
+| `patient_id` | text | hardcoded `'erin-yeung'` for prototype |
 | `visit_date` | date | sent explicitly from the client (defaults are bypassed by supabase-js) |
 | `transcript` | text | what the caregiver said |
 | `summary` | text \| null | from `/summarize` |
@@ -169,22 +169,47 @@ supabase_realtime add table family_messages`).
 |---|---|---|
 | `id` | uuid | pk |
 | `thread_id` | text | derived as `${caregiver_id}__${patient_id}` for the Sarah↔Janet thread |
-| `sender` | text | "Sarah Mitchell" |
+| `sender` | text | display name, e.g. "Sarah Lee" |
+| `sender_id` / `recipient_id` | text \| null | `'caregiver-001'` / `'janet-chen'` for the live thread; null on rows from other writers |
+| `final_tier` | text \| null | `'action'` = the sender marked it **Pending**. Only this drives Pending surfaces |
+| `tagged_by` | text \| null | `'sender_manual'` today; `'sender_confirmed_ai'` once suggestions ship |
+| `suggested_tier` / `suggested_by` | text \| null | model output — never drives Pending. Reserved for the suggestion plan |
+| `acknowledged_at` / `acknowledged_by` | timestamptz / text \| null | set by **Confirm** |
+| `followup_sent_at` | timestamptz \| null | reserved for the timeout follow-up plan |
 | `text` | text | plain-text body (Gemma-formatted for report messages) |
 | `report_id` | uuid \| null | when present, family chat renders ReportCard instead of ChatBubble |
 | `created_at` | timestamptz | default `now()` |
 
-Row-level security on all three tables is `using (true)` / `with check
-(true)` — anyone with the anon key can read and insert. Tighten before
-production.
+All three caregiver Pending surfaces — the Pending screen, the two Inbox
+summary cards above the thread list, and the Home bell's badge — are one query,
+`recipient_id = me and final_tier = 'action' and acknowledged_at is null`,
+**newest first** (reversed 2026-09-17; the longest wait is surfaced by the
+`Oldest: 5h` header and each card's waiting pill instead of by ordering). It is
+backed by `family_messages_pending_idx`.
+
+They read it through a single hook, `apps/caregiver/lib/use-caregiver-pending.ts`,
+which merges those live rows with the demo fixtures in `pending-fixtures.ts` and
+re-sorts both through the shared selectors in
+`packages/ui/src/messaging/pending.ts`. One merge, not one per screen, so the
+bell can never disagree with the screen it opens. See
+`docs/superpowers/specs/2026-09-15-pending-confirmations-design.md`.
+
+Updates from the browser are narrower than reads. The anon key may set the
+confirmation columns, set `final_tier`/`tagged_by` once on an untagged message,
+and record a model suggestion — nothing else, and never backwards. A policy
+cannot compare old to new, so the rule lives in the
+`family_messages_guard_update` trigger, which skips itself for trusted
+server-side roles (`supabase/schema.sql`, part 3). Everything else is `using
+(true)` / `with check (true)`: anyone with the anon key can read and insert.
+Tighten before production.
 
 ## Identity (current state)
 
 There is no auth yet. The frontend hardcodes:
 - `caregiver_id = 'caregiver-001'` (matches `SAMPLE_CG_USER` in mock-data)
-- Active patient comes from `SAMPLE_PATIENTS[0]` (`'dorothy-chen'`)
+- Active patient comes from `SAMPLE_PATIENTS[0]` (`'erin-yeung'`)
 - Family thread `sarah-caregiver` is mapped to Supabase thread_id
-  `caregiver-001__dorothy-chen` in `apps/family/.../chat/[id]/page.tsx`'s
+  `caregiver-001__erin-yeung` in `apps/family/.../chat/[id]/page.tsx`'s
   `SUPABASE_THREAD_FOR` constant
 
 To add a second caregiver/patient pair: extend `SAMPLE_PATIENTS`, add an
@@ -235,6 +260,8 @@ producing a result, the chunk poller activates automatically (watchdog).
 - **No multi-day report compilation.** `compile` filters
   `visit_date = current_date`. Add a date param for "compile yesterday's
   visit".
-- **No tests yet.** The Gemma repo has pytest tests for the report module
-  (`tests/test_report.py` etc.); those would port over to `backend/tests/`
-  with minor import tweaks.
+- **Thin test coverage.** `backend/tests/test_report.py` (8 tests, ported from
+  the Gemma repo — save/load/list, transcription, summarization) and
+  `backend/children/tests/test_chat.py` (13 tests) are the whole suite: run
+  `pytest` from `backend/`. `medical_ai.py` — compile, triage, lab
+  interpretation — has none.

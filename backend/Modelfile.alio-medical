@@ -1,4 +1,26 @@
-FROM C:\Users\aaron\.ollama\models\blobs\sha256-af758274d0eeb30f7dea3c7dc97f41d805e2f8ba1c1a138995df909a9f3224a5
+# Alio's fine-tuned medical model, for Ollama.
+#
+# Build it with:
+#
+#   ollama create alio-medical -f backend/Modelfile.alio-medical
+#
+# That registers it locally under the short name `alio-medical`, which is what
+# OLLAMA_MODEL defaults to in medical_ai.py — so nothing else needs configuring.
+# The first build downloads ~3.4 GB from HuggingFace and takes a few minutes.
+#
+# Then switch the backend over by adding this to backend/.env:
+#
+#   USE_LOCAL_OLLAMA=1
+#
+# See backend/README.md → "Running on the fine-tuned model" for the whole
+# procedure, including how to confirm it is actually being used.
+#
+# FROM names the published artifact rather than a file path. An earlier version
+# of this file pointed at a .ollama blob inside one teammate's Windows home
+# directory, which meant it only worked on that one machine. If you ever need a
+# local GGUF instead, point FROM at the file — but do not commit that.
+
+FROM hf.co/aarony630/alio-medical:Q4_K_M
 
 PARAMETER temperature 0.4
 PARAMETER top_p 0.9

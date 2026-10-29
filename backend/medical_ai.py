@@ -113,11 +113,19 @@ def interpret_lab_text(extracted_text: str) -> dict:
 
 
 # ── Image OCR for lab report photos (snapped on a phone, scanned, etc.) ──
-# Uses the hosted Gemma 4 31B for the *vision* step; the medical interpretation
-# still runs locally via _call_gemma → Ollama. So PHI for the image OCR DOES go
-# to Google's API briefly, but the reasoning stays on-device. For fully offline
-# image input, swap this for Tesseract or the local Gemma 4 multimodal projector
-# via llama-mtmd-cli.
+# The *vision* step always uses hosted Gemma 4 31B, whatever USE_LOCAL_OLLAMA
+# says — there is no local multimodal path here. So a lab photo always reaches
+# Google's API.
+#
+# What the reasoning step does depends on the flag, and the default is off:
+#   USE_LOCAL_OLLAMA unset → both OCR and interpretation go to Google
+#   USE_LOCAL_OLLAMA=1     → OCR goes to Google, interpretation stays local
+#
+# (This comment used to describe only the second case, which read as a promise
+# that reasoning was on-device. It is not, unless the flag is set.)
+#
+# For fully offline image input, swap this for Tesseract or the local Gemma 4
+# multimodal projector via llama-mtmd-cli.
 
 _VISION_MODEL = os.environ.get("VISION_MODEL", "models/gemma-4-31b-it")
 
